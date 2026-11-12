@@ -219,6 +219,9 @@ private:
 	bool bIsSimulatingInEditor = false;
 
 	void ResetSceneSelection();
+	void CopySelectedActor();
+	void PasteActor();
+	TUniquePtr<AActor> ActorClipboard;
 
 	void CreateNewScene();
 	void OpenScene();

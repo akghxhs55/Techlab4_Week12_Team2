@@ -461,6 +461,7 @@ Tools/SnowMountain/build_snow_mountain.py
 
 # All generated projects, headers, caches, user state and packages live here.
 **/Build/
+**/Logs/
 # Setup/Build contains source-controlled build tools, not generated output.
 !/Setup/Build/
 !/Setup/Build/premake5.exe

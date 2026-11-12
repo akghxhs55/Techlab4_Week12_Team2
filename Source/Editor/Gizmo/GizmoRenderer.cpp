@@ -22,6 +22,7 @@ bool FGizmoRenderer::Init(FRenderer* InRenderer)
 	RotationMesh = UAssetManager::GetAssetByPath<UStaticMesh>("Ring");
 	ScaleMesh = UAssetManager::GetAssetByPath<UStaticMesh>("ScaleBar");
 	SphereMesh = UAssetManager::GetAssetByPath<UStaticMesh>("GizmoSphere");
+	PlaneHandleMesh = UAssetManager::GetAssetByPath<UStaticMesh>("Cube");
 
 	CB = RenderCommand::CreateConstantBuffer(sizeof(FGizmoData));
 
@@ -97,6 +98,27 @@ void FGizmoRenderer::OnRender(
 			: AxisDataArray[i].Color;
 
 		DrawMesh(AxisMesh, Data);
+	}
+
+	if (Gizmo.GetMode() == EGizmoMode::Location && PlaneHandleMesh)
+	{
+		for (int Normal = 0; Normal < 3; ++Normal)
+		{
+			const FVector U = Gizmo.GetAxisDirection((Normal + 1) % 3);
+			const FVector V = Gizmo.GetAxisDirection((Normal + 2) % 3);
+			FMatrix World = FMatrix::Identity;
+			for (int Axis = 0; Axis < 3; ++Axis)
+			{
+				const FVector Direction = Gizmo.GetAxisDirection(Axis) * (Axis == Normal ? 0.015f : 0.35f);
+				World.M[Axis][0] = Direction.X; World.M[Axis][1] = Direction.Y; World.M[Axis][2] = Direction.Z;
+			}
+			const FVector Center = GizmoLocation + (U + V) * 0.475f;
+			World.M[3][0] = Center.X; World.M[3][1] = Center.Y; World.M[3][2] = Center.Z;
+			FGizmoData Data{};
+			Data.World = World; Data.ViewProj = ViewProj;
+			Data.Color = HoveredAxis == Normal + 3 ? FVector4(1, 1, 0, 1) : AxisDataArray[Normal].Color;
+			DrawMesh(PlaneHandleMesh, Data);
+		}
 	}
 
 	if (Gizmo.GetMode() != EGizmoMode::Rotation)

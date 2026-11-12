@@ -7,6 +7,7 @@
 #include "Launch/LaunchEngineLoop.h"
 #include "Core/StatOverlay.h"
 #include "Input/InputSystem.h"
+#include "Input/GameKeyboardInput.h"
 
 #include "Render/GeometryGenerator.h"
 
@@ -185,15 +186,7 @@ void UEditorEngine::TickPIEInput(float DeltaTime)
 		GameViewport.LostFocus();
 		return;
 	}
-	constexpr EKeyCode Keys[] = { EKeyCode::W, EKeyCode::A, EKeyCode::S, EKeyCode::D,
-		EKeyCode::Space, EKeyCode::Shift };
-	for (EKeyCode Key : Keys)
-	{
-		if (FInputSystem::IsKeyPressed(Key))
-			GameViewport.InputKey(nullptr, static_cast<int32>(Key), true);
-		if (FInputSystem::IsKeyReleased(Key))
-			GameViewport.InputKey(nullptr, static_cast<int32>(Key), false);
-	}
+	DispatchGameKeyboardInput([&](int32 Key, bool bDown) { GameViewport.InputKey(nullptr, Key, bDown); });
 
 	// UI 히트 테스트용 마우스 좌표 → 게임 렌더 타깃 기준
 	if (IsPIEInWindow())

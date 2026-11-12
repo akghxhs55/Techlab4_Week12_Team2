@@ -87,14 +87,17 @@ void USceneComponent::SetupAttachment(USceneComponent* InParent, EAttachmentRule
 
 	if (Rule == EAttachmentRule::KeepWorld)
 	{
-		FMatrix WorldMatrix = GetWorldMatrix();
+		FTransform WorldTransform(GetWorldRotation(), GetWorldLocation(), GetWorldScale3D());
 		DetachFromParent(Rule);
 		AttachParent = InParent;
 		if (AttachParent)
 		{
 			AttachParent->AttachChildren.Add(this);
 		}
-		SetWorldTransform(WorldMatrix, false);
+		const FTransform ParentTransform = AttachParent
+            ? FTransform(AttachParent->GetWorldRotation(), AttachParent->GetWorldLocation(), AttachParent->GetWorldScale3D())
+            : FTransform::Identity;
+        SetTransform(WorldTransform.GetRelativeTransform(ParentTransform));
 	}
 	else
 	{
@@ -122,7 +125,7 @@ void USceneComponent::DetachFromParent(EAttachmentRule Rule)
 
 	if (Rule == EAttachmentRule::KeepWorld)
 	{
-		FMatrix WorldMatrix = GetWorldMatrix();
+		FTransform WorldTransform(GetWorldRotation(), GetWorldLocation(), GetWorldScale3D());
 		TArray<USceneComponent*>& Siblings = AttachParent->AttachChildren;
 		for (uint32 i = 0;i < Siblings.Num(); ++i)
 		{
@@ -133,7 +136,7 @@ void USceneComponent::DetachFromParent(EAttachmentRule Rule)
 			}
 		}
 		AttachParent = nullptr;
-		SetWorldTransform(WorldMatrix, false);
+		SetTransform(WorldTransform);
 	}
 	else
 	{
@@ -331,6 +334,7 @@ void USceneComponent::MarkTransformDirty()
 
 void USceneComponent::Serialize(FStructuredArchive::FRecord Record)
 {
+    FTransform SavedWorldTransform(GetWorldRotation(), GetWorldLocation(), GetWorldScale3D());
 	Super::Serialize(Record);   // UActorComponent: Owner까지 처리됨
 
 	FArchive& Ar = Record.GetUnderlyingArchive();
@@ -340,16 +344,28 @@ void USceneComponent::Serialize(FStructuredArchive::FRecord Record)
 		Record << SA_VALUE("AttachParent", ParentObj);
 		AttachParent = static_cast<USceneComponent*>(ParentObj);
 
-		int32 Num = AttachChildren.Num();
-		FStructuredArchive::FArray ChildArray = Record.EnterArray("AttachChildren", Num);
-		if (Ar.IsLoading())
-			AttachChildren.SetNum(Num);
-		for (int32 i = 0; i < Num; ++i)
-		{
-			UObject* Obj = AttachChildren[i];
-			ChildArray.EnterElement() << Obj;
-			AttachChildren[i] = static_cast<USceneComponent*>(Obj);
-		}
+        const bool bPIE = Ar.HasAnyPortFlags(EPropertyPortFlags::PPF_DuplicateForPIE);
+        FTransform WorldTransform = SavedWorldTransform;
+        if (!bPIE) Record << SA_VALUE("DetachedWorldTransform", WorldTransform);
+        TArray<USceneComponent*> SavedChildren;
+        if (Ar.IsSaving())
+            for (USceneComponent* Child : AttachChildren)
+                if (bPIE || (Child && Child->GetOuter() == GetOuter())) SavedChildren.Add(Child);
+        int32 Num = SavedChildren.Num();
+        FStructuredArchive::FArray ChildArray = Record.EnterArray("AttachChildren", Num);
+        if (Ar.IsLoading()) AttachChildren.SetNum(Num);
+        for (int32 i = 0; i < Num; ++i)
+        {
+            UObject* Obj = Ar.IsSaving() ? SavedChildren[i] : nullptr;
+            ChildArray.EnterElement() << Obj;
+            if (Ar.IsLoading()) AttachChildren[i] = static_cast<USceneComponent*>(Obj);
+        }
+        if (Ar.IsLoading() && !bPIE && AttachParent && AttachParent->GetOuter() != GetOuter())
+        {
+            // A standalone actor copy is independent of the original actor's parent.
+            AttachParent = nullptr;
+            SetTransform(WorldTransform);
+        }
 	}
 }
 

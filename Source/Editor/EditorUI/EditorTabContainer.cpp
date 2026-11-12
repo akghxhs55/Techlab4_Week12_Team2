@@ -63,6 +63,7 @@ void FEditorTabContainer::ActivateTab(IEditorTab* Tab)
 	{
 		if (Existing == Tab)
 		{
+			Tab->SetOpen(true);
 			PendingActivation = Tab;
 			return;
 		}
@@ -119,6 +120,10 @@ void FEditorTabContainer::DrawMainMenuBar()
 			{
 				DrawTabMenu(*MainSelectedTab);
 			}
+			else
+			{
+				DrawEditorTabsMenu();
+			}
 		};
 	if (EditorTitleBar::DrawMenuBar(DrawMenus))
 	{
@@ -174,6 +179,12 @@ void FEditorTabContainer::DrawTabs()
 
 	for (IEditorTab* Tab : Tabs)
 	{
+		if (!Tab->IsOpen())
+		{
+			if (FocusedTab == Tab)
+				FocusedTab = nullptr;
+			continue;
+		}
 		const bool bCanDetach = Tab->CanDetach();
 		ImGui::SetNextWindowClass(&TabClass);
 		ImGui::SetNextWindowDockID(DockSpaceId, bCanDetach ? ImGuiCond_FirstUseEver : ImGuiCond_Always);
@@ -270,27 +281,42 @@ void FEditorTabContainer::DrawTabMenu(IEditorTab& Tab)
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
 			Tab.DrawMenuBar();
-			// 패널 목록에 이어 모든 에디터 탭에서 같은 열린 에디터 목록을 제공한다.
-			if (ImGui::BeginMenu("Window"))
-			{
-				ImGui::SeparatorText("Open Editors");
-				for (IEditorTab* OpenTab : Tabs)
-				{
-					bool bClosing = false;
-					for (IEditorTab* ClosingTab : PendingCloseTabs)
-						bClosing |= ClosingTab == OpenTab;
-					if (bClosing) continue;
-					ImGui::PushID(OpenTab);
-					if (ImGui::MenuItem(OpenTab->GetTabName(), nullptr, OpenTab == &Tab))
-						ActivateTab(OpenTab);
-					ImGui::PopID();
-				}
-				ImGui::EndMenu();
-			}
+			DrawEditorTabsMenu();
 			ImGui::PopStyleVar(2);
 		}
 		ImGui::PopID();
 	}
+}
+
+void FEditorTabContainer::DrawEditorTabsMenu()
+{
+	if (!ImGui::BeginMenu("Window"))
+		return;
+
+	ImGui::SeparatorText("Editors");
+	if (DrawEditorLaunchers)
+		DrawEditorLaunchers();
+	ImGui::SeparatorText("Editor Tabs");
+	for (IEditorTab* Tab : Tabs)
+	{
+		bool bClosing = false;
+		for (IEditorTab* ClosingTab : PendingCloseTabs)
+			bClosing |= ClosingTab == Tab;
+		if (bClosing)
+			continue;
+
+		ImGui::PushID(Tab);
+		if (ImGui::MenuItem(Tab->GetTabName(), nullptr, Tab->IsOpen()))
+		{
+			Tab->SetOpen(!Tab->IsOpen());
+			if (Tab->IsOpen())
+				ActivateTab(Tab);
+			else if (PendingActivation == Tab)
+				PendingActivation = nullptr;
+		}
+		ImGui::PopID();
+	}
+	ImGui::EndMenu();
 }
 
 void FEditorTabContainer::OnRender(bool bPassthruCentralNode)

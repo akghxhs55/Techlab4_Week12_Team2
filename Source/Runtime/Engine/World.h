@@ -41,6 +41,7 @@ public:
 	// UE는 선을 쌓아 두면 씬과 함께 그려지지만, 이 엔진은 쓰는 쪽이 BeginFrame, Add..., OnRender 순서로 직접 그린다.
 	TUniquePtr<FLineBatcher> LineBatcher;
 	/*UPrimitiveComponent* SpawnPrimitive(FClass* Class);*/
+	AActor* DuplicateActor(AActor* Source);
 	AActor* SpawnActor(UClass* Class, FName InName = NAME_None, const FTransform* Transform = nullptr);
 	
 	static bool AreAABBsOverlapping(const FBox& A, const FBox& B)

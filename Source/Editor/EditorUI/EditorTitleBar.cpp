@@ -86,9 +86,9 @@ namespace
 		}
 
 		const ImU32 Color = ImGui::GetColorU32(ImGuiCol_Text);
-		const float Thickness = ImMax(1.0f, ImFloor(ImGui::GetStyle().FontScaleDpi));
+		const float Thickness = ImMax(1.0f, EditorStyle::Scale(1.0f));
 		// 아이콘 크기는 버튼 높이에 비례시켜 DPI 배율을 따라간다.
-		const float Half = ImFloor(Size.y * 0.15f);
+		const float Half = ImFloor(Size.y * 0.22f);
 		const ImVec2 Center(ImFloor((Min.x + Max.x) * 0.5f) + 0.5f, ImFloor((Min.y + Max.y) * 0.5f) + 0.5f);
 
 		switch (Kind)
@@ -200,7 +200,7 @@ void EditorTitleBar::Draw()
 			ImVec2(GLogoColumnMaxX - Inset, Bar.Max.y - Inset));
 	}
 
-	const ImVec2 ButtonSize(ImFloor(Height * 1.4f), Height);
+	const ImVec2 ButtonSize(ImFloor(Height * 1.7f), Height);
 	const float ButtonsMinX = Bar.Max.x - ButtonSize.x * 3.0f;
 	// 메뉴는 이 프레임 뒤쪽(DrawMenuBar)에서 그리므로 직전 프레임의 메뉴 끝을 쓴다.
 	const float MenusMaxX = ImMax(GLogoColumnMaxX, GMenusMaxX);

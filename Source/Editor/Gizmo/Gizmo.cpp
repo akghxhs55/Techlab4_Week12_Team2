@@ -86,6 +86,29 @@ int FGizmo::PickLinearAxis(const FVector2& MousePos, const FMatrix& ViewProj, in
 	FVector2 d = MousePos - Center;
 	if (sqrtf(d.X * d.X + d.Y * d.Y) < 15.0f)
 		return AXIS_SCREEN;
+	if (Mode == EGizmoMode::Location)
+	{
+		// Pick the same projected quad that is rendered for each plane handle.
+		const auto Cross2 = [](const FVector2& A, const FVector2& B) { return A.X * B.Y - A.Y * B.X; };
+		for (int Normal = 0; Normal < 3; ++Normal)
+		{
+			const FVector U = GetAxisDirection((Normal + 1) % 3);
+			const FVector V = GetAxisDirection((Normal + 2) % 3);
+			FVector2 Points[4] = {
+				WorldToScreen(Origin + U * 0.3f + V * 0.3f, ViewProj, ScreenW, ScreenH),
+				WorldToScreen(Origin + U * 0.65f + V * 0.3f, ViewProj, ScreenW, ScreenH),
+				WorldToScreen(Origin + U * 0.65f + V * 0.65f, ViewProj, ScreenW, ScreenH),
+				WorldToScreen(Origin + U * 0.3f + V * 0.65f, ViewProj, ScreenW, ScreenH) };
+			if (fabsf(Cross2(Points[1] - Points[0], Points[3] - Points[0])) < 16.0f) continue;
+			bool Positive = false, Negative = false;
+			for (int Edge = 0; Edge < 4; ++Edge)
+			{
+				const float Side = Cross2(Points[(Edge + 1) % 4] - Points[Edge], MousePos - Points[Edge]);
+				Positive |= Side > 0.0f; Negative |= Side < 0.0f;
+			}
+			if (!(Positive && Negative)) return AXIS_PLANE_YZ + Normal;
+		}
+	}
 
 	int Best = -1;
 	float BestDist = HitPixels;
@@ -231,7 +254,11 @@ void FGizmo::BeginDrag(int Axis, const FRay& MouseRay, const FVector2& MousePos)
 	DragAxisDirection = GetAxisDirection(Axis);
 	FVector axis = DragAxisDirection;
 
-	if (Axis == AXIS_SCREEN)
+	if (Mode == EGizmoMode::Location && Axis >= AXIS_PLANE_YZ && Axis <= AXIS_PLANE_XY)
+	{
+		DragPlaneNormal = GetAxisDirection(Axis - AXIS_PLANE_YZ);
+	}
+	else if (Axis == AXIS_SCREEN)
 	{
 		if (Mode == EGizmoMode::Rotation)
 		{
@@ -276,6 +303,12 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 		return;
 
 	FVector current = MouseRay.Origin + MouseRay.Direction * t;
+	if (Mode == EGizmoMode::Location && DraggingAxis >= AXIS_PLANE_YZ && DraggingAxis <= AXIS_PLANE_XY)
+	{
+		const FVector Delta = current - DragStartPoint;
+		Target->SetWorldLocation(DragStartLocation + Delta - DragPlaneNormal * Delta.Dot(DragPlaneNormal), false);
+		return;
+	}
 
 	if (DraggingAxis == AXIS_SCREEN && Mode != EGizmoMode::Rotation)
 	{

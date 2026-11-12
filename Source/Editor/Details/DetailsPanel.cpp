@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/HitoriEd/EditorHierarchy.h"
 #include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/Details/DetailsPanel.h"
 #include "Editor/Details/PropertyEditor.h"
@@ -1413,16 +1414,38 @@ namespace
 			TArray<UClass*> Classes;
 			GetDerivedClasses(UActorComponent::StaticClass(), Classes);
 			std::sort(Classes.begin(), Classes.end(), [](const UClass* A, const UClass* B) { return A->Name < B->Name; });
-			for (UClass* Class : Classes)
-			{
-				//if (!IsSpawnableComponent(Class)) continue;
-				if (ImGui::MenuItem(Class->Name.c_str()))
-				{
-					OutSelectedComponent = Actor->AddComponent(Class, FString(ComponentNameInputBuf));
-					ComponentNameInputBuf[0] = '\0';
-					ImGui::CloseCurrentPopup();
-				}
-			}
+            const auto Category = [](const UClass* Class) -> const char*
+            {
+                const FString& Name = Class->Name;
+                if (Name.find("Light") != FString::npos || Name.find("Fog") != FString::npos) return "Lighting";
+                if (Name.find("Camera") != FString::npos || Name.find("SpringArm") != FString::npos) return "Camera";
+                if (Name.find("Audio") != FString::npos) return "Audio";
+                if (Name.find("Movement") != FString::npos) return "Movement";
+                if (Name.find("Collision") != FString::npos || Name.find("Shape") != FString::npos ||
+                    Name.find("Box") != FString::npos || Name.find("Sphere") != FString::npos || Name.find("Capsule") != FString::npos) return "Collision";
+                if (Name.find("Mesh") != FString::npos || Name.find("Render") != FString::npos ||
+                    Name.find("Particle") != FString::npos || Name.find("Decal") != FString::npos || Name.find("Billboard") != FString::npos) return "Rendering";
+                if (Name.find("Script") != FString::npos) return "Scripting";
+                return "Common";
+            };
+            const char* Categories[] = { "Common", "Rendering", "Lighting", "Camera", "Collision", "Movement", "Audio", "Scripting" };
+            for (const char* Group : Categories)
+            {
+                bool HasClasses = false;
+                for (UClass* Class : Classes) if (strcmp(Category(Class), Group) == 0) HasClasses = true;
+                if (!HasClasses || !ImGui::BeginMenu(Group)) continue;
+                for (UClass* Class : Classes)
+                {
+                    if (strcmp(Category(Class), Group) != 0) continue;
+                    if (ImGui::MenuItem(Class->Name.c_str()))
+                    {
+                        OutSelectedComponent = Actor->AddComponent(Class, FString(ComponentNameInputBuf));
+                        ComponentNameInputBuf[0] = '\0';
+                        ImGui::CloseCurrentPopup();
+                    }
+                }
+                ImGui::EndMenu();
+            }
 			ImGui::EndPopup();
 		}
 	}
@@ -1632,23 +1655,42 @@ void FDetailsPanel::DrawCompoenetList(AActor* SelectedActor, UActorComponent*& O
 		PendingDroppedComponent = nullptr;
 	}
 
-	USceneComponent* Root = SelectedActor->GetRootComponent();
+    if (PendingRootComponent)
+    {
+        USceneComponent* NewRoot = PendingRootComponent;
+        PendingRootComponent = nullptr;
+        if (SelectedActor->MakeRootComponent(NewRoot))
+        {
+            OutSelectedComponent = NewRoot;
+            if (Callback) Callback(NewRoot);
+        }
+    }
+    USceneComponent* Root = SelectedActor->GetRootComponent();
 
-	if (Root && ImGui::CollapsingHeader("Components", ImGuiTreeNodeFlags_DefaultOpen))
-	{
-		DrawSceneComponentNode(Root, Root, OutSelectedComponent);
-	}
-
-	ImGui::Separator();
+    const bool bExpanded = ImGui::CollapsingHeader("Components", ImGuiTreeNodeFlags_DefaultOpen);
+    if (ImGui::BeginDragDropTarget())
+    {
+        USceneComponent* Child = nullptr;
+        if (const auto* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Component))
+            Child = *static_cast<USceneComponent* const*>(Payload->Data);
+        if (const auto* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Actor))
+            Child = (*static_cast<AActor* const*>(Payload->Data))->GetRootComponent();
+        if (EditorHierarchy::CanAttach(Child, Root)) { PendingDroppedComponent = Child; PendingDragComponent = Root; }
+        ImGui::EndDragDropTarget();
+    }
+    if (!bExpanded) return;
+    if (Root) DrawSceneComponentNode(Root, Root, OutSelectedComponent);
+    bool bNeedsSeparator = Root && !Root->IsHiddenInDetails();
 
 	// Draw ActorComponent
 	for (UActorComponent* ActorComp : SelectedActor->GetComponents())
 	{
-		if (!ActorComp || Cast<USceneComponent>(ActorComp))
+		if (!ActorComp || ActorComp->IsHiddenInDetails() || Cast<USceneComponent>(ActorComp))
 		{
 			continue;
 		}
 
+        if (bNeedsSeparator) { ImGui::Separator(); bNeedsSeparator = false; }
 		ImGui::PushID(ActorComp);
 		ImGuiTreeNodeFlags Flags = ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen | ImGuiTreeNodeFlags_SpanAvailWidth;
 		if (ActorComp == OutSelectedComponent)
@@ -1667,13 +1709,16 @@ void FDetailsPanel::DrawCompoenetList(AActor* SelectedActor, UActorComponent*& O
 			OutSelectedComponent = ActorComp;
 		}
 
-		if (ImGui::BeginPopupContextItem("Component Context"))
-		{
-			if (ImGui::MenuItem("Delete", nullptr, false, ActorComp != Root))
+        bool Rename = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+        if (ImGui::BeginPopupContextItem("Component Context"))
+        {
+            if (ImGui::MenuItem("Rename", "F2")) Rename = true;
+            if (ImGui::MenuItem("Delete", nullptr, false, ActorComp != Root))
 				PendingDeleteComponent = ActorComp;
 			ImGui::EndPopup();
 		}
 
+		DrawComponentNameEditor(ActorComp, OutSelectedComponent, Rename);
 		const FString ClassName = std::format("({})", ActorComp->GetClass()->Name);
 		const float TextX = RowStart.x + RowWidth - ImGui::CalcTextSize(ClassName.c_str()).x;
 		ImGui::GetWindowDrawList()->AddText(ImVec2(TextX, RowStart.y), IM_COL32(200, 200, 200, 255), ClassName.c_str());
@@ -1692,7 +1737,7 @@ void FDetailsPanel::DrawSceneComponentNode(USceneComponent* Component, USceneCom
 	TArray<USceneComponent*> Children;
 	for (USceneComponent* Child : Component->GetAttachChildren())
 	{
-		if (Child && !Child->IsHiddenInDetails())
+		if (Child && Child->GetOwner() == Component->GetOwner() && !Child->IsHiddenInDetails())
 		{
 			Children.Add(Child);
 		}
@@ -1723,9 +1768,10 @@ void FDetailsPanel::DrawSceneComponentNode(USceneComponent* Component, USceneCom
 	USceneComponent* DragComponent = Component;
 
 	// source: Root 제외, 현재 Component를 payload에 담음
-	if (Component != Root && ImGui::BeginDragDropSource())
+	if (EditingNameComponent != Component && ImGui::BeginDragDropSource())
 	{
 		ImGui::SetDragDropPayload(EditorDragDrop::Component, &Component, sizeof(USceneComponent*));
+        ImGui::TextUnformatted(Component->GetName().c_str());
 		ImGui::EndDragDropSource();
 	}
 	// target: 모든 행이 가능, payload를 받아 현재 Component를 부모로 사용
@@ -1734,68 +1780,34 @@ void FDetailsPanel::DrawSceneComponentNode(USceneComponent* Component, USceneCom
 		if (const ImGuiPayload* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Component))
 		{
 			USceneComponent* DroppedComponent = *static_cast<USceneComponent**>(Payload->Data);
-			PendingDroppedComponent = DroppedComponent;
-			PendingDragComponent = DragComponent;
+            if (EditorHierarchy::CanAttach(DroppedComponent, DragComponent))
+            { PendingDroppedComponent = DroppedComponent; PendingDragComponent = DragComponent; }
 		}
-		ImGui::EndDragDropTarget();
-	}
+        if (const auto* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Actor))
+        {
+            auto* Dropped = (*static_cast<AActor* const*>(Payload->Data))->GetRootComponent();
+            if (EditorHierarchy::CanAttach(Dropped, Component))
+            { PendingDroppedComponent = Dropped; PendingDragComponent = Component; }
+        }
+        ImGui::EndDragDropTarget();
+    }
 
-	if (!bIsEditingName)
-	{
-		if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
-			OutSelectedComponent = Component;
-
-		if (Component != Root && ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-		{
-			EditingNameComponent = Component;
-			strncpy_s(ComponentNameEditBuffer, sizeof(ComponentNameEditBuffer), Component->GetName().c_str(), _TRUNCATE);
-			bFocusNameEdit = true;
-		}
-
-		if (ImGui::BeginPopupContextItem("Component Context"))
-		{
-			if (ImGui::MenuItem("Delete", nullptr, false, Component != Root))
-				PendingDeleteComponent = Component;
-			ImGui::EndPopup();
-		}
-
-		const FString ClassName = std::format("({})", Component->GetClass()->Name);
-		const float TextX = RowStart.x + RowWidth - ImGui::CalcTextSize(ClassName.c_str()).x;
-		ImGui::GetWindowDrawList()->AddText(ImVec2(TextX, RowStart.y), IM_COL32(200, 200, 200, 255), ClassName.c_str());
-	}
-	else
-	{
-		ImGui::SameLine();
-		if (bFocusNameEdit)
-		{
-			ImGui::SetKeyboardFocusHere();
-			bFocusNameEdit = false;
-		}
-
-		const bool bConfirmed = ImGui::InputText("Rename", ComponentNameEditBuffer,
-			sizeof(ComponentNameEditBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
-		const bool bCancelled = ImGui::IsItemActive() && ImGui::IsKeyPressed(ImGuiKey_Escape);
-		const bool bFinished = bConfirmed || ImGui::IsItemDeactivatedAfterEdit();
-		if (bCancelled || bFinished)
-		{
-			if (!bCancelled && ComponentNameEditBuffer[0] != '\0')
-			{
-				FName NewName(ComponentNameEditBuffer);
-				AActor* Owner = Component->GetOwner();
-
-				UActorComponent* Existing = Owner->FindComponentByName(NewName);
-				if (!Existing)
-				{
-					Component->SetName(FName(ComponentNameEditBuffer));
-				}
-				else
-				{
-					HTR_LOG(Warning, "A component with this name already exists in this Actor.");
-				}
-			}
-			EditingNameComponent = nullptr;
-		}
-	}
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) OutSelectedComponent = Component;
+    bool Rename = (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left));
+    if (ImGui::BeginPopupContextItem("Component Context"))
+    {
+        if (ImGui::MenuItem("Rename", "F2")) Rename = true;
+        if (ImGui::MenuItem("Make Root Component", nullptr, false, Component != Root)) PendingRootComponent = Component;
+        if (ImGui::MenuItem("Delete", nullptr, false, Component != Root)) PendingDeleteComponent = Component;
+        ImGui::EndPopup();
+    }
+    DrawComponentNameEditor(Component, OutSelectedComponent, Rename);
+    if (EditingNameComponent != Component)
+    {
+        const FString ClassName = std::format("({})", Component->GetClass()->Name);
+        const float TextX = RowStart.x + RowWidth - ImGui::CalcTextSize(ClassName.c_str()).x;
+        ImGui::GetWindowDrawList()->AddText(ImVec2(TextX, RowStart.y), IM_COL32(200, 200, 200, 255), ClassName.c_str());
+    }
 
 	if (bOpen && !bIsLeaf)
 	{
@@ -1809,14 +1821,37 @@ void FDetailsPanel::DrawSceneComponentNode(USceneComponent* Component, USceneCom
 	ImGui::PopID();
 }
 
+void FDetailsPanel::DrawComponentNameEditor(UActorComponent* Component, UActorComponent*& Selected, bool bRequested)
+{
+    const bool bF2 = Component == Selected && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) &&
+        !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_F2, false);
+    if (bRequested || bF2)
+    {
+        Selected = Component;
+        EditingNameComponent = Component;
+        strncpy_s(ComponentNameEditBuffer, Component->GetName().c_str(), _TRUNCATE);
+        bFocusNameEdit = true;
+    }
+    if (EditingNameComponent != Component) return;
+    if (bFocusNameEdit) { ImGui::SetKeyboardFocusHere(); bFocusNameEdit = false; }
+    const bool bEnter = ImGui::InputText("##ComponentRename", ComponentNameEditBuffer, sizeof(ComponentNameEditBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
+    const bool bCancel = ImGui::IsKeyPressed(ImGuiKey_Escape, false);
+    if (bEnter || bCancel || ImGui::IsItemDeactivated())
+    {
+        if (!bCancel && ComponentNameEditBuffer[0])
+        {
+            FName Name(ComponentNameEditBuffer);
+            UActorComponent* Existing = Component->GetOwner()->FindComponentByName(Name);
+            if (!Existing || Existing == Component) Component->SetName(Name);
+            else HTR_LOG(Warning, "A component with this name already exists in this actor.");
+        }
+        EditingNameComponent = nullptr;
+    }
+}
+
 void FDetailsPanel::TryReparent(USceneComponent* DroppedComponent, USceneComponent* DragComponent)
 {
-	if (DroppedComponent != nullptr
-		&& DroppedComponent->GetAttachParent() != DragComponent
-		&& DroppedComponent != DragComponent)
-	{
-		DroppedComponent->SetupAttachment(DragComponent, EAttachmentRule::KeepWorld);
-	}
+    EditorHierarchy::Attach(DroppedComponent, DragComponent);
 }
 
 

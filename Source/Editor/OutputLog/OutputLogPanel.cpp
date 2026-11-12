@@ -10,6 +10,9 @@
 
 #include <charconv>
 #include <sstream>
+#include "Core/Misc/Paths.h"
+#include <fstream>
+#include <chrono>
 
 namespace
 {
@@ -105,7 +108,25 @@ void FOutputLogPanel::OnRender()
 		ClearLog();
 
 	ImGui::SameLine();
-	bool CopyToClipboard = ImGui::SmallButton("Copy");
+    bool CopyToClipboard = ImGui::SmallButton("Copy");
+    ImGui::SameLine();
+    const bool bSaveLogs = ImGui::SmallButton("Save to Logs");
+    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save filtered output. Full session logs are also saved automatically to the project's Logs folder.");
+    if (bSaveLogs)
+    {
+        const auto Directory = FPaths::ProjectDir() / "Logs";
+        std::error_code Error;
+        std::filesystem::create_directories(Directory, Error);
+        const auto Stamp = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+        const auto Path = Directory / ("Output-" + std::to_string(Stamp) + ".log");
+        std::ofstream File(Path, std::ios::out);
+        for (const auto& Item : Items) if (Filter.PassFilter(Item.message.c_str())) File << Item.message << '\n';
+        File.flush();
+        const bool bSaved = !Error && File.good();
+        File.close();
+        if (bSaved) HTR_LOG(Info, "Output saved to {}", FPaths::ToUtf8(Path));
+        else HTR_LOG(Error, "Could not save output to {}", FPaths::ToUtf8(Path));
+    }
 
 	ImGui::Separator();
 
@@ -117,6 +138,7 @@ void FOutputLogPanel::OnRender()
 	{
 		if (ImGui::BeginPopupContextWindow())
 		{
+			if (ImGui::Selectable("Copy")) CopyToClipboard = true;
 			if (ImGui::Selectable("Clear"))
 				ClearLog();
 			ImGui::EndPopup();

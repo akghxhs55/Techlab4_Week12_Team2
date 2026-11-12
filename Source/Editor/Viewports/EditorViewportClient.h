@@ -110,7 +110,7 @@ public:
 
 	// 카메라 전방 벡터
 	FVector GetViewForward() const;
-	void FocusOnBounds(const FBoxSphereBounds& Bounds);
+	void FocusOnBounds(const FBoxSphereBounds& Bounds, bool bSmooth = false);
 
 	// 씬 뷰 생성
 	FSceneView CalcSceneView(const FRect& InViewRect) const;
@@ -183,6 +183,10 @@ protected:
 	FSceneRenderOptions EngineShowFlags;
 
 	FVector ViewLocation = FVector(0.0f, 0.0f, 0.0f);
+	FVector FocusStartLocation{}, FocusTargetLocation{};
+	float FocusStartWidth = 0.0f, FocusTargetWidth = 0.0f;
+	float FocusElapsed = 0.0f;
+	bool bFocusTransition = false;
 	FRotator ViewRotation = FRotator(0.0f, 0.0f, 0.0f);
 	float ViewFOV = 60.0f;
 	float AspectRatio = 1.777778f;

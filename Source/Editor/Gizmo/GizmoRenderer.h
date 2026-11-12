@@ -46,6 +46,7 @@ private:
 	UStaticMesh* RotationMesh;
 	UStaticMesh* ScaleMesh;
 	UStaticMesh* SphereMesh;
+	UStaticMesh* PlaneHandleMesh;
 	TUniquePtr<FConstantBuffer> CB;
 
 	//EGizmoMode Mode = EGizmoMode::Scale;

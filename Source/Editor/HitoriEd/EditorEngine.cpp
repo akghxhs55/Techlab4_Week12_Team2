@@ -508,7 +508,13 @@ void UEditorEngine::Tick(const float DeltaTime)
 			ViewportsPanel->SetActiveViewIndex(HoveredViewIndex);
 		}
 
-		const int32 WheelDelta = FInputSystem::GetWheelDelta();
+		int32 WheelDelta = FInputSystem::GetWheelDelta();
+		if (!PlayWorld && CapturedViewportIndex != -1 && WheelDelta != 0)
+		{
+			auto& Settings = EditorSettings->GetMutableSettings();
+			Settings.CameraSpeed = FMath::Clamp(Settings.CameraSpeed * powf(1.2f, WheelDelta / 120.0f), 0.1f, 10.0f);
+			WheelDelta = 0;
+		}
 		const float MoveSpeed = 10.0f * EditorSettings->GetSettings().CameraSpeed;
 		const float MouseSens = 0.2f * EditorSettings->GetSettings().MouseSensitivity;
 
@@ -526,6 +532,31 @@ void UEditorEngine::Tick(const float DeltaTime)
 
 			Client->TickInput(DeltaTime, i == CapturedViewportIndex,
 				i == HoveredViewIndex, WheelDelta, MoveSpeed, MouseSens);
+		}
+
+		if (!PlayWorld && EditorManager->GetFocusedTab() == LevelEditorTab && !ImGui::GetIO().WantTextInput &&
+			(ViewportsPanel->IsFocused() || OutlinerPanel->IsFocused()))
+		{
+			if (ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt && !ImGui::GetIO().KeyShift)
+			{
+				if (FInputSystem::IsKeyPressed(EKeyCode::C)) CopySelectedActor();
+				if (FInputSystem::IsKeyPressed(EKeyCode::V)) PasteActor();
+				if (FInputSystem::IsKeyPressed(EKeyCode::D))
+					if (AActor* Actor = OutlinerPanel->GetSelectedActor())
+						if (AActor* Duplicate = EditorWorld->DuplicateActor(Actor)) OutlinerPanel->SelectActor(Duplicate);
+			}
+			else if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt &&
+				CapturedViewportIndex == -1 && FInputSystem::IsKeyPressed(EKeyCode::F))
+			{
+				if (AActor* Actor = OutlinerPanel->GetSelectedActor())
+					if (auto* Client = ViewportsPanel->GetViewportClient(ViewportsPanel->GetActiveViewIndex()))
+					{
+						FBox Box;
+						FVector Origin = Actor->GetActorLocation(), Extent(0.5f, 0.5f, 0.5f);
+						if (Actor->TryGetActorBounds(Box)) { Origin = (Box.Min + Box.Max) * 0.5f; Extent = (Box.Max - Box.Min) * 0.5f; }
+						Client->FocusOnBounds({ Origin, Extent, Extent.Size() }, true);
+					}
+			}
 		}
 
 		// 활성 뷰포트 시점 동기화
@@ -873,6 +904,7 @@ void UEditorEngine::UpdateGizmoAndPicking()
 // ImGui를 정리한다. UObject 일괄 삭제와 공용 자원·Device 정리는 FEngineLoop가 이어서 한다.
 void UEditorEngine::PreExit()
 {
+	ActorClipboard.reset();
 	EndPlayMap();
 	// 시퀀서는 에디터 월드 액터를 가리키므로 월드보다 먼저 정리한다
 	EditorWorld->ClearWorld();
@@ -955,8 +987,24 @@ void UEditorEngine::OnActiveWorldChanged()
 }
 
 // 씬 변경으로 무효화된 에디터의 선택 참조를 모두 해제한다.
+void UEditorEngine::CopySelectedActor()
+{
+	AActor* Actor = OutlinerPanel->GetSelectedActor();
+	if (!Actor || PlayWorld) return;
+	FObjectDuplicationParameters Params(Actor, nullptr);
+	Params.DestName = MakeUniqueObjectName(nullptr, Actor->GetClass(), Actor->GetFName());
+	ActorClipboard.reset(Cast<AActor>(StaticDuplicateObjectEx(Params)));
+}
+
+void UEditorEngine::PasteActor()
+{
+	if (PlayWorld || !ActorClipboard) return;
+	if (AActor* Actor = EditorWorld->DuplicateActor(ActorClipboard.get())) OutlinerPanel->SelectActor(Actor);
+}
+
 void UEditorEngine::ResetSceneSelection()
 {
+	ActorClipboard.reset();
 	Gizmo->SetTarget(nullptr, false);
 	Outline->SetTarget(nullptr);
 	DetailsPanel->SetTarget(nullptr);

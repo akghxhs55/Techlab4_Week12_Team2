@@ -29,6 +29,7 @@ public:
 
 	void SetTarget(AActor* InTargetActor) 
 	{ 
+		if (TargetActor != InTargetActor) { EditingNameComponent = nullptr; PendingRootComponent = nullptr; PendingDeleteComponent = nullptr; PendingDragComponent = PendingDroppedComponent = nullptr; }
 		TargetActor = InTargetActor;
 		TargetComponent = InTargetActor ? InTargetActor->GetRootComponent() : nullptr;
 	}
@@ -46,6 +47,8 @@ public:
 
 private:
 	void DrawShadowPreview();
+	void DrawComponentNameEditor(UActorComponent* Component, UActorComponent*& Selected, bool bRequested);
+	USceneComponent* PendingRootComponent = nullptr;
 	FShadowPreviewQuery QueryShadowPreview;
 	FImGuiRenderer* ImGuiRenderer = nullptr;
 	float ShadowPreviewContrast = 32.0f;

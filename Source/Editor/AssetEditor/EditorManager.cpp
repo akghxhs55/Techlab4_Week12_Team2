@@ -17,12 +17,94 @@
 #include "Editor/AnimBlueprintEditor/AnimBlueprintEditor.h"
 
 #include <filesystem>
+#include <commdlg.h>
+
+namespace
+{
+	struct FEditorLauncher
+	{
+		const char* Label;
+		const wchar_t* Title;
+		const wchar_t* Filter;
+	};
+
+	const FEditorLauncher EditorLaunchers[] = {
+		{ "Static Mesh Editor...", L"Open Static Mesh Editor", L"Static Mesh (*.obj;*.fbx.bin)\0*.obj;*.fbx.bin\0" },
+		{ "Skeletal Mesh Editor...", L"Open Skeletal Mesh Editor", L"Skeletal Mesh (*.fbx.bin)\0*.fbx.bin\0" },
+		{ "Animation Sequence Editor...", L"Open Animation Sequence Editor", L"Animation Sequence (*.anim.bin)\0*.anim.bin\0" },
+		{ "Animation Blueprint Editor...", L"Open Animation Blueprint Editor", L"Animation Blueprint (*.animblueprint)\0*.animblueprint\0" },
+		{ "Blend Space Editor...", L"Open Blend Space Editor", L"Blend Space (*.blendspace)\0*.blendspace\0" },
+		{ "UI Editor...", L"Open UI Editor", L"Widget (*.widget)\0*.widget\0" },
+	};
+}
 
 FEditorManager::FEditorManager(UEditorEngine& InEditorEngine)
 	: EditorEngine(InEditorEngine)
 	, LevelEditorTab(MakeUnique<FLevelEditorTab>())
 {
 	TabContainer.AddTab(LevelEditorTab.get());
+	TabContainer.DrawEditorLaunchers = [this]()
+	{
+		for (int32 Index = 0; Index < static_cast<int32>(std::size(EditorLaunchers)); ++Index)
+		{
+			if (ImGui::MenuItem(EditorLaunchers[Index].Label))
+				PendingEditorPicker = Index;
+		}
+	};
+}
+
+void FEditorManager::ShowEditorAssetPicker(int32 EditorType)
+{
+	const FEditorLauncher& Launcher = EditorLaunchers[EditorType];
+	wchar_t FilePath[32768] = {};
+	const std::wstring InitialDir = FPaths::ProjectContentDir().wstring();
+	OPENFILENAMEW Dialog = {};
+	Dialog.lStructSize = sizeof(Dialog);
+	Dialog.hwndOwner = GetActiveWindow();
+	Dialog.lpstrFile = FilePath;
+	Dialog.nMaxFile = static_cast<DWORD>(std::size(FilePath));
+	Dialog.lpstrFilter = Launcher.Filter;
+	Dialog.lpstrTitle = Launcher.Title;
+	Dialog.lpstrInitialDir = InitialDir.c_str();
+	Dialog.Flags = OFN_FILEMUSTEXIST | OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR;
+	if (!GetOpenFileNameW(&Dialog))
+	{
+		const DWORD Error = CommDlgExtendedError();
+		if (Error != 0) HTR_LOG(Error, "Editor asset dialog failed: {}", Error);
+		return;
+	}
+
+	const FString Path = FPaths::ToUtf8(std::filesystem::path(FilePath));
+	const bool bMatchesType =
+		(EditorType == 0 && (std::filesystem::path(FilePath).extension() == L".obj" || FFbxMeshBake::IsBakedPath(Path))) ||
+		(EditorType == 1 && FFbxMeshBake::IsBakedPath(Path)) ||
+		(EditorType == 2 && AnimSequenceFile::IsAnimSequencePath(Path)) ||
+		(EditorType == 3 && AnimBlueprintFile::IsAnimBlueprintPath(Path)) ||
+		(EditorType == 4 && BlendSpaceFile::IsBlendSpacePath(Path)) ||
+		(EditorType == 5 && FUIEditor::IsWidgetPath(Path));
+	if (!bMatchesType)
+	{
+		MessageBoxW(Dialog.hwndOwner, L"Select an asset matching the editor type.", Launcher.Title, MB_OK | MB_ICONWARNING);
+		return;
+	}
+	if (EditorType <= 1 && FFbxMeshBake::IsBakedPath(Path))
+	{
+		FFbxBakedMesh Mesh;
+		FString Error;
+		if (!FFbxMeshBake::Read(Path, Mesh, Error))
+		{
+			HTR_LOG(Warning, "Cannot open mesh: {} ({})", Path, Error);
+			MessageBoxW(Dialog.hwndOwner, L"Cannot read the mesh. See Output Log.", Launcher.Title, MB_OK | MB_ICONERROR);
+			return;
+		}
+		const EFbxMeshKind Expected = EditorType == 0 ? EFbxMeshKind::Static : EFbxMeshKind::Skeletal;
+		if (Mesh.Kind != Expected)
+		{
+			MessageBoxW(Dialog.hwndOwner, L"Select a mesh matching the editor type.", Launcher.Title, MB_OK | MB_ICONWARNING);
+			return;
+		}
+	}
+	OpenEditor(Path);
 }
 
 void FEditorManager::OpenEditor(const FString& AssetPath)
@@ -254,6 +336,14 @@ void FEditorManager::RenderPreview()
 
 void FEditorManager::LateTick()
 {
+	// 파일 선택과 에디터 생성은 UI 및 분리 창 렌더링이 끝난 뒤 처리한다.
+	if (PendingEditorPicker >= 0 && !bShuttingDown)
+	{
+		const int32 EditorType = PendingEditorPicker;
+		PendingEditorPicker = -1;
+		ShowEditorAssetPicker(EditorType);
+	}
+
 	// ImGui의 분리 창까지 렌더링한 뒤 호출한다. 이번 프레임 텍스처 참조도 끝난 시점이다.
 	for (int32 Index = Editors.Num() - 1; Index >= 0; --Index)
 	{

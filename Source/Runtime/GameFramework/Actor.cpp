@@ -25,6 +25,15 @@ AActor::AActor()
 
 AActor::~AActor()
 {
+	// Detach other actors before their parent components disappear.
+	for (UActorComponent* Owned : Components)
+		if (auto* Scene = Cast<USceneComponent>(Owned))
+		{
+			const auto Children = Scene->GetAttachChildren();
+			for (USceneComponent* Child : Children)
+				if (Child && Child->GetOwner() != this)
+					Child->DetachFromParent(EAttachmentRule::KeepWorld);
+		}
 	TArray<UActorComponent*> ToDelete = Components;
 	Components.Reset();
 	RootComponent = nullptr;
@@ -102,6 +111,20 @@ void AActor::RegisterAllActorTickFunctions(bool bRegister)
 	}
 }
 
+bool AActor::MakeRootComponent(USceneComponent* Component)
+{
+	if (!Component || Component == RootComponent || Component->GetOwner() != this ||
+		fabsf(Component->GetWorldMatrix().Determinant()) < 1e-12f) return false;
+	USceneComponent* OldRoot = RootComponent;
+	USceneComponent* ActorParent = OldRoot ? OldRoot->GetAttachParent() : nullptr;
+	Component->DetachFromParent(EAttachmentRule::KeepWorld);
+	SetRootComponent(Component);
+	if (ActorParent && ActorParent->GetOwner() != this)
+		Component->SetupAttachment(ActorParent, EAttachmentRule::KeepWorld);
+	if (OldRoot) OldRoot->SetupAttachment(Component, EAttachmentRule::KeepWorld);
+	return true;
+}
+
 void AActor::Serialize(FStructuredArchive::FRecord Record)
 {
 	Super::Serialize(Record);   // "Properties"
@@ -133,7 +156,9 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 		return;
 	}
 
-	TArray<UActorComponent*> SavedComponents;
+    FString SavedRootName = RootComponent ? RootComponent->GetName() : "";
+    if (auto Slot = Record.TryEnterField("RootComponentName", true)) Slot.GetValue() << SavedRootName;
+    TArray<UActorComponent*> SavedComponents;
 	if (Ar.IsSaving())
 	{
 		for (UActorComponent* Component : Components)
@@ -165,9 +190,13 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 			UActorComponent* Component = SavedComponents[i];
 			FString Name = Component->GetName();
 			FString ClassName = Component->GetClass()->Name;
+			FString DefaultName = Component->GetDefaultSubobjectName().ToString();
+			if (Component->GetDefaultSubobjectName().IsNone()) DefaultName.clear();
+			ComponentRecord << SA_VALUE("DefaultSubobjectName", DefaultName);
 			if (USceneComponent* SceneComponent = Cast<USceneComponent>(Component))
 			{
-				ParentName = SceneComponent->GetAttachParent() ? SceneComponent->GetAttachParent()->GetName() : "";
+				ParentName = SceneComponent->GetAttachParent() && SceneComponent->GetAttachParent()->GetOwner() == this
+                    ? SceneComponent->GetAttachParent()->GetName() : "";
 			}
 			ComponentRecord << SA_VALUE("Name", Name) << SA_VALUE("Class", ClassName) << SA_VALUE("Parent", ParentName);
 			Component->Serialize(ComponentRecord);
@@ -178,6 +207,18 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 		ComponentRecord << SA_VALUE("Name", Name) << SA_VALUE("Class", ClassName) << SA_VALUE("Parent", ParentName);
 
 		UActorComponent* Component = FindComponentByName(FName(Name));
+		FString DefaultName;
+		if (auto Slot = ComponentRecord.TryEnterField("DefaultSubobjectName", false)) Slot.GetValue() << DefaultName;
+		if (!Component && !DefaultName.empty())
+		{
+			for (UActorComponent* Candidate : Components)
+				if (Candidate->GetDefaultSubobjectName() == FName(DefaultName) && Candidate->GetClass() == FindClass(ClassName))
+				{
+					Component = Candidate;
+					Component->SetName(FName(Name));
+					break;
+				}
+		}
 		if (!Component)
 		{
 			UClass* ComponentClass = FindClass(ClassName);
@@ -215,7 +256,11 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 		}
 	}
 
-	for (const FPendingAttachment& Attachment : PendingAttachments)
+    if (Ar.IsLoading() && !SavedRootName.empty())
+        if (auto* SavedRoot = Cast<USceneComponent>(FindComponentByName(FName(SavedRootName))))
+            SetRootComponent(SavedRoot);
+
+    for (const FPendingAttachment& Attachment : PendingAttachments)
 	{
 		USceneComponent* ParentComponent = Cast<USceneComponent>(FindComponentByName(FName(Attachment.ParentName)));
 		if (ParentComponent)

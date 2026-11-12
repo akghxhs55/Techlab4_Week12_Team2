@@ -8,6 +8,7 @@
 #include "Engine/GameInstance.h"
 #include "Engine/GameViewportClient.h"
 #include "Input/InputSystem.h"
+#include "Input/GameKeyboardInput.h"
 #include "Render/RenderCommand.h"
 #include "Render/Renderer.h"
 #include "Render/SceneRenderer.h"
@@ -141,13 +142,9 @@ void UGameEngine::DispatchInput(FGameViewportClient& Viewport, float DeltaTime)
 		return;
 	}
 
-	constexpr EKeyCode Keys[] = { EKeyCode::W, EKeyCode::A, EKeyCode::S, EKeyCode::D,
-		EKeyCode::Space, EKeyCode::Shift, EKeyCode::Escape };
-	for (EKeyCode Key : Keys)
-	{
-		if (FInputSystem::IsKeyPressed(Key))  Viewport.InputKey(nullptr, static_cast<int32>(Key), true);
-		if (FInputSystem::IsKeyReleased(Key)) Viewport.InputKey(nullptr, static_cast<int32>(Key), false);
-	}
+	DispatchGameKeyboardInput([&](int32 Key, bool bDown) { Viewport.InputKey(nullptr, Key, bDown); });
+	if (FInputSystem::IsKeyPressed(EKeyCode::Escape)) Viewport.InputKey(nullptr, static_cast<int32>(EKeyCode::Escape), true);
+	if (FInputSystem::IsKeyReleased(EKeyCode::Escape)) Viewport.InputKey(nullptr, static_cast<int32>(EKeyCode::Escape), false);
 
 	Viewport.MouseMove(nullptr, FInputSystem::GetMouseX(), FInputSystem::GetMouseY());
 

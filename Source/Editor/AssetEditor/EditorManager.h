@@ -47,6 +47,9 @@ public:
 	FAssetEditor* FindEditor(const FString& Path) const;
 
 private:
+	void ShowEditorAssetPicker(int32 EditorType);
+	int32 PendingEditorPicker = -1;
+
 	// 에디터를 생성합니다. 이미 열려 있는 에디터가 있으면 활성화합니다.
 	void CreateEditor(const FString& AssetPath);
 

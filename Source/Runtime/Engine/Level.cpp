@@ -69,7 +69,13 @@ void ULevel::Serialize(FStructuredArchive::FRecord Record)
 			FStructuredArchive::FRecord ActorRecord = ActorArray.EnterElement().EnterRecord();
 			FString ClassName = Actor->GetClass()->Name;
 			FString ActorName = Actor->GetName();
-			ActorRecord << SA_VALUE("Class", ClassName) << SA_VALUE("Name", ActorName);
+            FString ParentActorName, ParentComponentName;
+            if (auto* Root = Actor->GetRootComponent())
+                if (auto* Parent = Root->GetAttachParent())
+                    if (AActor* Owner = Parent->GetOwner(); Owner && Owner != Actor && SavedActors.Find(Owner) != INDEX_NONE)
+                    { ParentActorName = Owner->GetName(); ParentComponentName = Parent->GetName(); }
+            ActorRecord << SA_VALUE("ParentActor", ParentActorName) << SA_VALUE("ParentComponent", ParentComponentName);
+            ActorRecord << SA_VALUE("Class", ClassName) << SA_VALUE("Name", ActorName);
 			Actor->Serialize(ActorRecord);
 		}
 		return;
@@ -78,8 +84,10 @@ void ULevel::Serialize(FStructuredArchive::FRecord Record)
 	// 불러오기: 월드를 비우는 건 호출하는 쪽 책임 (PIE 복제는 새 월드라 비울 필요가 없다)
 	assert(OwningWorld);
 
-	int32 Num = 0;
-	FStructuredArchive::FArray ActorArray = Record.EnterArray("Actors", Num);
+    struct FPendingActorAttachment { AActor* Child; FString ParentActor; FString ParentComponent; };
+    TArray<FPendingActorAttachment> Attachments;
+    int32 Num = 0;
+    FStructuredArchive::FArray ActorArray = Record.EnterArray("Actors", Num);
 	for (int32 i = 0; i < Num; ++i)
 	{
 		FStructuredArchive::FRecord ActorRecord = ActorArray.EnterElement().EnterRecord();
@@ -105,7 +113,21 @@ void ULevel::Serialize(FStructuredArchive::FRecord Record)
 
 		if (Actor)
 		{
-			Actor->Serialize(ActorRecord);
-		}
-	}
+            Actor->Serialize(ActorRecord);
+            FString ParentActor, ParentComponent;
+            if (auto Slot = ActorRecord.TryEnterField("ParentActor", false)) Slot.GetValue() << ParentActor;
+            if (auto Slot = ActorRecord.TryEnterField("ParentComponent", false)) Slot.GetValue() << ParentComponent;
+            if (!ParentActor.empty()) Attachments.Add({Actor, ParentActor, ParentComponent});
+        }
+    }
+    // All parents must exist before rebuilding inter-actor attachments.
+    for (const auto& Pending : Attachments)
+        for (AActor* ParentActor : Actors)
+            if (ParentActor && ParentActor->GetName() == Pending.ParentActor)
+            {
+                auto* Parent = Cast<USceneComponent>(ParentActor->FindComponentByName(FName(Pending.ParentComponent)));
+                if (Parent && Pending.Child->GetRootComponent())
+                    Pending.Child->GetRootComponent()->SetupAttachment(Parent, EAttachmentRule::KeepRelative);
+                break;
+            }
 }

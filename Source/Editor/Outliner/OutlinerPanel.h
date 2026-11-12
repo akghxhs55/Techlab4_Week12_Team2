@@ -36,6 +36,7 @@ public:
     void SelectActor(AActor* Actor);
 
     AActor* GetSelectedActor() const;
+	bool IsFocused() const { return bFocused; }
 
 
 private:
@@ -45,4 +46,12 @@ private:
     SelectionCallback Callback;
     DeleteActorCallback DeleteCallback;
     AActor* PendingDeleteActor = nullptr;
+	bool bFocused = false;
+	AActor* RenamingActor = nullptr;
+	char RenameBuffer[256] = {};
+	bool bFocusRename = false;
+	TMap<AActor*, TArray<AActor*>> ActorChildren;
+	USceneComponent* PendingAttachChild = nullptr;
+	USceneComponent* PendingAttachParent = nullptr;
+	bool bPendingDetach = false;
 };

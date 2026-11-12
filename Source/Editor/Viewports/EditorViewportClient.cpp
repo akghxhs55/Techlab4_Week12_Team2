@@ -31,20 +31,26 @@ void FEditorViewportClient::SetWorld(UWorld* InWorld) {
   }
 
   if (World != InWorld) {
+    bFocusTransition = false;
     RenderData.ResetScene();
     World = InWorld;
   }
 }
 
-void FEditorViewportClient::FocusOnBounds(const FBoxSphereBounds& Bounds) {
+void FEditorViewportClient::FocusOnBounds(const FBoxSphereBounds& Bounds, bool bSmooth) {
   const float Radius = FMath::Max(FMath::Max(Bounds.SphereRadius, Bounds.BoxExtent.Size()), 0.1f);
   const float Aspect = FMath::Max(AspectRatio, 0.01f);
   const float HalfFOV = FMath::DegreesToRadians(FMath::Clamp(ViewFOV, 1.0f, 179.0f)) * 0.5f;
   const float LimitingHalfFOV = atanf(tanf(HalfFOV) * FMath::Min(Aspect, 1.0f));
   const float Distance = FMath::Max(Radius * 1.1f / sinf(LimitingHalfFOV), Radius + NearClip);
 
-  OrthoWidth = Radius * 2.2f * FMath::Max(Aspect, 1.0f);
-  ViewLocation = Bounds.Origin - GetViewForward() * Distance;
+  FocusStartLocation = ViewLocation;
+  FocusStartWidth = OrthoWidth;
+  FocusTargetWidth = Radius * 2.2f * FMath::Max(Aspect, 1.0f);
+  FocusTargetLocation = Bounds.Origin - GetViewForward() * Distance;
+  FocusElapsed = 0.0f;
+  bFocusTransition = bSmooth;
+  if (!bSmooth) { OrthoWidth = FocusTargetWidth; ViewLocation = FocusTargetLocation; }
   FarClip = FMath::Max(FarClip, Distance + Radius * 2.0f);
 }
 
@@ -64,6 +70,16 @@ void FEditorViewportClient::TickInput(float DeltaTime, bool bCaptured,
   Input.bLeft = FInputSystem::IsKeyDown(EKeyCode::A);
   Input.bUp = FInputSystem::IsKeyDown(EKeyCode::E);
   Input.bDown = FInputSystem::IsKeyDown(EKeyCode::Q);
+  if (bCaptured || (bHovered && WheelDelta != 0)) bFocusTransition = false;
+  if (bFocusTransition)
+  {
+    FocusElapsed += DeltaTime;
+    const float T = FMath::Clamp(FocusElapsed / 0.25f, 0.0f, 1.0f);
+    const float Alpha = T * T * (3.0f - 2.0f * T);
+    ViewLocation = FocusStartLocation + (FocusTargetLocation - FocusStartLocation) * Alpha;
+    OrthoWidth = FocusStartWidth + (FocusTargetWidth - FocusStartWidth) * Alpha;
+    if (T >= 1.0f) bFocusTransition = false;
+  }
   FViewportCameraState Camera{ViewLocation, ViewRotation, OrthoWidth,
       Width > 0 ? static_cast<float>(Width) : 800.0f, bIsPerspective};
   ApplyViewportCameraMovement(Camera, Input, DeltaTime, MoveSpeed, MouseSensitivity);

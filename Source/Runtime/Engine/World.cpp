@@ -95,6 +95,20 @@ bool UWorld::Init()
 	return true;
 }
 
+AActor* UWorld::DuplicateActor(AActor* Source)
+{
+	if (!Source || bBegunPlay) return nullptr;
+	FObjectDuplicationParameters Params(Source, PersistentLevel);
+	Params.DestName = MakeUniqueObjectName(PersistentLevel, Source->GetClass(), Source->GetFName());
+	AActor* Copy = Cast<AActor>(StaticDuplicateObjectEx(Params));
+	if (!Copy) return nullptr;
+	Copy->World = this;
+	Copy->Level = PersistentLevel;
+	PersistentLevel->AddActor(Copy);
+	Copy->RegisterAllComponents();
+	return Copy;
+}
+
 AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transform)
 {
 	if (!Class) return nullptr;

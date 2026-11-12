@@ -147,17 +147,20 @@ public:
 	T* CreateDefaultSubobject(FName SubobjectName)
 	{
 		T* Subobject = NewObject<T>(this, SubobjectName, EObjectFlags::RF_DefaultSubObject);
+		Subobject->DefaultSubobjectName = SubobjectName;
 		OnDefaultSubobjectCreated(Subobject);
 		return Subobject;
 	}
 
 	virtual void PostDuplicate(bool bDuplicateForPIE) {}
+	FName GetDefaultSubobjectName() const { return DefaultSubobjectName; }
 protected:
 	virtual void OnDefaultSubobjectCreated(UObject* Subobject) {}
 private:
 	void SerializeScriptProperties(FStructuredArchive::FSlot Slot);
 
 	uint32 ObjectUUID;
+	FName DefaultSubobjectName;
 	uint32 InternalIndex;
 
 	bool bIsRegistered = true;

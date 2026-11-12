@@ -77,9 +77,19 @@ UObject* FDuplicateDataWriter::GetDuplicatedObject(UObject* Object, bool bCreate
 				// The object's outer is being duplicated, create a duplicate of this object.
 				FStaticConstructObjectParameters Params(Object->GetClass());
 				Params.Outer = DupOuter;
+				// Renaming a default component must still reuse its constructor-created counterpart.
 				Params.Name = Object->GetFName();
 				Params.SetFlags = ApplyFlags | Object->GetMaskedFlags(FlagMask);
-				Result = StaticConstructObject_Internal(Params);
+				if (!Object->GetDefaultSubobjectName().IsNone())
+					for (UObject* Candidate : GUObjectArray)
+						if (Candidate->GetOuter() == DupOuter && Candidate->GetClass() == Object->GetClass() &&
+							Candidate->GetDefaultSubobjectName() == Object->GetDefaultSubobjectName())
+						{
+							Result = Candidate;
+							break;
+						}
+				if (!Result) Result = StaticConstructObject_Internal(Params);
+				if (Result) Result->SetName(Object->GetFName());
 
 				// If we assign external package to duplicated object, fetch the package
 				AddDuplicate(Object, Result);

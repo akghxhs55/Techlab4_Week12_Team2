@@ -45,7 +45,10 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
     Labels[View] = Views[std::clamp(static_cast<int>(Client->GetViewportType()), 0, 3)];
     Labels[Mode] = Modes[std::clamp(static_cast<int>(Client->GetViewportMode()), 0, 5)];
     Labels[Add] = "+ Add";
-    Labels[Camera] = "Camera";
+    char CameraLabel[64];
+    std::snprintf(CameraLabel, sizeof(CameraLabel), "Camera %.2fx###Camera",
+        EditorSettings ? EditorSettings->GetSettings().CameraSpeed : 1.0f);
+    Labels[Camera] = CameraLabel;
     Labels[Grid] = GridLabel;
     Labels[Show] = "Show";
     Labels[Render] = "Render";
