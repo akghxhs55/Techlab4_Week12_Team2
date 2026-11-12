@@ -465,3 +465,7 @@ Tools/SnowMountain/build_snow_mountain.py
 # Setup/Build contains source-controlled build tools, not generated output.
 !/Setup/Build/
 !/Setup/Build/premake5.exe
+
+# Stale HeaderTool output from the old build layout (now Build/Generated) and per-user editor data
+/Intermediate/
+/Saved/
