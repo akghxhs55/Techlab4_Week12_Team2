@@ -5,7 +5,6 @@
 #include <chrono>
 #include <unordered_map>
 
-#include "Render/SkyboxRenderer.h"
 #include "Render/PostProcess/HeightFogRenderer.h"
 #include "Render/PostProcess/FXAARenderer.h"
 #include "Render/PostProcess/ToneMapData.h"
@@ -30,7 +29,6 @@ bool FRenderer::Init()
 	ViewCB = RenderCommand::CreateConstantBuffer(sizeof(FMatrix));
 	MaterialCB = RenderCommand::CreateConstantBuffer(sizeof(FForwardMaterialConstants));
 	if (!ObjectCB || !ViewCB || !MaterialCB) return false;
-	GPUOcclusion.Init();
 	return true;
 }
 
@@ -131,17 +129,8 @@ void FRenderer::EndObjectConstants()
 	if (PerObjectSlotCB) RenderCommand::Unmap(PerObjectSlotCB.get());
 }
 
-void FRenderer::InitScenePasses(const FString& SkyPanoramaPath)
+void FRenderer::InitScenePasses()
 {
-	if (!SkyPanoramaPath.empty())
-	{
-		Skybox = MakeUnique<FSkyboxRenderer>();
-		if (!Skybox->Init(SkyPanoramaPath))
-		{
-			HTR_LOG(Warning, "Skybox panorama not loaded: {}", SkyPanoramaPath);
-			Skybox.reset();
-		}
-	}
 	HeightFog = MakeUnique<FHeightFogRenderer>();
 	HeightFog->Init(this);
 	FXAA = MakeUnique<FFXAARenderer>();
@@ -152,80 +141,5 @@ void FRenderer::InitScenePasses(const FString& SkyPanoramaPath)
 	DecalConstants = RenderCommand::CreateConstantBuffer(sizeof(FDecalData));
 	SceneText = MakeUnique<FTextRenderer>();
 	SceneText->Init();
-}
-
-FOcclusionMeasureResult FRenderer::MeasureDrawVisibility(std::span<const FMeshDrawBatch> Batches)
-{
-	FOcclusionMeasureResult Result;
-	uint32 Count = 0;
-	for (const FMeshDrawBatch& Batch : Batches) Count += static_cast<uint32>(Batch.Items.Num());
-	if (!Count) return Result;
-	ID3D11Device* Device = FRenderDevice::Get()->GetDevice();
-	ID3D11DeviceContext* Context = FRenderDevice::Get()->GetContext();
-	if (!Device || !Context) return Result;
-	const auto StartTime = std::chrono::high_resolution_clock::now();
-	if (!DepthLessEqualReadOnly)
-	{
-		D3D11_DEPTH_STENCIL_DESC Desc{};
-		Desc.DepthEnable = TRUE;
-		Desc.DepthWriteMask = D3D11_DEPTH_WRITE_MASK_ZERO;
-		Desc.DepthFunc = D3D11_COMPARISON_LESS_EQUAL;
-		if (FAILED(Device->CreateDepthStencilState(&Desc, DepthLessEqualReadOnly.GetAddressOf()))) return Result;
-	}
-	while (OcclusionQueries.Num() < Count)
-	{
-		const D3D11_QUERY_DESC Desc{ D3D11_QUERY_OCCLUSION, 0 };
-		ComPtr<ID3D11Query> Query;
-		if (FAILED(Device->CreateQuery(&Desc, Query.GetAddressOf()))) return Result;
-		OcclusionQueries.Add(std::move(Query));
-	}
-	uint32 QueryIndex = 0;
-	for (const FMeshDrawBatch& Batch : Batches)
-	{
-		BindBatch(Batch);
-		RenderCommand::SetBlendState(EBlendState::NoColorWrite);
-		Context->OMSetDepthStencilState(DepthLessEqualReadOnly.Get(), 0);
-		for (const FMeshDrawBatch::FItem& Item : Batch.Items)
-		{
-			BindObject(Batch, Item);
-			ID3D11Query* Query = OcclusionQueries[QueryIndex++].Get();
-			Context->Begin(Query);
-			RenderCommand::DrawIndexed(Item.IndexCount, Item.StartIndex);
-			Context->End(Query);
-		}
-	}
-	std::unordered_map<const void*, bool> ObjectVisible;
-	ObjectVisible.reserve(Count);
-	QueryIndex = 0;
-	for (const FMeshDrawBatch& Batch : Batches)
-		for (const FMeshDrawBatch::FItem& Item : Batch.Items)
-		{
-			UINT64 Samples = 0;
-			while (Context->GetData(OcclusionQueries[QueryIndex++].Get(), &Samples, sizeof(Samples), 0) == S_FALSE) {}
-			const bool bVisible = Samples > 0;
-			++Result.TotalDraws;
-			Result.TotalTriangles += Item.IndexCount / 3;
-			if (bVisible)
-			{
-				++Result.VisibleDraws;
-				Result.VisibleTriangles += Item.IndexCount / 3;
-			}
-			if (Item.bOccludedByGpu)
-			{
-				++Result.GPUOccludedDraws;
-				if (bVisible) ++Result.FalseCulls;
-			}
-			bool& bObjectVisible = ObjectVisible[Item.ObjectKey];
-			bObjectVisible = bObjectVisible || bVisible;
-		}
-	Result.TotalObjects = static_cast<uint32>(ObjectVisible.size());
-	for (const auto& [Key, bVisible] : ObjectVisible)
-		Result.VisibleObjects += bVisible ? 1 : 0;
-	RenderCommand::SetBlendState(EBlendState::Opaque);
-	RenderCommand::SetDepthStencilState(EDepthStencilState::Default);
-	Result.ElapsedMs = std::chrono::duration<double, std::milli>(
-		std::chrono::high_resolution_clock::now() - StartTime).count();
-	Result.bValid = true;
-	return Result;
 }
 

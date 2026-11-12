@@ -9,8 +9,7 @@
 // 패키징된 게임의 실행 설정. Config/DefaultGame.ini에서 읽고, 파일이나 항목이 없으면 기본값을 쓴다.
 struct FGameSettings
 {
-	FString StartupMap = "Scenes/Demo_1_LightTypes.scene";   // [Game] GameDefaultMap
-	FString SkyPanorama = "Assets/SkySphere/IceEscapeSnowPanorama-v2.png";
+	FString StartupMap = "Content/Game/Scenes/Main.scene";   // [Game] GameDefaultMap
 
 	std::wstring WindowTitle = L"Hitori";
 	uint32 Width = 1600;

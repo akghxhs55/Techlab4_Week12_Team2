@@ -185,7 +185,7 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 			Component = AddComponent(ComponentClass, FName(Name));
 		}
 
-		if (!Component || Component->GetClass()->Name != ClassName)
+		if (!Component || Component->GetClass() != FindClass(ClassName))
 		{
 			HTR_LOG(Warning, "Load: component {} ({}) failed", Name, ClassName);
 			continue;

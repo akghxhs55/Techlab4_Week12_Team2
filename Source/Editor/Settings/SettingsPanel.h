@@ -35,7 +35,6 @@ struct FEditorSettings
 	bool bDecalBVHCulling = true;
 	bool bDecalOBBTree = true;
 	ELightCullingMode LightCullingMode = ELightCullingMode::Tiled;
-	ERenderingPath RenderingPath = ERenderingPath::Deferred;
 	ELightingModel LightingModel = ELightingModel::Gouraud;
 
 	// Values

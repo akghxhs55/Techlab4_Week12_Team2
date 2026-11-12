@@ -4,7 +4,7 @@
 #include "Core/EngineString.h"
 #include "Math/Quat.h"
 #include "Math/Vector.h"
-#include "MovieScene/MovieSceneFrameTime.h"
+#include "Core/FrameTime.h"
 #include "UObject/Object.h"
 #include <utility>
 #include "AnimDataModel.generated.h"

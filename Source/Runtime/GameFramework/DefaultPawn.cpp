@@ -10,7 +10,7 @@ ADefaultPawn::ADefaultPawn()
 	CameraComponent = CreateDefaultSubobject<UCameraComponent>("CameraComponent");
 	StaticMeshComponent = CreateDefaultSubobject<UStaticMeshComponent>("StaticMeshComponent");
 	SetRootComponent(StaticMeshComponent);
-	StaticMeshComponent->SetStaticMesh(UAssetManager::GetAssetByPath<UStaticMesh>("Models/Hitori/Hitori.obj"));
+	StaticMeshComponent->SetStaticMesh(UAssetManager::GetAssetByPath<UStaticMesh>("Sphere"));
 	CameraComponent->SetupAttachment(StaticMeshComponent);
 	CameraComponent->SetRelativeLocation({-5.0f, 0.0f, 8.0f});
 	CameraComponent->SetRelativeRotation({45.0f, 0.0f, 0.0f});

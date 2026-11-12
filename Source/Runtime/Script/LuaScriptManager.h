@@ -1,6 +1,7 @@
 #pragma once
 
 #include <sol/forward.hpp>
+#include "Core/Misc/Paths.h"
 
 // sol::state 하나를 엔진 전체가 공유한다. 액터별 격리는 FLuaScriptInstance의 environment로 한다.
 // 담당: A, 소비자: B (FLuaBindings::Register에 GetState를 넘긴다)
@@ -26,7 +27,7 @@ public:
 
 	static fs::path ToPath(const FString& Utf8)
 	{
-		return fs::path(std::u8string(Utf8.begin(), Utf8.end()));
+		return FPaths::FromUtf8(FPaths::ResolveContentPath(Utf8));
 	}
 
 	static FString FromPath(const fs::path& Path)

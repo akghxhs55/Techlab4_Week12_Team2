@@ -1,51 +1,41 @@
 #include "EnginePCH.h"
 #include "Core/Misc/Paths.h"
-
 #include <fstream>
+#include <algorithm>
 #include <Windows.h>
 
 namespace fs = std::filesystem;
-
 namespace
 {
-	fs::path GEngineDir;
-	fs::path GProjectDir;
-	fs::path GProjectFile;
-	FString GProjectName;
-
-	bool StartsWithFolder(const FString& Path, const char* Folder)
-	{
-		const size_t Length = std::strlen(Folder);
-		if (Path.size() <= Length) return false;
-		if (_strnicmp(Path.c_str(), Folder, Length) != 0) return false;
-		return Path[Length] == '/' || Path[Length] == '\\';
-	}
+    fs::path GEngineDir, GProjectDir, GProjectFile;
+    FString GProjectName;
+    bool StartsWithFolder(const FString& Path, const char* Folder)
+    {
+        const size_t Length = std::strlen(Folder);
+        return Path.size() > Length && _strnicmp(Path.c_str(), Folder, Length) == 0 && Path[Length] == '/';
+    }
+    fs::path ProjectRoot() { return GProjectDir.empty() ? GEngineDir : GProjectDir; }
+    bool IsInside(const fs::path& Relative)
+    {
+        return !Relative.empty() && !Relative.is_absolute() && *Relative.begin() != "..";
+    }
 }
 
 bool FPaths::InitEngineDir()
 {
-	wchar_t ExePath[MAX_PATH] = {};
-	if (!GetModuleFileNameW(nullptr, ExePath, MAX_PATH)) return false;
-
-	std::error_code Ec;
-	fs::path Dir = fs::path(ExePath).parent_path();
-	while (!Dir.empty())
-	{
-		if (fs::exists(Dir / L"Resources" / L"Shader", Ec))
-		{
-			GEngineDir = Dir;
-			return true;
-		}
-		const fs::path Parent = Dir.parent_path();
-		if (Parent == Dir) break;
-		Dir = Parent;
-	}
-
-	// exe 위쪽에 엔진 폴더가 없으면 예전처럼 작업 디렉터리(디버거의 debugdir)를 엔진 폴더로 본다.
-	GEngineDir = fs::current_path(Ec);
-	return fs::exists(GEngineDir / L"Resources" / L"Shader", Ec);
+    wchar_t ExePath[MAX_PATH] = {};
+    if (!GetModuleFileNameW(nullptr, ExePath, MAX_PATH)) return false;
+    std::error_code Ec;
+    for (fs::path Dir = fs::path(ExePath).parent_path(); !Dir.empty();)
+    {
+        if (fs::is_directory(Dir / L"EngineResources/Shaders", Ec)) { GEngineDir = Dir; return true; }
+        const fs::path Parent = Dir.parent_path();
+        if (Parent == Dir) break;
+        Dir = Parent;
+    }
+    GEngineDir = fs::current_path(Ec);
+    return fs::is_directory(GEngineDir / L"EngineResources/Shaders", Ec);
 }
-
 const fs::path& FPaths::EngineDir() { return GEngineDir; }
 const fs::path& FPaths::ProjectDir() { return GProjectDir; }
 const fs::path& FPaths::ProjectFilePath() { return GProjectFile; }
@@ -54,62 +44,93 @@ bool FPaths::HasProject() { return !GProjectFile.empty(); }
 
 bool FPaths::SetProject(const fs::path& ProjectFile, FString* OutError)
 {
-	std::error_code Ec;
-	const fs::path Absolute = fs::absolute(ProjectFile, Ec).lexically_normal();
-	FProjectDescriptor Descriptor;
-	if (Ec || !Descriptor.Load(Absolute, OutError)) return false;
-
-	const fs::path Dir = Absolute.parent_path();
-	if (!SetCurrentDirectoryW(Dir.c_str()))
-	{
-		if (OutError) *OutError = "Cannot enter project folder: " + ToUtf8(Dir);
-		return false;
-	}
-
-	GProjectFile = Absolute;
-	GProjectDir = Dir;
-	GProjectName = Descriptor.Name.empty() ? ToUtf8(Absolute.stem()) : Descriptor.Name;
-	return true;
+    std::error_code Ec;
+    const fs::path Absolute = fs::absolute(ProjectFile, Ec).lexically_normal();
+    FProjectDescriptor Descriptor;
+    if (Ec || !Descriptor.Load(Absolute, OutError)) return false;
+    const fs::path Dir = Absolute.parent_path();
+    if (!SetCurrentDirectoryW(Dir.c_str()))
+    {
+        if (OutError) *OutError = "Cannot enter project folder: " + ToUtf8(Dir);
+        return false;
+    }
+    GProjectFile = Absolute; GProjectDir = Dir;
+    GProjectName = Descriptor.Name.empty() ? ToUtf8(Absolute.stem()) : Descriptor.Name;
+    return true;
 }
-
 fs::path FPaths::EngineFile(const fs::path& Relative)
 {
-	if (Relative.is_absolute()) return Relative;
-	return (GEngineDir / Relative).lexically_normal();
+    return Relative.is_absolute() ? Relative : (GEngineDir / Relative).lexically_normal();
 }
-
-fs::path FPaths::ResolveEngineRelative(const FString& Path)
+FString FPaths::EngineFileUtf8(const fs::path& Relative) { return ToUtf8(EngineFile(Relative)); }
+fs::path FPaths::EngineResourcesDir() { return GEngineDir / L"EngineResources"; }
+fs::path FPaths::ProjectContentDir()
 {
-	if (StartsWithFolder(Path, "Resources") || StartsWithFolder(Path, "Intermediate"))
-		return EngineFile(FromUtf8(Path));
-	return FromUtf8(Path);
+    const fs::path Root = ProjectRoot();
+    std::error_code Ec;
+    // Older external projects can still be opened without moving their files automatically.
+    if (!fs::exists(Root / L"Content/Game", Ec) && fs::is_directory(Root / L"Assets", Ec)) return Root / L"Assets";
+    return Root / L"Content/Game";
 }
-
-FString FPaths::EngineFileUtf8(const fs::path& Relative)
+fs::path FPaths::ProjectScenesDir()
 {
-	return ToUtf8(EngineFile(Relative));
+    return ProjectContentDir().filename() == L"Assets" ? ProjectRoot() / L"Scenes" : ProjectContentDir() / L"Scenes";
 }
-
-fs::path FPaths::EngineContentDir()
+fs::path FPaths::ProjectScriptsDir()
 {
-	return GEngineDir / L"EngineContent";
+    return ProjectContentDir().filename() == L"Assets" ? ProjectRoot() / L"Scripts" : ProjectContentDir() / L"Scripts";
 }
+fs::path FPaths::EngineBuildDir() { return GEngineDir / L"Build"; }
+fs::path FPaths::ProjectBuildDir() { return ProjectRoot() / L"Build"; }
+fs::path FPaths::EngineSavedDir() { return EngineBuildDir() / L"Saved"; }
+fs::path FPaths::ProjectSavedDir() { return ProjectBuildDir() / L"Saved"; }
+fs::path FPaths::EditorSettingsFile() { return ProjectSavedDir() / L"Editor/editor.ini"; }
 
 bool FPaths::IsEngineContentPath(const FString& Path)
 {
-	return StartsWithFolder(Path, "Engine");
+    FString Normal = Path; std::replace(Normal.begin(), Normal.end(), '\\', '/');
+    return StartsWithFolder(Normal, "Engine");
 }
-
 FString FPaths::ResolveContentPath(const FString& Path)
 {
-	if (!IsEngineContentPath(Path)) return Path;
-	const size_t PrefixLength = std::strlen(EngineContentPrefix);
-	return ToUtf8(EngineContentDir() / FromUtf8(Path.substr(PrefixLength)));
+    FString Normal = Path; std::replace(Normal.begin(), Normal.end(), '\\', '/');
+    if (FromUtf8(Normal).is_absolute()) return ToUtf8(FromUtf8(Normal).lexically_normal());
+    if (StartsWithFolder(Normal, "Engine")) return ToUtf8(EngineResourcesDir() / FromUtf8(Normal.substr(7)));
+    if (StartsWithFolder(Normal, "EngineResources")) return EngineFileUtf8(FromUtf8(Normal));
+    // Previously saved engine file paths still resolve after the folder rename.
+    if (StartsWithFolder(Normal, "Content/Engine")) return ToUtf8(EngineResourcesDir() / FromUtf8(Normal.substr(15)));
+    if (StartsWithFolder(Normal, "Content/Game")) return ToUtf8(ProjectContentDir() / FromUtf8(Normal.substr(13)));
+    if (StartsWithFolder(Normal, "Assets")) return ToUtf8(ProjectContentDir() / FromUtf8(Normal.substr(7)));
+    if (StartsWithFolder(Normal, "Scenes")) return ToUtf8(ProjectScenesDir() / FromUtf8(Normal.substr(7)));
+    if (StartsWithFolder(Normal, "Scripts")) return ToUtf8(ProjectScriptsDir() / FromUtf8(Normal.substr(8)));
+    return Normal;
 }
-
-fs::path FPaths::EngineSavedDir()
+fs::path FPaths::ResolveEngineRelative(const FString& Path)
 {
-	return GEngineDir / L"Saved";
+    if (StartsWithFolder(Path, "EngineResources") || StartsWithFolder(Path, "Build/Cache/Shaders")) return EngineFile(FromUtf8(Path));
+    return FromUtf8(ResolveContentPath(Path));
+}
+fs::path FPaths::MeshCacheFile(const FString& SourcePath)
+{
+    const fs::path Source = fs::absolute(FromUtf8(ResolveContentPath(SourcePath))).lexically_normal();
+    fs::path CacheRoot = ProjectBuildDir() / L"Cache/Meshes";
+    fs::path Relative = Source.lexically_relative(ProjectContentDir());
+    fs::path Result;
+    if (IsInside(Relative)) Result = CacheRoot / L"Game" / Relative;
+    else
+    {
+        Relative = Source.lexically_relative(EngineResourcesDir());
+        if (IsInside(Relative)) Result = EngineBuildDir() / L"Cache/Meshes/Engine" / Relative;
+        else
+        {
+            uint64 Hash = 14695981039346656037ull;
+            for (unsigned char C : ToUtf8(Source)) { Hash ^= C; Hash *= 1099511628211ull; }
+            Result = CacheRoot / L"External" / std::to_string(Hash) / Source.filename();
+        }
+    }
+    Result += L".bin";
+    std::error_code Ec; fs::create_directories(Result.parent_path(), Ec);
+    return Result;
 }
 
 FString FPaths::ToUtf8(const fs::path& Path)

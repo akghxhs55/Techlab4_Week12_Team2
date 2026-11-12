@@ -121,9 +121,7 @@ namespace
 			"\n"
 			"[Game]\n"
 			"; 시작할 씬. 프로젝트 폴더 기준 상대 경로. 에디터에서 이 경로로 씬을 저장한다.\n"
-			"GameDefaultMap=Scenes/Main.scene\n"
-			"; 비워 두면 하늘을 그리지 않는다\n"
-			"SkyPanorama=\n"
+			"GameDefaultMap=Content/Game/Scenes/Main.scene\n"
 			"\n"
 			"[Window]\n"
 			"Title=" + Name + "\n"
@@ -167,7 +165,7 @@ bool ProjectCreator::Create(const FString& Name, const fs::path& ParentDir, fs::
 		return false;
 	}
 
-	for (const wchar_t* Folder : { L"Assets", L"Scenes", L"Scripts", L"Config" })
+	for (const wchar_t* Folder : { L"Content/Game/Scenes", L"Content/Game/Scripts", L"Config" })
 	{
 		fs::create_directories(ProjectDir / Folder, Ec);
 		if (Ec)
@@ -182,6 +180,11 @@ bool ProjectCreator::Create(const FString& Name, const fs::path& ParentDir, fs::
 	{
 		std::ofstream Ini(ProjectDir / L"Config" / L"DefaultGame.ini");
 		Ini << MakeDefaultGameIni(Name);
+	}
+
+	{
+		std::ofstream Scene(ProjectDir / L"Content/Game/Scenes/Main.scene");
+		Scene << R"({"Version":4,"World":{"PersistentLevel":{"Actors":[],"Properties":{}},"Properties":{}}})";
 	}
 
 	FProjectDescriptor Descriptor;
@@ -459,7 +462,7 @@ namespace
 			}
 
 			ImGui::Spacing();
-			ImGui::TextDisabled("Creates Assets, Scenes, Scripts and Config folders.\nEngine icons and fonts are shared from the engine folder.");
+			ImGui::TextDisabled("Creates Content/Game and Config folders.\nEngine icons and fonts are shared from the engine folder.");
 
 			ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetFrameHeightWithSpacing() - ImGui::GetStyle().WindowPadding.y);
 			ImGui::BeginDisabled(!NameError.empty() || Location.empty());
@@ -566,14 +569,15 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 		IO.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
 		ApplyStyle(Scale);
-		const FString FontPath = FPaths::EngineFileUtf8(L"NanumSquareR.TTF");
+		const FString FontPath = FPaths::EngineFileUtf8(L"EngineResources/Fonts/NanumSquareR.ttf");
 		std::error_code Ec;
-		if (!fs::exists(FPaths::EngineFile(L"NanumSquareR.TTF"), Ec) ||
+		if (!fs::exists(FPaths::EngineFile(L"EngineResources/Fonts/NanumSquareR.ttf"), Ec) ||
 			!IO.Fonts->AddFontFromFileTTF(FontPath.c_str(), 17.0f * Scale, nullptr, IO.Fonts->GetGlyphRangesKorean()))
 		{
 			ImFontConfig Config;
 			Config.SizePixels = 15.0f * Scale;
-			IO.Fonts->AddFontDefault(&Config);
+			// Keep the fallback font stable when the window DPI changes.
+			IO.Fonts->AddFontDefaultVector(&Config);
 		}
 
 		ImGui_ImplWin32_Init(Window.Hwnd);

@@ -5,13 +5,11 @@
 #include "Texture2D.h"
 #include "Text/Font.h"
 #include "SceneView.h"
-#include "Occlusion/GPUOcclusion.h"
 #include "Engine/LightSceneProxy.h"
 #include "Render/Buffer.h"
 #include "MeshPassProcessor.h"
 #include <span>
 
-class FSkyboxRenderer;
 class FHeightFogRenderer;
 class FFXAARenderer;
 class FCameraOverlayRenderer;
@@ -31,19 +29,14 @@ public:
 	void UploadViewMatrix(const FMatrix& ViewProjection);
 	void DrawMeshes(std::span<const FMeshDrawBatch> Batches);
 
-	// 오클루전 객체 조회
-	FGPUOcclusion& GetGPUOcclusion() { return GPUOcclusion; }
 
-	// 측정 대상 드로우를 동일한 GPU 상태로 다시 제출한다.
-	FOcclusionMeasureResult MeasureDrawVisibility(std::span<const FMeshDrawBatch> Batches);
 
 	uint8* BeginObjectConstants(uint32 MaxSlots);
 	void EndObjectConstants();
 
-	void InitScenePasses(const FString& SkyPanoramaPath);
+	void InitScenePasses();
 
 	// FSceneRenderer::Render가 쓰는 상주 패스 객체. UE에서는 렌더러 모듈의 글로벌 자원에 해당한다.
-	FSkyboxRenderer* GetSkybox() const { return Skybox.get(); }
 	FHeightFogRenderer* GetHeightFog() const { return HeightFog.get(); }
 	FFXAARenderer* GetFXAA() const { return FXAA.get(); }
 	FCameraOverlayRenderer* GetCameraOverlay() const { return CameraOverlay.get(); }
@@ -64,11 +57,7 @@ private:
 	TUniquePtr<FConstantBuffer> DecalConstants;
 	uint32 PerObjectSlotCapacity = 0;
 	bool bUsePerObjectSlots = false;
-	TArray<ComPtr<ID3D11Query>> OcclusionQueries;
-	ComPtr<ID3D11DepthStencilState> DepthLessEqualReadOnly;
-	FGPUOcclusion GPUOcclusion;
 
-	TUniquePtr<FSkyboxRenderer> Skybox;
 	TUniquePtr<FHeightFogRenderer> HeightFog;
 	TUniquePtr<FFXAARenderer> FXAA;
 	TUniquePtr<FCameraOverlayRenderer> CameraOverlay;

@@ -23,11 +23,9 @@
 #include "GameFramework/Actor/LightActorBase.h"
 #include "GameFramework/Actor/PointLightActor.h"
 #include "GameFramework/Actor/SpotLightActor.h"
-#include "GameFramework/Actor/RectLightActor.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SpotLightComponent.h"
-#include "Components/RectLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/TextRenderComponent.h"
 

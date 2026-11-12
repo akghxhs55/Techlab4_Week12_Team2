@@ -141,32 +141,3 @@ public:
 	bool GetWholeSceneProjectedShadowInitializer(const FSceneView& View,
 		TArray<FWholeSceneProjectedShadowInitializer>& OutInitializers) const override;
 };
-
-class FRectLightSceneProxy : public FLocalLightSceneProxy
-{
-public:
-	using FLocalLightSceneProxy::FLocalLightSceneProxy;
-	void GetLightShaderParameters(FLightRenderParameters& Out) const override;
-};
-
-class FAmbientLightSceneProxy
-{
-public:
-	bool IsEnabled() const { return false; }
-	bool IsShown(bool) const { return false; }
-	const FAmbientLightRenderData& GetRenderData() const { return RenderData; }
-
-private:
-	FAmbientLightRenderData RenderData{};
-};
-
-class FSkyLightSceneProxy
-{
-public:
-	bool IsEnabled() const { return false; }
-	bool IsShown(bool) const { return false; }
-	const FSkyLightRenderData& GetRenderData() const { return RenderData; }
-
-private:
-	FSkyLightRenderData RenderData{};
-};

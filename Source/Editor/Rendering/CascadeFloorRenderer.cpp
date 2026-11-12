@@ -7,7 +7,7 @@
 
 void FCascadeFloorRenderer::Init()
 {
-	Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/CascadeFloorShader.hlsl");
+	Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/CascadeFloorShader.hlsl");
 	PipelineState.Shader = Shader;
 	PipelineState.Topology = EPrimitiveTopology::TriangleList;
 	PipelineState.RasterizerState = ERasterizerState::SolidNone;

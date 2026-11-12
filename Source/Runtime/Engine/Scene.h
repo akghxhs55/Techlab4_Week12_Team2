@@ -5,12 +5,11 @@
 #include "Components/BillboardComponent.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/LightComponent.h"
-#include "Components/SkyLightComponent.h"
+#include "Components/AmbientLightComponent.h"
 #include "Components/DecalComponent.h"
 #include "Math/Frustum.h"
 #include "Math/BVH.h"
 #include "Render/Renderer.h"
-#include "Render/SkyLightEnvironment.h"
 #include "Render/LightRenderData.h"
 #include "Render/LightSceneInfo.h"
 #include <unordered_map>
@@ -31,14 +30,10 @@ public:
 	void RemoveDecal(UDecalComponent* Component);
 	void RemoveAllDecals();
 
-	const class FAmbientLightSceneProxy* GetActiveAmbientLight(bool bGameView) const { return nullptr; }
-	FAmbientLightRenderData GetSkyAmbientLight(bool bGameView) const;
-	void PrepareSkyLight(const FSkyLightRenderData& SkyLight);
-	const FSkyLightEnvironment* FindSkyLightEnvironment(const FString& SourcePath) const;
-	FSkyLightEnvironment* FindPendingSkyLightEnvironment(const FString& SourcePath);
+	FAmbientLightRenderData GetAmbientLight(bool bGameView) const;
 
 	const TArray<FDirectionalLightSceneProxy*>& GetDirectionalLights() const { return DirectionalLightProxies; }
-	// Point·Spot·Rect를 한 배열로 다룬다. 종류는 GetLightShaderParameters가 채우는 Type으로 구분한다.
+	// Point·Spot를 한 배열로 다룬다. 종류는 GetLightShaderParameters가 채우는 Type으로 구분한다.
 	const TArray<FLocalLightSceneProxy*>& GetLocalLights() const { return LocalLightProxies; }
 
 	void UpdateAllTransforms();
@@ -76,7 +71,7 @@ public:
 	TArray<FLightSceneInfo*>              Lights;
 	TArray<FLocalLightSceneProxy*>        LocalLightProxies;      // ↔ PackedIndex ↔
 	TArray<FDirectionalLightSceneProxy*>  DirectionalLightProxies;
-	TArray<USkyLightComponent*>           SkyLights;               // 프록시 없음
+	TArray<UAmbientLightComponent*>           AmbientLights;               // 프록시 없음
 
 	TArray<UDecalComponent*>			  Decals;
 
@@ -89,5 +84,4 @@ private:
 	uint64 ShadowVersion = 0;
 	uint64 ShadowOldestVersion = 0;
 
-	std::unordered_map<FString, TUniquePtr<FSkyLightEnvironment>> SkyLightEnvironments;
 };

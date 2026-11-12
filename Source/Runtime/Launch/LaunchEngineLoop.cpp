@@ -66,7 +66,7 @@ namespace
 	{
 		if (!FPaths::InitEngineDir())
 		{
-			MessageBoxW(nullptr, L"Cannot find the engine folder (Resources/Shader).", L"Hitori", MB_OK | MB_ICONERROR);
+			MessageBoxW(nullptr, L"Cannot find the engine folder (EngineResources/Shaders).", L"Hitori", MB_OK | MB_ICONERROR);
 			return false;
 		}
 
@@ -172,7 +172,7 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 
 	{
 		FLoadStageTimer Timer{ "Phase/InitScenePasses" };
-		Renderer->InitScenePasses(Config.SkyPanorama ? Config.SkyPanorama : "");
+		Renderer->InitScenePasses();
 	}
 
 	return true;

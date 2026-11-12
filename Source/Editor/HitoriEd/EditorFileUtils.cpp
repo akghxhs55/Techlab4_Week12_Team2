@@ -4,6 +4,7 @@
 #include "Core/EngineLog.h"
 #include <commdlg.h>
 #include "Serialization/JsonArchive.h"
+#include "Core/Misc/Paths.h"
 #include "Editor/Asset/FbxImporter/FbxImporter.h"
  
 FString FEditorFileUtils::CurrentScenePath = "";
@@ -146,7 +147,8 @@ FString FEditorFileUtils::OpenSaveSceneDialog()
 
 	ofn.lpstrFilter = "Scene Files (*.scene)\0*.scene\0";
 	ofn.lpstrDefExt = "scene";
-	ofn.lpstrInitialDir = "Scene/";
+	const FString SceneDirectory = FPaths::ToUtf8(FPaths::ProjectScenesDir());
+	ofn.lpstrInitialDir = SceneDirectory.c_str();
 
 	ofn.Flags =
 		OFN_PATHMUSTEXIST |

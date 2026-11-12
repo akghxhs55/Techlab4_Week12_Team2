@@ -9,12 +9,6 @@ enum class EShaderType
 	Compute,
 };
 
-enum class ERenderingPath
-{
-    Forward,
-    Deferred
-};
-
 enum class ELightingModel
 {
     Gouraud,
@@ -26,9 +20,7 @@ enum class ELightingModel
 enum class ELightCullingMode
 {
     Off = 0,
-    Tiled = 1,
-    Clustered = 2,
-    Tiled25D = 3
+    Tiled = 1
 };
 
 enum class EPcfMode : uint32_t

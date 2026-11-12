@@ -1,7 +1,7 @@
 #include "EnginePCH.h"
 
 #include "Window.h"
-#include "../resource.h"
+#include "Core/Windows/ResourceIds.h"
 #include "Input/InputSystem.h"
 
 #include <dwmapi.h>

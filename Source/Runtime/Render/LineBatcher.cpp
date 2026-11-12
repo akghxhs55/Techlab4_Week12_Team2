@@ -17,7 +17,7 @@ bool FLineBatcher::Init(FRenderer* InRenderer, UWorld* InWorld)
 	Renderer = InRenderer;
 	World = InWorld;
 
-	LineShader = FRenderResourceManager::GetShaderProgram("Resources/Shader/BoundingBoxShader.hlsl");
+	LineShader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/BoundingBoxShader.hlsl");
 
 	PipelineState.Shader = LineShader;
 	PipelineState.Topology = EPrimitiveTopology::LineList;

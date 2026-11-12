@@ -51,7 +51,7 @@ void FTextRenderer::Init(uint32 InMaxCharacters)
 	MVP = RenderCommand::CreateConstantBuffer(sizeof(TextTransformData));
 	ScreenPx = RenderCommand::CreateConstantBuffer(sizeof(MSDFData));
 
-	TextShader = FRenderResourceManager::GetShaderProgram("Resources/Shader/TextShader.hlsl");
+	TextShader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/TextShader.hlsl");
 
 	PipelineState.Shader = TextShader;
 	PipelineState.Topology = EPrimitiveTopology::TriangleList;

@@ -40,7 +40,6 @@ enum class EViewportMode
 	WorldNormal,
 	LightCulling,
 	Cascade,
-	ShadowMask,
 };
 
 // 에디터 뷰포트 클라이언트
@@ -151,7 +150,6 @@ public:
 	bool IsWorldNormal() const { return ViewportMode == EViewportMode::WorldNormal; }
 	bool IsLightCulling() const { return ViewportMode == EViewportMode::LightCulling; }
 	bool IsCascade() const { return ViewportMode == EViewportMode::Cascade; }
-	bool IsShadowMask() const { return ViewportMode == EViewportMode::ShadowMask; }
 	EViewportMode GetViewportMode() const { return ViewportMode; }
 	void SetViewportMode(const EViewportMode InViewportMode) { ViewportMode = InViewportMode; }
 	float GetMaxRange() const { return MaxRange; }

@@ -103,11 +103,8 @@ void FEditorControlsPanel::OnRender()
 	if (ImGui::Button("Point Light"))
 		World->SpawnActor(APointLightActor::StaticClass());
 	ImGui::SameLine();
-	if (ImGui::Button("Rect Light"))
-		World->SpawnActor(ARectLightActor::StaticClass());
-	ImGui::SameLine();
-	if (ImGui::Button("Sky Light"))
-		World->SpawnActor(ASkyLightActor::StaticClass());
+	if (ImGui::Button("Ambient Light"))
+		World->SpawnActor(AAmbientLightActor::StaticClass());
 	ImGui::SameLine();
 	if (ImGui::Button("Decal"))
 		World->SpawnActor(ADecalActor::StaticClass());
@@ -145,7 +142,7 @@ void FEditorControlsPanel::OnRender()
 
 	//////////////////////////////////////////////////////
 
-	// Gizmo가 없는 앱(Benchmark 등)에서는 이 섹션을 통째로 건너뛴다.
+	// Gizmo가 없는 앱에서는 이 섹션을 통째로 건너뛴다.
 	if (Gizmo)
 	{
 		ImGui::Dummy(ImVec2(0.0f, SectionGap));

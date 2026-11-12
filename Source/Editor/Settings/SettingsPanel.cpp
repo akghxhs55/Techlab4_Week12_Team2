@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Core/Misc/Paths.h"
 #include "Editor/Settings/SettingsPanel.h"
 #include "Animation/AnimSequence.h"
 #include "Asset/AssetManager.h"
@@ -63,18 +64,12 @@ void FSettingsPanel::OnRender()
 	ImGui::Checkbox("Use OBBTree", &Settings.bDecalOBBTree);
 	ImGui::Unindent();
 
-	const char* RenderingPaths[] = { "Forward", "Deferred" };
-	int RenderingPathIndex = static_cast<int>(Settings.RenderingPath);
-	ImGui::SetNextItemWidth(200.0f);
-	if (ImGui::Combo("Rendering Path", &RenderingPathIndex, RenderingPaths, IM_ARRAYSIZE(RenderingPaths)))
-		Settings.RenderingPath = static_cast<ERenderingPath>(RenderingPathIndex);
-
 	const char* LightingModels[] = { "Gouraud", "Lambert", "Phong", "Unlit" };
 	int LightingModelIndex = static_cast<int>(Settings.LightingModel);
 	ImGui::SetNextItemWidth(200.0f);
 	if (ImGui::Combo("Lighting Model", &LightingModelIndex, LightingModels, IM_ARRAYSIZE(LightingModels)))
 		Settings.LightingModel = static_cast<ELightingModel>(LightingModelIndex);
-	const char* LightCullingModes[] = { "Off", "Tiled", "Clustered", "Tiled 2.5D" };
+	const char* LightCullingModes[] = { "Off", "Tiled" };
 	int LightCullingModeIndex = static_cast<int>(Settings.LightCullingMode);
 	ImGui::SetNextItemWidth(200.0f);
 	if (ImGui::Combo("Light Culling", &LightCullingModeIndex,
@@ -83,7 +78,6 @@ void FSettingsPanel::OnRender()
 		Settings.LightCullingMode = static_cast<ELightCullingMode>(LightCullingModeIndex);
 	}
 	ImGui::TextDisabled("Forward Lambert/Phong only; Off evaluates all uploaded local lights.");
-	ImGui::TextDisabled("Forward Lambert/Phong only; off evaluates all visible local lights.");
 
 	ImGui::Dummy(ImVec2(0.0f, SectionGap));
 	ImGui::SeparatorText("Debug Draw (PIE)");
@@ -199,7 +193,9 @@ bool FSettingsPanel::SaveSettings() const
 {
 	FEditorSettings Snapshot = Settings;
 	ReadViewportSettings(Snapshot);
-	std::ofstream File("editor.ini");
+	std::error_code Ec;
+	std::filesystem::create_directories(FPaths::EditorSettingsFile().parent_path(), Ec);
+	std::ofstream File(FPaths::EditorSettingsFile());
 
 	if (!File.is_open())
 	{
@@ -233,8 +229,7 @@ bool FSettingsPanel::SaveSettings() const
 	File << "ShowCameraOverlay=" << Settings.bShowCameraOverlay << "\n";
 	File << "ShowSkeletalMesh=" << Settings.bShowSkeletalMesh << "\n";
 
-	File << "LightCullingMode=" << (Settings.LightCullingMode == ELightCullingMode::Off ? "Off" : Settings.LightCullingMode == ELightCullingMode::Tiled ? "Tiled" : Settings.LightCullingMode == ELightCullingMode::Tiled25D ? "Tiled25D" : "Clustered") << "\n";
-	File << "RenderingPath=" << (Settings.RenderingPath == ERenderingPath::Forward ? "Forward" : "Deferred") << "\n";
+	File << "LightCullingMode=" << (Settings.LightCullingMode == ELightCullingMode::Off ? "Off" : "Tiled") << "\n";
 	File << "LightingModel=" << (Settings.LightingModel == ELightingModel::Gouraud ? "Gouraud" :
 		Settings.LightingModel == ELightingModel::Lambert ? "Lambert" :
 		Settings.LightingModel == ELightingModel::Unlit ? "Unlit" : "Phong") << "\n";
@@ -279,7 +274,9 @@ bool FSettingsPanel::SaveSettings() const
 // 파일의 키를 파싱해 렌더·카메라·레이아웃 설정을 복원한다.
 bool FSettingsPanel::LoadSettings()
 {
-	std::ifstream File("editor.ini");
+	const auto FilePath = std::filesystem::exists(FPaths::EditorSettingsFile()) ?
+		FPaths::EditorSettingsFile() : FPaths::ProjectDir() / "editor.ini";
+	std::ifstream File(FilePath);
 	if (!File.is_open())
 	{
 		return false;
@@ -323,7 +320,7 @@ bool FSettingsPanel::LoadSettings()
                     else if (Key == Prefix + "Wireframe" && (Value == 0 || Value == 1))
                         Settings.ViewWireframe[Index] = static_cast<int32>(Value);
 					else if (Key == Prefix + "Mode" && Value >= 0 &&
-						Value <= static_cast<int32>(EViewportMode::ShadowMask) && Value == static_cast<int32>(Value))
+						Value <= static_cast<int32>(EViewportMode::Cascade) && Value == static_cast<int32>(Value))
 						Settings.ViewMode[Index] = static_cast<int32>(Value);
                     else if (Key == Prefix + "LocationX")
                     {
@@ -395,17 +392,10 @@ bool FSettingsPanel::LoadSettings()
 				{
 					if (ValueStr == "Off") Settings.LightCullingMode = ELightCullingMode::Off;
 					else if (ValueStr == "Tiled") Settings.LightCullingMode = ELightCullingMode::Tiled;
-					else if (ValueStr == "Clustered") Settings.LightCullingMode = ELightCullingMode::Clustered;
-					else if (ValueStr == "Tiled25D") Settings.LightCullingMode = ELightCullingMode::Tiled25D;
 				}
 				else if (Key == "EnableTiledLightCulling" || Key == "EnableClusteredLightCulling")
 				{
 					Settings.LightCullingMode = std::stoi(ValueStr) != 0 ? ELightCullingMode::Tiled : ELightCullingMode::Off;
-				}
-				else if (Key == "RenderingPath")
-				{
-					if (ValueStr == "Forward") Settings.RenderingPath = ERenderingPath::Forward;
-					else if (ValueStr == "Deferred") Settings.RenderingPath = ERenderingPath::Deferred;
 				}
 				else if (Key == "LightingModel")
 				{

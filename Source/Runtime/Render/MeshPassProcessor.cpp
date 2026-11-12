@@ -33,8 +33,7 @@ namespace
 	uint64 GroupKey(const FStaticDrawGroup& Group)
 	{
 		return (static_cast<uint64>(Group.Material->SortID) << 47)
-			| (static_cast<uint64>(Group.Mesh->SortID) << 31)
-			| (static_cast<uint64>(Group.LODIndex & 0x3) << 29);
+			| (static_cast<uint64>(Group.Mesh->SortID) << 31);
 	}
 
 	bool BuildBatch(FMeshDrawBatch& Batch, FVertexBuffer* VB, FIndexBuffer* IB,
@@ -82,14 +81,12 @@ namespace
 		else
 		{
 			EPSOType Type = Material->PSOType;
-			if (Pass == EMeshPassType::GBuffer && Type == EPSOType::StaticMesh_Opaque)
-				Type = EPSOType::StaticMesh_GBuffer;
-			else if (View.bIsWireframe && Type == EPSOType::StaticMesh_Opaque)
+			if (View.bIsWireframe && Type == EPSOType::StaticMesh_Opaque)
 				Type = EPSOType::StaticMesh_Wireframe;
 			FPipelineState* Pipeline = FRenderResourceManager::GetPSO(Type);
 			if (!Pipeline || !Pipeline->Shader) return false;
 			Batch.Pipeline = *Pipeline;
-			Batch.bForceWireframe = Pass == EMeshPassType::GBuffer && View.bIsWireframe;
+			Batch.bForceWireframe = View.bIsWireframe;
 			if (Material->PSOType == EPSOType::StaticMesh_Opaque ||
 				Material->PSOType == EPSOType::StaticMesh_Translucent ||
 				Material->PSOType == EPSOType::StaticMesh_Wireframe)
@@ -141,7 +138,7 @@ namespace
 
 	FMeshDrawBatch::FItem BuildItem(const FMatrix& World, const FSceneView& View,
 		EMeshPassType Pass, uint32 Slot, uint32 StartIndex, uint32 IndexCount,
-		const void* ObjectKey, bool bOccludedByGpu, bool bReceiveShadow, bool bReceivesDecals, const FAABB &Bounds,
+		const void* ObjectKey, bool bReceiveShadow, bool bReceivesDecals, const FAABB &Bounds,
 		const FPrimitiveSceneProxy* Proxy)
 	{
 		FMeshDrawBatch::FItem Item{};
@@ -149,7 +146,6 @@ namespace
 		Item.StartIndex = StartIndex;
 		Item.IndexCount = IndexCount;
 		Item.ObjectKey = ObjectKey;
-		Item.bOccludedByGpu = bOccludedByGpu;
 		Item.bReceivesDecals = bReceivesDecals;
 		Item.Bounds = Bounds;
 		Item.Proxy = Proxy;
@@ -175,14 +171,13 @@ namespace
 
 	FMeshDrawBatch::FItem BuildBatchItem(const FMatrix& World, const FMatrix& View, const FMatrix& Projection,
 		uint32 Slot, uint32 StartIndex, uint32 IndexCount,
-		const void* ObjectKey, bool bOccludedByGpu)
+		const void* ObjectKey)
 	{
 		FMeshDrawBatch::FItem Item{};
 		Item.ObjectSlot = Slot;
 		Item.StartIndex = StartIndex;
 		Item.IndexCount = IndexCount;
 		Item.ObjectKey = ObjectKey;
-		Item.bOccludedByGpu = bOccludedByGpu;
 
 		FForwardObjectConstants Constants{};
 		Constants.World = World;
@@ -227,19 +222,19 @@ bool FMeshPassProcessor::Build(const FSceneView& View, const FRenderQueue& Queue
 				if (!Group.Items.empty()) Groups.Add(&Group);
 
 		std::sort(Groups.begin(), Groups.end(),
-			[](const FStaticDrawGroup* A, const FStaticDrawGroup* B) { return GroupKey(*A) < GroupKey(*B); }); // 재질, 메시, LOD 순으로 정렬
+			[](const FStaticDrawGroup* A, const FStaticDrawGroup* B) { return GroupKey(*A) < GroupKey(*B); }); // 재질, 메시 순으로 정렬
 
 		for (const FStaticDrawGroup* Group : Groups)
 		{
 			FMeshDrawBatch Batch; // Render에게 전달하는 최종 구조체
-			if (!BuildBatch(Batch, Group->Mesh->GetVertexBuffer(Group->LODIndex), Group->Mesh->GetIndexBuffer(Group->LODIndex), Group->Material, Pass, View, LightingModel))
+			if (!BuildBatch(Batch, Group->Mesh->GetVertexBuffer(), Group->Mesh->GetIndexBuffer(), Group->Material, Pass, View, LightingModel))
 				return false;
 
 			Batch.Items.Reserve(static_cast<uint32>(Group->Items.size()));
 
 			for (const FStaticDrawItem& Item : Group->Items)
 				Batch.Items.Add(BuildItem(Item.Proxy->GetLocalToWorld(), View, Pass, Item.Slot,
-					Item.StartIndex, Item.IndexCount, Item.Proxy, Item.bOccludedByGpu != 0, Item.Proxy->bReceiveShadow,
+					Item.StartIndex, Item.IndexCount, Item.Proxy, Item.Proxy->bReceiveShadow,
 					Item.Proxy->bReceivesDecals, Item.Proxy->GetBounds(), Item.Proxy));
 			Out.Add(std::move(Batch));
 		}
@@ -253,8 +248,8 @@ bool FMeshPassProcessor::Build(const FSceneView& View, const FRenderQueue& Queue
 		if (Pass == EMeshPassType::WorldNormal &&
 			(!Packet.Material || Packet.Material->PSOType != EPSOType::StaticMesh_Opaque)) continue;
 		FMeshDrawBatch Batch;
-		FVertexBuffer* VB = Packet.Mesh ? Packet.Mesh->GetVertexBuffer(Packet.LODIndex) : Packet.VertexBuffer;
-		FIndexBuffer* IB = Packet.Mesh ? Packet.Mesh->GetIndexBuffer(Packet.LODIndex) : Packet.IndexBuffer;
+		FVertexBuffer* VB = Packet.Mesh ? Packet.Mesh->GetVertexBuffer() : Packet.VertexBuffer;
+		FIndexBuffer* IB = Packet.Mesh ? Packet.Mesh->GetIndexBuffer() : Packet.IndexBuffer;
 		if (!BuildBatch(Batch, VB, IB, Packet.Material, Pass, View,
 			LightingModel, Packet.MaterialParamData, Packet.MaterialParamDataSize)) return false;
 		if (!ApplyGpuSkin(Batch, Packet)) continue;
@@ -263,7 +258,7 @@ bool FMeshPassProcessor::Build(const FSceneView& View, const FRenderQueue& Queue
 		const void* ObjectKey = Packet.Proxy ? static_cast<const void*>(Packet.Proxy) : static_cast<const void*>(&Packet);
 
 		Batch.Items.Add(BuildItem(PacketWorld(Packet), View, Pass, Packet.Slot,
-			Packet.StartIndex, IndexCount, ObjectKey, Packet.bOccludedByGpu, !Packet.Proxy || Packet.Proxy->bReceiveShadow,
+			Packet.StartIndex, IndexCount, ObjectKey, !Packet.Proxy || Packet.Proxy->bReceiveShadow,
 			!Packet.Proxy || Packet.Proxy->bReceivesDecals,
 			Packet.Proxy ? Packet.Proxy->GetBounds() : ConservativeBounds, Packet.Proxy));
 
@@ -318,16 +313,15 @@ bool FMeshPassProcessor::Build(const TArray<FPrimitiveSceneProxy*>& ShadowMeshes
 		}
 
 		UStaticMesh* Mesh = Proxy->GetMesh();
-		if (!Mesh || Proxy->GetLODCount() == 0)
+		if (!Mesh || !Proxy->GetRenderState())
 			continue;
 
-		constexpr uint8 LOD = 0;
-		const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
+		const FMeshRenderState& MeshState = *Proxy->GetRenderState();
 
 		FMeshDrawBatch Batch{};
 		Batch.Pipeline = *Pipeline;
-		Batch.VertexBuffer = Mesh->GetVertexBuffer(LOD);
-		Batch.IndexBuffer = Mesh->GetIndexBuffer(LOD);
+		Batch.VertexBuffer = Mesh->GetVertexBuffer();
+		Batch.IndexBuffer = Mesh->GetIndexBuffer();
 		Batch.bUseObjectSlots = false;
 		Batch.bBindViewConstants = true;
 		Batch.ObjectBindingSlot = 2;
@@ -338,9 +332,9 @@ bool FMeshPassProcessor::Build(const TArray<FPrimitiveSceneProxy*>& ShadowMeshes
 			return false;
 		}
 
-		for (uint32 Index = 0; Index < CachedLOD.NumSections; ++Index)
+		for (uint32 Index = 0; Index < MeshState.Sections.Num(); ++Index)
 		{
-			const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + Index);
+			const FCachedMeshSection& Section = Proxy->GetSection(Index);
 			if (Section.IndexCount == 0)
 				continue;
 

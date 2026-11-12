@@ -8,7 +8,6 @@ class FStructuredBuffer;
 class UStaticMesh;
 class UTexture2D;
 class FTexture2DArray;
-class FTextureCube;
 class FShaderProgram;
 class FVertexShader;
 class FPixelShader;
@@ -47,7 +46,6 @@ public:
 	static TUniquePtr<FTexture2D> CreateTexture2D(const FTextureDesc& Desc, const FImageData& Image);
 	static TUniquePtr<FTexture2DArray> CreateTexture2DArray(const FTextureDesc& Desc, const void* InitialData = nullptr);
 	// ArraySize는 면 개수(6)로 고정된다.
-	static TUniquePtr<FTextureCube> CreateTextureCube(const FTextureDesc& Desc, const TArray<const void*>& InitialDatas);
 
 	static TUniquePtr<FVertexShader> CreateVertexShader(const FShaderByteCode& ByteCode);
 	static TUniquePtr<FPixelShader> CreatePixelShader(const FShaderByteCode& ByteCode);
@@ -55,7 +53,7 @@ public:
 
 	static void BindPipelineState(const FPipelineState& PipelineState);
 
-	static void BindMesh(UStaticMesh* Mesh, uint32 LODIndex = 0);
+	static void BindMesh(UStaticMesh* Mesh);
 
 	static void BindShaderProgram(FShaderProgram* Shader);
 
@@ -84,7 +82,6 @@ public:
 	static void Unmap(FBuffer* InBuffer);
 	static void BindShaderResource(uint32 Slot, FTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 	static void BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
-	static void BindShaderResource(uint32 Slot, const FTextureCube* TextureCube, EShaderBindFlagBits FlagBits);
 	static void BindShaderResource(uint32 Slot, const FStructuredBuffer* StructuredBuffer, EShaderBindFlagBits FlagBits);
 	static void UnbindShaderResources(uint32 FirstSlot, uint32 Count, EShaderBindFlagBits FlagBits);
 
@@ -112,7 +109,6 @@ public:
 	static void BindComputeShader(FComputeShader* ComputeShader);
 	static void Dispatch(uint32 ThreadGroupCountX, uint32 ThreadGroupCountY, uint32 ThreadGroupCountZ);
 	static void BindUnorderedAccess(uint32 Slot, FStructuredBuffer* StructuredBuffer);
-	static void BindUnorderedAccess(uint32 Slot, FTextureCube* TextureCube);
 	static void UnbindUnorderedAccess(uint32 Slot);
 	static void ClearUnorderedAccess(FStructuredBuffer* StructuredBuffer, uint32 Value = 0);
 

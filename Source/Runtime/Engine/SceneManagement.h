@@ -7,7 +7,7 @@
 #include "Math/Frustum.h"
 #include <cstddef>
 
-// 모든 광원(방향광·포인트·스포트·렉트)이 공유하는 GPU 원소.
+// 모든 광원(방향광·포인트·스포트)이 공유하는 GPU 원소.
 // LightData.hlsli의 FLightRenderParameters와 바이트 단위로 같아야 한다.
 struct FLightRenderParameters
 {
@@ -17,26 +17,19 @@ struct FLightRenderParameters
 	float Intensity;
 	FVector Direction;
 	float InnerConeCos;
-	FVector Right;
 	float FalloffExponent;
 	float OuterConeCos;
-	float HalfWidth;
-	float HalfHeight;
 	uint32 Type;
-	// Rect 전용: 발광면 가장자리의 문(Barn Door)
-	float BarnDoorCos;
-	float BarnDoorSin;
-	float BarnDoorLength;
-	// ScreenShadowMask 채널. Deferred는 그림자 맵이 있으면 0(광원별 마스크), Forward는 겹침 기반 배정 0~3. 없으면 InvalidShadowMapChannel.
+	// ScreenShadowMask 채널. 겹침 기반 배정 0~3. 없으면 InvalidShadowMapChannel.
 	uint32 ShadowMapChannel;
 	float SourceSize; // Directional: tan(angular radius), Point/Spot: world radius
 
 	static constexpr uint32 InvalidShadowMapChannel = 0xFFFFFFFFu;
 };
 
-static_assert(sizeof(FLightRenderParameters) == 100, "sizeof(LightData.hlsli FLightRenderParameters) == sizeof(FLightRenderParameters)");
-static_assert(offsetof(FLightRenderParameters, ShadowMapChannel) == 92);
-static_assert(offsetof(FLightRenderParameters, SourceSize) == 96);
+static_assert(sizeof(FLightRenderParameters) == 68, "sizeof(LightData.hlsli FLightRenderParameters) == sizeof(FLightRenderParameters)");
+static_assert(offsetof(FLightRenderParameters, ShadowMapChannel) == 60);
+static_assert(offsetof(FLightRenderParameters, SourceSize) == 64);
 
 // Directional 라이트 CSM에서 캐스케이드 하나가 맡는 구간과 Fade 정보
 class FShadowCascadeSettings

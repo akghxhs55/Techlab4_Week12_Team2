@@ -26,7 +26,7 @@ public:
 	class UActorComponent* AddComponent(class UClass* ComponentClass);
 
 	// 기초 장면을 세팅합니다.
-	// Skybox, Directional Light, SkyLight, 바닥 Plane등을 세팅합니다.
+	// Directional Light, Ambient Light, 바닥 Plane등을 세팅합니다.
 	void Setup();
 
 private:

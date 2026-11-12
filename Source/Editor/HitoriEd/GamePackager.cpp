@@ -16,10 +16,10 @@ FGamePackager::~FGamePackager()
 bool FGamePackager::Start(const FString& Config)
 {
 	if (IsRunning()) return false;
-	// 엔진(Package.bat, Resources)과 프로젝트(Assets 등)는 서로 다른 폴더일 수 있다.
+	// 엔진(Setup/Packaging/Package.bat, EngineResources)과 프로젝트(Content/Game)는 서로 다른 폴더일 수 있다.
 	const std::filesystem::path Root = FPaths::EngineDir();
 	std::error_code Ec;
-	if (std::filesystem::exists(Root / "Package.bat", Ec) && std::filesystem::exists(Root / "premake5.lua", Ec))
+	if (std::filesystem::exists(Root / "Setup/Packaging/Package.bat", Ec) && std::filesystem::exists(Root / "Setup/Build/premake5.lua", Ec))
 		return StartBuildAndPackage(Root, Config);
 	return StartCopyOnly(Root);
 }
@@ -46,7 +46,7 @@ bool FGamePackager::StartBuildAndPackage(const std::filesystem::path& Root, cons
 
 	// 작업 디렉터리는 프로젝트 폴더이므로 엔진 폴더의 Package.bat을 절대 경로로 부르고 프로젝트 파일을 넘긴다.
 	// cmd /c는 바깥 따옴표 한 쌍을 벗기므로 전체를 한 번 더 감싼다.
-	const std::wstring BatchPath = (Root / L"Package.bat").wstring();
+	const std::wstring BatchPath = (Root / L"Setup/Packaging/Package.bat").wstring();
 	const std::wstring ConfigW(Config.begin(), Config.end());
 	std::wstring CommandLine = L"cmd.exe /c \"\"" + BatchPath + L"\" " + ConfigW + L" \"" + FPaths::ProjectFilePath().wstring() + L"\"\"";
 	STARTUPINFOW StartupW{};
@@ -85,7 +85,7 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 
 	const std::filesystem::path ProjectDir = FPaths::ProjectDir();
 	const std::filesystem::path ProjectFile = FPaths::ProjectFilePath();
-	const std::filesystem::path Out = ProjectDir / "Build" / "Package" / FPaths::FromUtf8(FPaths::ProjectName());
+	const std::filesystem::path Out = ProjectDir / "Build" / "Package" / FPaths::ProjectFilePath().stem();
 	bCopyDone = false;
 	bCopyFailed = false;
 	CopyResult = FPaths::ToUtf8(Out);
@@ -103,18 +103,31 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 				CopyResult = "HitoriGame.exe";
 				bCopyFailed = true;
 			}
-			// 엔진 셰이더(Resources)와 엔진 콘텐츠(EngineContent)는 엔진 폴더에서, 프로젝트 콘텐츠는 프로젝트 폴더에서 가져온다.
+			// 엔진 콘텐츠(EngineResources)는 엔진 폴더에서, 프로젝트 콘텐츠(Content/Game)는 프로젝트 폴더에서 가져온다.
 			// 게임 exe는 옆에 있는 .hproject를 찾아 그 폴더를 프로젝트 폴더로 쓴다.
 			const std::pair<std::filesystem::path, const char*> Folders[] =
 			{
-				{ Root, "Resources" }, { Root, "EngineContent" },
-				{ ProjectDir, "Assets" }, { ProjectDir, "Scenes" }, { ProjectDir, "Scripts" }, { ProjectDir, "Config" },
+				{ Root / "EngineResources", "EngineResources" },
+				{ FPaths::ProjectContentDir(), "Content/Game" },
+				{ FPaths::ProjectScenesDir(), "Content/Game/Scenes" },
+				{ FPaths::ProjectScriptsDir(), "Content/Game/Scripts" },
+				{ ProjectDir / "Config", "Config" },
 			};
 			for (const auto& [Base, Folder] : Folders)
 			{
 				if (bCopyFailed) break;
-				if (!fs::exists(Base / Folder, Ec)) continue;
-				fs::copy(Base / Folder, Out / Folder, fs::copy_options::recursive | fs::copy_options::overwrite_existing, Ec);
+				if (!fs::exists(Base, Ec)) continue;
+				fs::create_directories(Out / Folder, Ec);
+                for (fs::recursive_directory_iterator It(Base, Ec), End; !Ec && It != End; It.increment(Ec))
+                {
+                    if (!It->is_regular_file(Ec)) continue;
+                    FString Name = It->path().filename().string();
+                    std::transform(Name.begin(), Name.end(), Name.begin(), [](unsigned char C) { return static_cast<char>(std::tolower(C)); });
+                    if (Name.ends_with(".obj.bin")) continue;
+                    const fs::path Target = Out / Folder / It->path().lexically_relative(Base);
+                    fs::create_directories(Target.parent_path(), Ec);
+                    if (Ec || !fs::copy_file(It->path(), Target, fs::copy_options::overwrite_existing, Ec)) break;
+                }
 				if (Ec) { CopyResult = Folder; bCopyFailed = true; }
 			}
 			if (!bCopyFailed && !fs::copy_file(ProjectFile, Out / ProjectFile.filename(), fs::copy_options::overwrite_existing, Ec))

@@ -8,7 +8,7 @@
 void FHeightFogRenderer::Init(FRenderer* InRenderer)
 {
 	Renderer = InRenderer;
-	Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/HeightFogShader.hlsl");
+	Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/HeightFogShader.hlsl");
 	PipelineState.Shader = Shader;
 	PipelineState.Topology = EPrimitiveTopology::TriangleList;
 	PipelineState.RasterizerState = ERasterizerState::SolidNone;

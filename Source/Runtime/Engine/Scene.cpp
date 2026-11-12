@@ -1,7 +1,7 @@
 #include "EnginePCH.h"
 #include "Scene.h"
 #include "Components/DirectionalLightComponent.h"
-#include "Components/SkyLightComponent.h"
+#include "Components/AmbientLightComponent.h"
 
 void FScene::AddPrimitive(UPrimitiveComponent* Component)
 {
@@ -85,8 +85,8 @@ void FScene::AddLight(ULightComponent* Component)
 	FLightSceneProxy* Proxy = Component->CreateSceneProxy();
 	if (!Proxy)
 	{
-		if (USkyLightComponent* Sky = Cast<USkyLightComponent>(Component))
-			if (SkyLights.Find(Sky) == INDEX_NONE) SkyLights.Add(Sky);
+		if (UAmbientLightComponent* Ambient = Cast<UAmbientLightComponent>(Component))
+			if (AmbientLights.Find(Ambient) == INDEX_NONE) AmbientLights.Add(Ambient);
 		return;
 	}
 
@@ -128,10 +128,10 @@ void FScene::RemoveLight(ULightComponent* Component)
 	FLightSceneProxy* Proxy = Component->SceneProxy;
 	if (!Proxy)
 	{
-		if (USkyLightComponent* Sky = Cast<USkyLightComponent>(Component))
+		if (UAmbientLightComponent* Ambient = Cast<UAmbientLightComponent>(Component))
 		{
-			const int32 Found = SkyLights.Find(Sky);
-			if (Found != INDEX_NONE) SkyLights.RemoveAtSwap(Found);
+			const int32 Found = AmbientLights.Find(Ambient);
+			if (Found != INDEX_NONE) AmbientLights.RemoveAtSwap(Found);
 		}
 		return;
 	}
@@ -168,8 +168,7 @@ void FScene::RemoveAllLights()
 	for (FLightSceneProxy* Proxy : LocalLightProxies)       delete Proxy;
 	DirectionalLightProxies.Reset();
 	LocalLightProxies.Reset();
-	SkyLights.Reset();
-	SkyLightEnvironments.clear();
+	AmbientLights.Reset();
 }
 
 void FScene::AddDecal(UDecalComponent* Component)
@@ -191,39 +190,16 @@ void FScene::RemoveAllDecals()
 	Decals.Reset();
 }
 
-FAmbientLightRenderData FScene::GetSkyAmbientLight(bool bGameView) const
+FAmbientLightRenderData FScene::GetAmbientLight(bool bGameView) const
 {
-	for (const USkyLightComponent* Sky : SkyLights)
+	for (const UAmbientLightComponent* Ambient : AmbientLights)
 	{
-		if (!Sky || !Sky->IsShown(bGameView)) continue;
-		const FLinearColor Color(Sky->GetLightColor());
-		return { FVector4(Color.R, Color.G, Color.B, Sky->GetIntensity()) };
+		if (!Ambient || !Ambient->IsShown(bGameView)) continue;
+		const FLinearColor Color(Ambient->GetLightColor());
+		return { FVector4(Color.R, Color.G, Color.B, Ambient->GetIntensity()) };
 	}
 	return {};
 }
-
-void FScene::PrepareSkyLight(const FSkyLightRenderData& SkyLight)
-{
-	if (SkyLight.SourcePath.empty() || SkyLightEnvironments.contains(SkyLight.SourcePath)) return;
-	auto Environment = MakeUnique<FSkyLightEnvironment>();
-	Environment->Prepare(SkyLight.SourcePath);
-	SkyLightEnvironments.emplace(SkyLight.SourcePath, std::move(Environment));
-}
-
-FSkyLightEnvironment* FScene::FindPendingSkyLightEnvironment(const FString& SourcePath)
-{
-	const auto It = SkyLightEnvironments.find(SourcePath);
-	return It != SkyLightEnvironments.end() && It->second->IsPrepared() && !It->second->IsValid()
-		? It->second.get() : nullptr;
-}
-
-const FSkyLightEnvironment* FScene::FindSkyLightEnvironment(const FString& SourcePath) const
-{
-	const auto It = SkyLightEnvironments.find(SourcePath);
-	return It != SkyLightEnvironments.end() && It->second->IsValid() ? It->second.get() : nullptr;
-}
-
-
 
 void FScene::UpdateAllTransforms()
 {

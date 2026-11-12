@@ -4,7 +4,6 @@
 #include "Render/RenderCommand.h"
 
 #include "Engine/PrimitiveSceneProxy.h"
-#include "Asset/LOD/StaticMeshLODSelector.h"
 
 
 // StaticMesh 컴포넌트를 초기화한다.
@@ -61,33 +60,20 @@ UMaterial* UStaticMeshComponent::GetDefaultMaterial(int32 SlotIndex) const
 void UStaticMeshComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const FViewContext& ViewContext)
 {
 	if (!StaticMesh) return;
-	uint32 SelectedLOD = 0;
-	if (const FPrimitiveSceneProxy* Proxy = GetSceneProxy())
-	{
-		SelectedLOD = SelectLOD(*Proxy, ViewContext);
-	}
-	SubmitToRenderQueue(RenderQueue, SelectedLOD);
-}
 
-// 지정한 LOD의 Section으로 패킷을 만든다.
-void UStaticMeshComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, uint32 LODIndex)
-{
     const FPrimitiveSceneProxy* Proxy = GetSceneProxy();
     if (!StaticMesh || !Proxy) return;
     const FMeshRenderState* State = Proxy->GetRenderState();
     if (!State) return;
-    if (LODIndex >= State->LODCount) LODIndex = 0;
-    const FCachedMeshLOD& LOD = State->LODs[LODIndex];
-    for (uint32 I = 0; I < LOD.NumSections; ++I)
+    for (uint32 I = 0; I < State->Sections.Num(); ++I)
     {
-        const FCachedMeshSection& Section = State->Sections[LOD.FirstSection + I];
+        const FCachedMeshSection& Section = State->Sections[I];
         FRenderPacket& Packet = RenderQueue.AddDefaulted_GetRef();
         Packet.Proxy = Proxy;
         Packet.Mesh = StaticMesh;
         Packet.Material = Section.Material;
         Packet.StartIndex = Section.StartIndex;
         Packet.IndexCount = Section.IndexCount;
-        Packet.LODIndex = static_cast<uint8>(LODIndex);
     }
 }
 /*

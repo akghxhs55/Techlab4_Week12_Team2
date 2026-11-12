@@ -4,7 +4,7 @@
 #include "Engine/World.h"
 
 #include "Runtime/Components/DirectionalLightComponent.h"
-#include "Runtime/Components/SkyLightComponent.h"
+#include "Runtime/Components/AmbientLightComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Asset/AssetManager.h"
 #include "Runtime/GameFramework/Actor.h"
@@ -126,10 +126,8 @@ void FPreviewScene::Setup()
 		return;
 	}
 
-	// TODO: SkyPanorama 배경 생성
-	// 지금은 관련 기능이 없어서 일단 나중에
 
-	// Directional Light, SkyLight를 붙일 액터 생성
+	// Directional Light, Ambient Light를 붙일 액터 생성
 	AActor* SystemActor = World->SpawnActor<AActor>("PreviewSceneManagerActor");
 	if (!SystemActor)
 	{
@@ -155,17 +153,17 @@ void FPreviewScene::Setup()
 	}
 
 
-	// Setup SkyLight
+	// Setup AmbientLight
 	{
-		auto _SkyLightComponent = SystemActor->AddComponent(
-			USkyLightComponent::StaticClass(),
-			"SkyLightComponent"
+		auto _AmbientLightComponent = SystemActor->AddComponent(
+			UAmbientLightComponent::StaticClass(),
+			"AmbientLightComponent"
 		);
 
-		auto SkyLightComponent = Cast<USkyLightComponent>(_SkyLightComponent);
-		if (SkyLightComponent)
+		auto AmbientLightComponent = Cast<UAmbientLightComponent>(_AmbientLightComponent);
+		if (AmbientLightComponent)
 		{
-			SkyLightComponent->SetIntensity(0.25f);
+			AmbientLightComponent->SetIntensity(0.25f);
 		}
 	}
 

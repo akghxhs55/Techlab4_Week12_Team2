@@ -1,142 +1,53 @@
 #include "EnginePCH.h"
 #include "Asset/AssetUtils.h"
-
+#include "Core/Misc/Paths.h"
 #include <algorithm>
-#include <filesystem>
 
-std::filesystem::path ToPath(const FString& Value)
+namespace
 {
-	return std::filesystem::path(std::u8string(Value.begin(), Value.end()));
+    bool IsBuiltinKey(const fs::path& Path) { return !Path.has_parent_path() && !Path.has_extension(); }
+    bool RelativeInside(const fs::path& File, const fs::path& Root, fs::path& Relative)
+    {
+        const fs::path NormalFile = File.lexically_normal().make_preferred();
+        const fs::path NormalRoot = Root.lexically_normal().make_preferred();
+        auto Part = NormalFile.begin();
+        for (const auto& RootPart : NormalRoot)
+        {
+            if (Part == NormalFile.end() || _wcsicmp(Part->c_str(), RootPart.c_str()) != 0) return false;
+            ++Part;
+        }
+        Relative.clear();
+        for (; Part != NormalFile.end(); ++Part) Relative /= *Part;
+        return true;
+    }
 }
-
-FString ToString(const std::filesystem::path& Path)
-{
-	const auto UTF8 = Path.generic_u8string();
-	return FString(UTF8.begin(), UTF8.end());
-}
-
-bool IsBuiltinKey(const std::filesystem::path& Path)
-{
-	return !Path.has_parent_path() && !Path.has_extension();
-}
-
-bool HasAssetsPrefix(const std::filesystem::path& Path)
-{
-	if (Path.empty())
-	{
-		return false;
-	}
-
-	FString First = ToString(*Path.begin());
-	for (char& Character : First)
-	{
-		if (Character >= 'A' && Character <= 'Z')
-		{
-			Character += 'a' - 'A';
-		}
-	}
-
-	return First == "assets";
-}
-
 FString FAssetUtils::NormalizeAssetPath(const FString& Path)
 {
-	if (Path.empty())
-	{
-		return "";
-	}
-
-	// '\' 문자를 '/' 문자로 교체
-	FString Normalized = Path;
-	std::replace(Normalized.begin(), Normalized.end(), '\\', '/');
-
-	// 상대 경로들 resolve
-	const auto Result = ToPath(Normalized).lexically_normal();
-	return Result == "." ? FString{} : ToString(Result);
+    if (Path.empty()) return {};
+    FString Normal = Path;
+    std::replace(Normal.begin(), Normal.end(), '\\', '/');
+    const fs::path Result = FPaths::FromUtf8(Normal).lexically_normal();
+    return Result == "." ? FString{} : FPaths::ToUtf8(Result);
 }
-
 FString FAssetUtils::ResolveAssetFilePath(const FString& Path)
 {
-	const FString Normalized = NormalizeAssetPath(Path);
-	if (Normalized.empty())
-	{
-		return "";
-	}
-
-	const auto Input = ToPath(Normalized);
-	if (IsBuiltinKey(Input))
-	{
-		return "";
-	}
-
-	std::filesystem::path FilePath = Input;
-	if (Input.is_relative())
-	{
-		// Assets 접두 경로와 상위 디렉터리 경로는 프로젝트 기준으로 해석한다.
-		// 나머지는 Assets 상대 키로 해석하며, 현재 파일 유무로 추측하지 않는다.
-		if (!HasAssetsPrefix(Input) && *Input.begin() != "..")
-		{
-			FilePath = std::filesystem::path("Assets") / Input;
-		}
-	}
-
-	std::error_code Error;
-	const auto Absolute = std::filesystem::absolute(FilePath, Error);
-	return Error ? FString{} : ToString(Absolute.lexically_normal());
+    const FString Normal = NormalizeAssetPath(Path);
+    if (Normal.empty() || IsBuiltinKey(FPaths::FromUtf8(Normal))) return {};
+    fs::path File = FPaths::FromUtf8(FPaths::ResolveContentPath(Normal));
+    if (File.is_relative() && *File.begin() != "..") File = FPaths::ProjectContentDir() / File;
+    std::error_code Ec;
+    File = fs::absolute(File, Ec).lexically_normal();
+    return Ec ? FString{} : FPaths::ToUtf8(File);
 }
-
 FString FAssetUtils::GetAssetKey(const FString& Path)
 {
-	const FString Normalized = NormalizeAssetPath(Path);
-	if (Normalized.empty())
-	{
-		return "";
-	}
-
-	if (IsBuiltinKey(ToPath(Normalized)))
-	{
-		return Normalized;
-	}
-
-	const FString FilePath = ResolveAssetFilePath(Normalized);
-	if (FilePath.empty())
-	{
-		return "";
-	}
-
-	std::error_code Error;
-	const auto Root = std::filesystem::absolute("Assets", Error).lexically_normal();
-	if (Error)
-	{
-		return "";
-	}
-
-	const auto Absolute = ToPath(FilePath);
-	auto FilePart = Absolute.begin();
-	for (const auto& RootPart : Root)
-	{
-		if (FilePart == Absolute.end())
-		{
-			return FilePath;
-		}
-
-		const std::wstring FilePathWStr = FilePart->generic_wstring();
-		const std::wstring RootPathWStr = RootPart.generic_wstring();
-
-		// Windows의 경로 비교 규칙을 사용하되 파일명의 대소문자 표기는 보존한다.
-		if (_wcsicmp(FilePathWStr.c_str(), RootPathWStr.c_str()) != 0)
-		{
-			return FilePath;
-		}
-		
-		++FilePart;
-	}
-
-	std::filesystem::path Relative;
-	for (; FilePart != Absolute.end(); ++FilePart)
-	{
-		Relative /= *FilePart;
-	}
-
-	return ToString(Relative);
+    const FString Normal = NormalizeAssetPath(Path);
+    if (Normal.empty() || IsBuiltinKey(FPaths::FromUtf8(Normal))) return Normal;
+    const FString Resolved = ResolveAssetFilePath(Normal);
+    if (Resolved.empty()) return {};
+    const fs::path File = FPaths::FromUtf8(Resolved);
+    fs::path Relative;
+    if (RelativeInside(File, FPaths::EngineResourcesDir(), Relative)) return FString(FPaths::EngineContentPrefix) + FPaths::ToUtf8(Relative);
+    if (RelativeInside(File, FPaths::ProjectContentDir(), Relative)) return FPaths::ToUtf8(Relative);
+    return Resolved;
 }

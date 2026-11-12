@@ -14,7 +14,6 @@ class FScene;
 class FRenderer;
 class FConstantBuffer;
 class FTexture2D;
-class FSkyboxRenderer;
 struct FSceneViewTargets;
 struct FLightSceneInfo;
 class UDecalComponent;
@@ -68,7 +67,7 @@ public:
 
 	// 한 뷰의 모든 패스를 정해진 순서로 등록한다.
 	bool AddViewportPasses(FRenderGraphBuilder& Graph, FRenderer* Renderer, FSceneViewTargets& Targets,
-		const FSceneRenderOptions& Options, FSkyboxRenderer* Skybox, const FScenePassCallbacks& Callbacks);
+		const FSceneRenderOptions& Options, const FScenePassCallbacks& Callbacks);
 	bool DidCorePassSucceed() const { return bCorePassSucceeded; }
 	bool DidFXAAPassSucceed() const { return bFXAAPassSucceeded; }
 
@@ -88,11 +87,9 @@ public:
 	
 private:
 	bool AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Renderer, FSceneViewTargets& Targets,
-		const FSceneRenderOptions& Options, FSkyboxRenderer* Skybox);
+		const FSceneRenderOptions& Options);
 	bool AddWorldNormalPass(FRenderGraphBuilder& Graph, FRenderer* Renderer, FSceneViewTargets& Targets,
 		const FSceneRenderOptions& Options);
-	// SingleLightIndex < 0: 그림자 없는 광원 전부 + Ambient/Sky. 0 이상: VisibleLights[SingleLightIndex] 하나만 ScreenShadowMask를 곱해 더한다.
-	bool BindDeferredLighting(FRenderer* Renderer, uint32 Width, uint32 Height, int32 SingleLightIndex);
 	bool BindForwardLighting(FRenderer* Renderer, const FSceneRenderOptions& Options, FTexture2D* ShadowMask);
 	void UnbindForwardLighting(FRenderer* Renderer);
 	bool IntersectSphereFrustum(const FVector4& PositionRadius, const FPlane (&Planes)[6]) const;
@@ -116,15 +113,13 @@ private:
 	void RenderShadowProjection(const FProjectedShadowInfo& Shadow, uint32 Channel, uint32 Width, uint32 Height);
 	// 광원 하나의 ShadowsToProject를 그린다. Directional은 먼 캐스케이드부터 그려 가까운 캐스케이드가 Fade로 덮는다.
 	void RenderShadowProjectionsForLight(const FVisibleLightInfo& VisibleLightInfo, uint32 Channel, uint32 Width, uint32 Height);
-	// Shadow Mask 뷰 모드: 그림자 광원을 최대 4개까지 채널 하나씩 그린다 (Directional이 R).
-	void RenderShadowMaskVisualizationProjections(uint32 Width, uint32 Height);
-	// 그림자 맵이 생긴 광원에 ShadowMapChannel을 주고(Deferred 0, Forward 겹침 기반 0~3) 광원 데이터를 다시 올린다.
+	// 그림자 맵이 생긴 광원에 ShadowMapChannel을 주고(겹침 기반 0~3) 광원 데이터를 다시 올린다.
 	// Details 미리보기·캐스케이드 경계 선·stat이 읽는 LightShadows, CascadeShadowDistances도 여기서 채운다.
 	void FinalizeShadowLights(const FSceneRenderOptions& Options);
 
 	static bool CompareDecalSortOrder(const UDecalComponent* A, const UDecalComponent* B) ;
 
-	// 이번 프레임에 그림자를 Projection할 광원. Deferred는 이 순서대로 광원마다 마스크를 만들어 더한다.
+	// 이번 프레임에 그림자를 Projection할 광원. 광원마다 배정된 마스크 채널을 사용한다.
 	struct FShadowedLight
 	{
 		int32 VisibleLightIndex = INDEX_NONE;   // RenderData.VisibleLights 인덱스

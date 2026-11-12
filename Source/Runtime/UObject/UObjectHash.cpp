@@ -27,7 +27,9 @@ void RegisterClass(UClass* Class)
 
 UClass* FindClass(const FString& Name)
 {
-	UClass** Found = GetClassMap().Find(Name);
+	const FString Lookup = Name == "ASkyLightActor" ? "AAmbientLightActor" :
+		Name == "USkyLightComponent" ? "UAmbientLightComponent" : Name;
+	UClass** Found = GetClassMap().Find(Lookup);
 	return Found ? *Found : nullptr;
 }
 

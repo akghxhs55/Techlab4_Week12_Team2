@@ -7,7 +7,7 @@
 void FCameraOverlayRenderer::Init(FRenderer* InRenderer)
 {
     Renderer = InRenderer;
-    Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/CameraOverlay.hlsl");
+    Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/CameraOverlay.hlsl");
 
     PipelineState.Shader = Shader;
     PipelineState.Topology = EPrimitiveTopology::TriangleList;

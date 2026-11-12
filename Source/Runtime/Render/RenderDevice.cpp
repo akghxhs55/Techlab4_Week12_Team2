@@ -3,7 +3,6 @@
 
 #include "Buffer.h"
 #include "Texture2D.h"
-#include "TextureCube.h"
 #include "PipelineState.h"
 #include "DDSTextureLoader11.h"
 
@@ -230,12 +229,6 @@ TUniquePtr<FTexture2D> FRenderDevice::LoadDDSTexture(const FString& Path) {
 	return LoadedTexture;
 }
 
-TUniquePtr<FTextureCube> FRenderDevice::CreateTextureCube(const D3D11_TEXTURE2D_DESC& Desc, const TArray<const void*>& InitialDatas)
-{
-	TUniquePtr<FTextureCube> Texture = MakeUnique<FTextureCube>(Device.Get(), Desc, InitialDatas);
-
-	return Texture;
-}
 
 TUniquePtr<FVertexShader> FRenderDevice::CreateVertexShader(const FShaderByteCode& ByteCode)
 {

@@ -3,7 +3,7 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Engine/GameplayStatics.h"
 #include "Asset/AssetManager.h"
-#include "Engine/Classes/Sound/SoundWave.h"
+#include "Audio/SoundWave.h"
 #include "AnimSequenceBase.h"
 
 // 엔진 종료 때 DestroyAllObjectsExceptEngine이 UObject를 하나씩 지우므로

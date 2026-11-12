@@ -81,7 +81,7 @@ void FContentDrawerPanel::OnRender()
 			ImGui::BeginDisabled(bExists || NewAssetName[0] == '\0');
 			if (ImGui::Button("Create") && OnCreateWidget)
 			{
-				OnCreateWidget(Target.generic_string());   // "Assets/UI/GameOver.widget" 형식
+				OnCreateWidget(Target.generic_string());   // "Content/Game/UI/GameOver.widget" 형식
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::EndDisabled();

@@ -18,7 +18,7 @@ public:
 	void OnRenderPreview() override;
 
 	static bool IsWidgetPath(const FString& Path);
-	// 빈 루트 캔버스만 든 .widget 파일을 만듭니다. FilePath는 "Assets/UI/GameOver.widget" 형식입니다.
+	// 빈 루트 캔버스만 든 .widget 파일을 만듭니다. FilePath는 "Content/Game/UI/GameOver.widget" 형식입니다.
 	static bool CreateDefaultAsset(const FString& FilePath);
 
 	////////////////////////////////////////////////////////////

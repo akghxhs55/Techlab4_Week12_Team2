@@ -24,11 +24,9 @@
 #include "GameFramework/Actor/LightActorBase.h"
 #include "GameFramework/Actor/PointLightActor.h"
 #include "GameFramework/Actor/SpotLightActor.h"
-#include "GameFramework/Actor/RectLightActor.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SpotLightComponent.h"
-#include "Components/RectLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/TextRenderComponent.h"
 
@@ -221,7 +219,6 @@ void UEditorEngine::InitPanels()
 	ContentDrawerPanel = LevelEditorTab->AddPanel<FContentDrawerPanel>();
 
 	SettingsPanel = LevelEditorTab->AddPanel<FSettingsPanel>();
-	SequencerPanel = LevelEditorTab->AddPanel<FSequencerPanel>();
 	OutputLogPanel->SetEditorSettings(&SettingsPanel->GetMutableSettings());
 
 	// 위젯 에셋은 다른 에셋처럼 EditorManager가 여는 탭에서 편집한다.
@@ -315,18 +312,6 @@ void UEditorEngine::InitPanels()
 
 	SettingsPanel->SetWorld(EditorWorld);
 	SettingsPanel->SetViewportsPanel(ViewportsPanel);
-	SequencerPanel->SetWorld(EditorWorld, true);
-	// 에디터 월드 미리보기: Camera Cut 카메라에 0번 뷰포트를 태운다 (PIE는 ULevelSequencePlayer가 게임 뷰포트를 바꾼다)
-	SequencerPanel->SetPilotCameraHandler([this](UCameraComponent* Camera)
-	{
-		if (!Camera || !ViewportsPanel) return;
-		if (FEditorViewportClient* Client = ViewportsPanel->GetViewportClient(0))
-		{
-			Client->SetViewLocation(Camera->GetWorldLocation());
-			Client->SetViewRotation(Camera->GetWorldRotation());
-			Client->SetViewFOV(Camera->GetFieldOfView());
-		}
-	});
 	ViewportsPanel->SetLayoutMode(ViewportLayoutMode, SingleViewportIndex);
 
 	for (int32 i = 0; i < 4; ++i)
@@ -644,7 +629,6 @@ void UEditorEngine::Tick(const float DeltaTime)
 					ShowFlags.bEnableFXAA = S.bEnableFXAA;
 					ShowFlags.bCacheShadows = S.bCacheShadows;
 					ShowFlags.PcfMode = S.PcfMode;
-					ShowFlags.RenderingPath = S.RenderingPath;
 					ShowFlags.LightingModel = S.LightingModel;
 					ShowFlags.LightCullingMode = S.LightCullingMode;
 					ShowFlags.DirectionalShadowMapSize = S.GetDirectionalShadowMapSize();
@@ -882,7 +866,6 @@ void UEditorEngine::PreExit()
 {
 	EndPlayMap();
 	// 시퀀서는 에디터 월드 액터를 가리키므로 월드보다 먼저 정리한다
-	if (SequencerPanel) SequencerPanel->Shutdown();
 	EditorWorld->ClearWorld();
 	// PIE 창이 열린 채 종료하면 Device가 살아 있을 때 Swapchain과 타깃을 먼저 정리한다.
 	DestroyPIEWindow();
@@ -899,7 +882,6 @@ void UEditorEngine::PreExit()
 	DetailsPanel = nullptr;
 	EditorControlsPanel = nullptr;
 	SettingsPanel = nullptr;
-	SequencerPanel = nullptr;
 	ViewportsPanel = nullptr;
 	ContentDrawerPanel = nullptr;
 	OutlinerPanel = nullptr;
@@ -959,7 +941,6 @@ void UEditorEngine::OnActiveWorldChanged()
 	if (DetailsPanel) DetailsPanel->SetWorld(ActiveWorld);
 	if (EditorControlsPanel) EditorControlsPanel->SetWorld(ActiveWorld);
 	if (SettingsPanel) SettingsPanel->SetWorld(ActiveWorld);
-	if (SequencerPanel) SequencerPanel->SetWorld(ActiveWorld, ActiveWorld == EditorWorld);
 }
 
 // 씬 변경으로 무효화된 에디터의 선택 참조를 모두 해제한다.

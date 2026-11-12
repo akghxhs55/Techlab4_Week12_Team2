@@ -14,7 +14,7 @@ void FUIRenderer::Init(uint32 InMaxQuads)
 	IndexBuffer = RenderCommand::CreateDynamicIndexBuffer(MaxIndices);
 	ParamBuffer = RenderCommand::CreateConstantBuffer(sizeof(FUIParams));
 
-	Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/UIShader.hlsl");
+	Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/UIShader.hlsl");
 
 	PipelineState.Shader = Shader;
 	PipelineState.Topology = EPrimitiveTopology::TriangleList;

@@ -17,7 +17,6 @@ class FConstantBuffer;
 class FStructuredBuffer;
 class FTexture2D;
 class FTexture2DArray;
-class FTextureCube;
 struct FPipelineState;
 
 // Device, DeviceContext
@@ -51,7 +50,6 @@ public:
 	TUniquePtr<FTexture2D> CreateTexture2D(const D3D11_TEXTURE2D_DESC& Desc, const FImageData& Image);
 	TUniquePtr<FTexture2DArray> CreateTexture2DArray(const D3D11_TEXTURE2D_DESC& Desc, const void* InitialData);
 	TUniquePtr<FTexture2D> LoadDDSTexture(const FString& Path);
-	TUniquePtr<FTextureCube> CreateTextureCube(const D3D11_TEXTURE2D_DESC& Desc, const TArray<const void*>& InitialDatas);
 
 	TUniquePtr<FVertexShader> CreateVertexShader(const FShaderByteCode& ByteCode);
 	TUniquePtr<FPixelShader> CreatePixelShader(const FShaderByteCode& ByteCode);

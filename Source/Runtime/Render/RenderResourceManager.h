@@ -11,13 +11,13 @@ enum class EPSOType : uint8
 	StaticMesh_Wireframe,    
 	Particle_AlphaBlend,     
 	Particle_Additive,       
-	Skybox,                  
+	Reserved_5,
 	Grid,                    
 	Outline_Mask,            
 	Outline_Draw,
-	StaticMesh_GBuffer,
-	DeferredLighting,
-	DeferredPointLighting,      // 이전 재질 파일의 PSOType 숫자와 호환을 위해 ID 유지
+	Reserved_9,
+	Reserved_10,
+	Reserved_11,
 	ToneMap,
 	Reserved_13,                // 삭제된 FireBall 자리. 씬 파일의 PSOType 숫자(Billboard=14 등)가 밀리지 않게 남긴다
 	Billboard,
@@ -29,7 +29,7 @@ enum class EPSOType : uint8
 	ShadowTileClear,         // 그림자 캐시: 다시 그릴 아틀라스 타일만 깊이 1로 지운다
 	ShadowDepth,
 	ShadowProjection,        // 그림자 한 장을 화면 마스크(ScreenShadowMask)에 그린다
-	ShadowMaskVisualize,     // Shadow Mask 뷰 모드: 마스크를 화면에 띄운다
+	Reserved_23,
 	Decal, 
 	DecalAdditive,
 	Count
@@ -46,7 +46,7 @@ public:
 
 	static void Init()
 	{
-		Get().ScanShaders("Resources/Shader");
+		Get().ScanShaders("EngineResources/Shaders");
 		Get().InitPipelineStates(); // PSO 초기화 추가
 	}
 

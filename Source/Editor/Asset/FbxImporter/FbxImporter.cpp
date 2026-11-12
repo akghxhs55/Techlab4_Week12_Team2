@@ -1,4 +1,6 @@
 #include "EnginePCH.h"
+#include "Core/Misc/Paths.h"
+#include "Asset/AssetUtils.h"
 #include "FbxImporter.h"
 #include "Animation/AnimSequence.h"
 #include "Animation/AnimSequenceFile.h"
@@ -1407,7 +1409,7 @@ namespace
 	{
 		for (const auto& Path : Paths)
 		{
-			const FString Key = std::filesystem::relative(PathOf(Path), "Assets").generic_string();
+			const FString Key = FAssetUtils::GetAssetKey(Path);
 			if (bChanged && UAssetManager::FindLoadedAsset(Key))
 			{
 				// TODO: 현재는 재Import로 파일을 갱신해도 이미 로드된 Asset은 유지되어 변경 내용을 사용하려면 엔진을 재시작해야 한다.
@@ -1462,7 +1464,7 @@ bool FFbxImporter::ImportToAssets(const FString& Path, EFbxImportMode Mode, FFbx
 			Name = "FBX_";
 			for (int Shift = 28; Shift >= 0; Shift -= 4) Name += "0123456789abcdef"[(Hash >> Shift) & 0xf];
 		}
-		const auto Folder = std::filesystem::path("Assets/FBX") / Name;
+		const auto Folder = FPaths::ProjectContentDir() / "FBX" / Name;
 		const auto StaticPath = Folder / (Name + "_Static.fbx.bin");
 		const auto SkeletalPath = Folder / (Name + ".fbx.bin");
 		TArray<std::filesystem::path> AnimationPaths; // 이번 임포트가 저장하는 애니메이션 파일들

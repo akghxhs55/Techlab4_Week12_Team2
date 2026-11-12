@@ -2,7 +2,7 @@
 #include "Audio/AudioDevice.h"
 #include "Audio/AudioPlatformMiniaudio.h"
 #include "Components/AudioComponent.h"
-#include "Engine/Classes/Sound/SoundWave.h"
+#include "Audio/SoundWave.h"
 #include <cmath>
 
 bool FAudioDevice::Init()

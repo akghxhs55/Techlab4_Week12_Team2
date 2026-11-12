@@ -6,7 +6,6 @@
 #include "Mesh.h"
 #include "Shader.h"
 #include "Texture2D.h"
-#include "TextureCube.h"
 #include "RenderingInfo.h"
 #include "D3D11TypeConversion.h"
 #include <algorithm>
@@ -87,14 +86,6 @@ TUniquePtr<FTexture2D> RenderCommand::CreateTexture2D(const FTextureDesc& Desc, 
 	return RenderDevice->CreateTexture2D(D3D11Type::ToD3D11(Desc), InitialData);
 }
 
-TUniquePtr<FTextureCube> RenderCommand::CreateTextureCube(const FTextureDesc& Desc, const TArray<const void*>& InitialDatas)
-{
-	assert(RenderDevice);
-	D3D11_TEXTURE2D_DESC D3DDesc = D3D11Type::ToD3D11(Desc);
-	D3DDesc.ArraySize = FTextureCube::FaceCount;
-	D3DDesc.MiscFlags |= D3D11_RESOURCE_MISC_TEXTURECUBE;
-	return RenderDevice->CreateTextureCube(D3DDesc, InitialDatas);
-}
 
 TUniquePtr<FVertexShader> RenderCommand::CreateVertexShader(const FShaderByteCode& ByteCode)
 {
@@ -139,10 +130,10 @@ void RenderCommand::BindShaderProgram(FShaderProgram* Shader)
 	RenderDevice->GetContext()->IASetInputLayout(Shader->VertexShader->GetLayout());
 }
 
-void RenderCommand::BindMesh(UStaticMesh* Mesh, uint32 LODIndex)
+void RenderCommand::BindMesh(UStaticMesh* Mesh)
 {
-	BindVertexBuffer(Mesh->GetVertexBuffer(LODIndex));
-	BindIndexBuffer(Mesh->GetIndexBuffer(LODIndex));
+	BindVertexBuffer(Mesh->GetVertexBuffer());
+	BindIndexBuffer(Mesh->GetIndexBuffer());
 }
 
 void RenderCommand::Draw(uint32 VertexCount, uint32 StartIndexLocation)
@@ -250,16 +241,6 @@ void RenderCommand::BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShad
 	BindShaderResource(Slot, Texture2D ? Texture2D->GetResource() : nullptr, FlagBits);
 }
 
-void RenderCommand::BindShaderResource(uint32 Slot, const FTextureCube* TextureCube, EShaderBindFlagBits FlagBits)
-{
-	ID3D11ShaderResourceView* SRV = TextureCube ? TextureCube->GetSRV() : nullptr;
-	if (HasFlag(FlagBits, EShaderBindFlagBits::Vertex))
-		RenderDevice->GetContext()->VSSetShaderResources(Slot, 1, &SRV);
-	if (HasFlag(FlagBits, EShaderBindFlagBits::Pixel))
-		RenderDevice->GetContext()->PSSetShaderResources(Slot, 1, &SRV);
-	if (HasFlag(FlagBits, EShaderBindFlagBits::Compute))
-		RenderDevice->GetContext()->CSSetShaderResources(Slot, 1, &SRV);
-}
 
 void RenderCommand::BindShaderResource(uint32 Slot, const FStructuredBuffer* StructuredBuffer, EShaderBindFlagBits FlagBits)
 {
@@ -302,11 +283,6 @@ void RenderCommand::BindUnorderedAccess(uint32 Slot, FStructuredBuffer* Structur
 	RenderDevice->GetContext()->CSSetUnorderedAccessViews(Slot, 1, &UAV, nullptr);
 }
 
-void RenderCommand::BindUnorderedAccess(uint32 Slot, FTextureCube* TextureCube)
-{
-	ID3D11UnorderedAccessView* UAV = TextureCube ? TextureCube->GetUAV() : nullptr;
-	RenderDevice->GetContext()->CSSetUnorderedAccessViews(Slot, 1, &UAV, nullptr);
-}
 
 void RenderCommand::UnbindUnorderedAccess(uint32 Slot)
 {

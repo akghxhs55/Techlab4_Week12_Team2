@@ -29,8 +29,6 @@ struct FRenderPacket
 	uint32 StartIndex = 0;
 	uint32 IndexCount = 0; // 0이면 인덱스 버퍼 전체를 사용한다
 	uint32 Slot = InvalidObjectSlot;
-	uint8 LODIndex = 0;
-	bool bOccludedByGpu = false;
 	int32 DebugWeightBone = -1; // 웨이트 히트맵 본 번호. -1이면 끔
 };
 
@@ -83,14 +81,12 @@ struct FStaticDrawItem
 	uint32 Slot;
 	uint32 StartIndex;
 	uint32 IndexCount;
-	uint32 bOccludedByGpu;
 };
 
 struct FStaticDrawGroup
 {
 	UMaterial* Material = nullptr;
 	UStaticMesh* Mesh = nullptr;
-	uint8 LODIndex = 0;
 	std::vector<FStaticDrawItem> Items;
 };
 
@@ -115,8 +111,7 @@ class FRenderQueue : public TArray<FRenderPacket>
 
 		const uint64 MeshKey = Packet.Mesh ? Packet.Mesh->SortID : 0xFFFFu;
 		return (static_cast<uint64>(Packet.Material->SortID) << 47)
-			| (static_cast<uint64>(MeshKey) << 31)
-			| (static_cast<uint64>(Packet.LODIndex & 0x3) << 29);
+			| (static_cast<uint64>(MeshKey) << 31);
 	}
 
 public:

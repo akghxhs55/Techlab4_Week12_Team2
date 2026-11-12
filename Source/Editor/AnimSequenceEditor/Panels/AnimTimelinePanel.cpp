@@ -235,7 +235,7 @@ void FAnimTimelinePanel::DrawTrack()
 
     Draw->AddRectFilled(Origin, ImVec2(Origin.x + Width, Origin.y + RulerHeight), IM_COL32(40, 44, 48, 255));
 
-    // 눈금: 60픽셀 이상 간격이 나오는 가장 작은 단위를 고른다 (SequencerPanel과 같은 방식)
+    // 눈금: 60픽셀 이상 간격이 나오는 가장 작은 단위를 고른다
     const float Steps[] = { 1.0f / Rate, 0.1f, 0.25f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f };
     float Step = Steps[IM_ARRAYSIZE(Steps) - 1];
     for (float Candidate : Steps)

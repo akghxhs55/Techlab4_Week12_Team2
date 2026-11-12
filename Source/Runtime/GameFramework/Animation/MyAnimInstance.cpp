@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 #include "MyAnimInstance.h"
-#include "Animation/AnimSequenceFile.h"
+#include "Asset/AssetManager.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "GameFrameWork/Pawn.h"
 
@@ -28,42 +28,26 @@ void UMyAnimInstance::NativeInitializeAnimation()
 	int32 Attack = StateMachine.AddState(AttackState);
 
 	//TEMP : BlendSpace 생성 밎 설정
-	auto LoadSequence = [&](const char* Path) -> UAnimSequence*
-		{
-			auto* Sequence = NewObject<UAnimSequence>(SkeletalMesh);
-			FString Error;
-
-			if (!AnimSequenceFile::Read(Path, *Sequence, Error))
-			{
-				HTR_LOG(Error, "Animation load failed: {} ({})", Path, Error);
-				delete Sequence;
-				return nullptr;
-			}
-
-			return Sequence;
-		};
-
-	auto* Idle = LoadSequence(
-		"Assets/FBX/UAL1_Standard/UAL1_Standard_Armature_Idle_Loop.anim.bin");
-	auto* Walk = LoadSequence(
-		"Assets/FBX/UAL1_Standard/UAL1_Standard_Armature_Walk_Loop.anim.bin");
-	auto* Running = LoadSequence(
-		"Assets/FBX/UAL1_Standard/UAL1_Standard_Armature_Jog_Fwd_Loop.anim.bin");
+	auto LoadSequence = [](const FString& Path) -> UAnimSequence*
+	{
+		return Path.empty() ? nullptr : UAssetManager::Get().LoadAnimSequence(Path);
+	};
+	auto* Idle = LoadSequence(IdleAnimationPath);
+	auto* Walk = LoadSequence(WalkAnimationPath);
+	auto* Running = LoadSequence(RunAnimationPath);
 
 	auto* BlendSpace = NewObject<UBlendSpace1D>();
 
-	BlendSpace->AddSample(Idle, FVector(0, 0, 0));
-	BlendSpace->AddSample(Walk, FVector(200, 0, 0));
-	BlendSpace->AddSample(Running, FVector(550, 0, 0));
+	if (Idle) BlendSpace->AddSample(Idle, FVector(0, 0, 0));
+	if (Walk) BlendSpace->AddSample(Walk, FVector(200, 0, 0));
+	if (Running) BlendSpace->AddSample(Running, FVector(550, 0, 0));
 	LocomotionPlayer.BlendSpace = BlendSpace;
 	LocomotionPlayer.X = 0.f;
 
-	AttackPlayer.Sequence = LoadSequence(
-		"Assets/FBX/UAL1_Standard/UAL1_Standard_Armature_Punch_Jab.anim.bin");
+	AttackPlayer.Sequence = LoadSequence(AttackAnimationPath);
 	AttackPlayer.bLooping = false;
 
-	HitPlayer.Sequence = LoadSequence(
-		"Assets/FBX/UAL1_Standard/UAL1_Standard_Armature_Hit_Chest.anim.bin");
+	HitPlayer.Sequence = LoadSequence(HitAnimationPath);
 	HitPlayer.bLooping = false;
 
 	StateMachine.SetInitialState(Loco);

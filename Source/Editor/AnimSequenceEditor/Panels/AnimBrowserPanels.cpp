@@ -41,7 +41,7 @@ void FAnimAssetBrowserPanel::Refresh()
 
     // 같은 미리보기 메시로 임포트한 애니메이션 = Unreal의 "같은 스켈레톤" 필터
     std::error_code Ec;
-    for (fs::recursive_directory_iterator It("Assets", fs::directory_options::skip_permission_denied, Ec), End;
+    for (fs::recursive_directory_iterator It(FPaths::ProjectContentDir(), fs::directory_options::skip_permission_denied, Ec), End;
         !Ec && It != End; It.increment(Ec))
     {
         if (!It->is_regular_file(Ec))

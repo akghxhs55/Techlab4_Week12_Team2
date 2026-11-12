@@ -32,14 +32,10 @@ public:
 	const FAABB& GetBounds() const { return Bounds; }
 	const FMatrix& GetLocalToWorld() const { return LocalToWorld; }
 	const FMatrix& GetWorldToLocal() const { return WorldToLocal; }
-	const FLODSphere& GetLODSphere() const { return LODSphere; }
 	UStaticMesh* GetMesh() const { return Mesh; }
 	bool IsVisible() const { return bVisible; }
 	bool IsShown(bool bGameView) const { return bVisible && !(bGameView && bHiddenInGame); }
-	uint8 GetLODCount() const { return RenderState ? RenderState->LODCount : 1; }
 	const FMeshRenderState* GetRenderState() const { return RenderState.get(); }
-	const float* GetLODThresholdsSq() const { return RenderState->LODThresholdSq; }
-	const FCachedMeshLOD& GetLOD(uint32 Index) const { return RenderState->LODs[Index]; }
 	const FCachedMeshSection& GetSection(uint32 Index) const { return RenderState->Sections[Index]; }
 	FScene* GetScene() const { return Scene; }
 
@@ -61,7 +57,6 @@ private:
 	FMatrix LocalToWorld;
 	FMatrix WorldToLocal;
 	FAABB Bounds;
-	FLODSphere LODSphere;
 	int32 PackedIndex = INDEX_NONE;
 	bool bQueuedForUpdate = false;
 	bool bRenderStateQueued = false;

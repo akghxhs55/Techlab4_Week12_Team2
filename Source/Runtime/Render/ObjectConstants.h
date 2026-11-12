@@ -9,7 +9,7 @@ struct FPerObjectConstants
 {
 	FMatrix World;
 	FMatrix NormalMatrix;
-	FVector4 ShadowFlags; // x: bReceiveShadow (GBuffer가 NormalRoughness.w 부호로 넘긴다)
+	FVector4 ShadowFlags; // x: bReceiveShadow
 };
 
 inline FPerObjectConstants MakePerObjectConstants(const FMatrix& World, bool bReceiveShadow = true)

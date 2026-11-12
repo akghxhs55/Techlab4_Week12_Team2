@@ -12,7 +12,7 @@
 void FOutlineRenderer::Init(FRenderer* InRenderer)
 {
 	Renderer = InRenderer;
-	Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/OutlineShader.hlsl");
+	Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/OutlineShader.hlsl");
 
 	// 1패스: 원본 크기 메시 영역을 색 없이 스텐실에만 기록한다.
 	MaskPipelineState.Shader = Shader;
@@ -51,8 +51,8 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 	const FStructuredBuffer* BoneBuffer = nullptr;
 	if (UStaticMesh* StaticMesh = InOutline.GetMesh())
 	{
-		VertexBuffer = StaticMesh->GetVertexBuffer(0);
-		IndexBuffer = StaticMesh->GetIndexBuffer(0);
+		VertexBuffer = StaticMesh->GetVertexBuffer();
+		IndexBuffer = StaticMesh->GetIndexBuffer();
 	}
 	else if (USkinnedMeshComponent* Skinned = Cast<USkinnedMeshComponent>(InOutline.GetTarget()))
 	{

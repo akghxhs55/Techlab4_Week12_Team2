@@ -4,14 +4,11 @@
 #include "Render/SceneLightResources.h"
 #include "Render/RenderGraph/RenderGraph.h"
 #include "Render/SceneViewTargets.h"
-#include "Render/SkyboxRenderer.h"
 #include "Render/RenderResourceManager.h"
 #include "Engine/World.h"
 #include "Tasks/Tasks.h"
 #include "Core/Stats/LightweightStats.h"
 #include "Components/StaticMeshComponent.h"
-#include "Asset/LOD/StaticMeshLODSelector.h"
-#include "Render/SkyLightEnvironment.h"
 #include "Engine/SceneManagement.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Render/PostProcess/HeightFogRenderer.h"
@@ -183,7 +180,7 @@ void FSceneRenderer::InitViews(FRenderer* Renderer, const FSceneRenderOptions& O
 
 	// 월드 프리미티브 수집 및 절두체 컬링
 	GatherRenderPackets(World->GetScene(), RenderData, CachedViewContext, &View.Frustum, Renderer);
-	RenderData.AmbientLight = World->GetScene().GetSkyAmbientLight(View.bGameView);
+	RenderData.AmbientLight = World->GetScene().GetAmbientLight(View.bGameView);
 
 	// 모든 프록시가 같은 FLightRenderParameters를 채우고, 종류는 Type으로만 구분한다.
 	auto AddVisibleLight = [this](const FLightSceneProxy* Light)
@@ -216,40 +213,6 @@ void FSceneRenderer::InitViews(FRenderer* Renderer, const FSceneRenderOptions& O
 	FinalizeShadowLights(Options);
 }
 
-bool FSceneRenderer::BindDeferredLighting(FRenderer* Renderer, uint32 Width, uint32 Height, int32 SingleLightIndex)
-{
-	FSceneLightResources& LightResources = RenderData.ViewLightResources;
-
-	FConstantBuffer* DefferedConstants = LightResources.GetDeferredConstants();
-
-	if (!bLightUploadSucceeded || !DefferedConstants)
-	{
-		return false;
-	}
-
-	FDeferredLightConstants Constants{};
-	Constants.bSingleLightPass = SingleLightIndex >= 0 ? 1u : 0u;
-	Constants.SingleLightIndex = SingleLightIndex >= 0 ? static_cast<uint32>(SingleLightIndex) : 0u;
-	Constants.InverseViewProjection = View.ViewProjectionMatrix.Inverse();
-	Constants.CameraPosition = FVector4(View.ViewLocation.X, View.ViewLocation.Y, View.ViewLocation.Z, View.bIsPerspective ? 1.0f : 0.0f);
-	Constants.CameraForward = FVector4(View.ViewForward.X, View.ViewForward.Y, View.ViewForward.Z, 0.0f);
-	
-	const FSkyLightEnvironment* Sky = RenderData.bHasSkyLight ? World->GetScene().FindSkyLightEnvironment(RenderData.SkyLight.SourcePath) : nullptr;
-	Constants.Ambient = Sky ? FAmbientLightRenderData{ FVector4(0.0f) } : RenderData.AmbientLight; // 지금 환경광 계산이 ambient + skylight로 되어있어서 sky 잇으면 ambient 0으로 해줘야됨
-	Constants.SkyColorIntensity = Sky ? RenderData.SkyLight.ColorIntensity : FVector4(0.f);
-
-	std::memcpy(Constants.LightCounts, RenderData.LightParameterCounts, sizeof(RenderData.LightParameterCounts));
-	std::memcpy(Constants.LightOffsets, RenderData.LightParameterOffsets, sizeof(RenderData.LightParameterOffsets)); // LightOffset은 각 조명별로 시작하는 위치
-
-	Constants.ViewportSize = FVector4(static_cast<float>(Width), static_cast<float>(Height), 0.0f, 0.0f);
-	RenderCommand::UpdateBufferData(DefferedConstants, &Constants, sizeof(Constants));
-	RenderCommand::BindConstantBuffer(0, DefferedConstants, EShaderBindFlagBits::Pixel);
-	// t0~t3은 패스의 ReadTextures(BaseColor, Normal, Depth, ScreenShadowMask)가 묶는다.
-	RenderCommand::BindShaderResource(4, RenderData.HasLights() ? LightResources.GetSceneLights() : nullptr, EShaderBindFlagBits::Pixel);
-
-	return true;
-}
-
 bool FSceneRenderer::BindForwardLighting(FRenderer* Renderer, const FSceneRenderOptions& Options, FTexture2D* ShadowMask)
 {
 	FSceneLightResources& LightResources = RenderData.ViewLightResources;
@@ -270,9 +233,7 @@ bool FSceneRenderer::BindForwardLighting(FRenderer* Renderer, const FSceneRender
 
 	FForwardLightingConstants Constants{};
 
-	const FSkyLightEnvironment* Sky = RenderData.bHasSkyLight ? World->GetScene().FindSkyLightEnvironment(RenderData.SkyLight.SourcePath) : nullptr;
-	Constants.Ambient = Sky ? FAmbientLightRenderData{ FVector4(0.0f) } : RenderData.AmbientLight;
-	Constants.SkyColorIntensity = Sky ? RenderData.SkyLight.ColorIntensity : FVector4(0.f);
+	Constants.Ambient = RenderData.AmbientLight;
 	Constants.CameraPosition = FVector4(View.ViewLocation.X, View.ViewLocation.Y, View.ViewLocation.Z, 1.0f);
 
 	std::memcpy(Constants.LightCounts, RenderData.LightParameterCounts, sizeof(RenderData.LightParameterCounts));
@@ -280,7 +241,6 @@ bool FSceneRenderer::BindForwardLighting(FRenderer* Renderer, const FSceneRender
 
 	RenderCommand::UpdateBufferData(ForwardConstants, &Constants, sizeof(Constants));
 	RenderCommand::BindConstantBuffer(1, ForwardConstants, EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);
-	RenderCommand::BindShaderResource(11, Sky ? Sky->GetIrradianceCube() : nullptr, EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel);
 	// 광원 채널(ShadowMapChannel)로 읽는 그림자 마스크. 없으면 셰이더가 그림자 없음(1)으로 본다.
 	RenderCommand::BindShaderResource(13, ShadowMask, EShaderBindFlagBits::Pixel);
 
@@ -332,7 +292,7 @@ bool FSceneRenderer::AddWorldNormalPass(FRenderGraphBuilder& Graph, FRenderer* R
 }
 
 bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Renderer, FSceneViewTargets& Targets,
-	const FSceneRenderOptions& Options, FSkyboxRenderer* Skybox)
+	const FSceneRenderOptions& Options)
 {
 	if (!World || !Renderer || !Targets.SceneColor || !Targets.Depth)
 		return false;
@@ -358,18 +318,6 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 	
 	PrepareDrawData(Renderer, RenderData);
 
-	// HDR 파노라마를 물체보다 먼저 그려 두고, 최종 ToneMap에서 함께 인코딩한다.
-	FRenderGraphRasterPassDesc Sky{};
-	Sky.Name = "Skybox";
-	Sky.ColorAttachments = {
-		{ LightingHDR, ERenderGraphLoadAction::Clear, { 0.0f, 0.0f, 0.0f, 1.0f } }
-	};
-	if (!Graph.AddRasterPass(std::move(Sky), [this, Skybox]
-		{
-			if (bCorePassSucceeded && Skybox)
-				Skybox->OnRender(View.ViewProjectionMatrix, View.ViewLocation);
-		})) return false;
-
 	// 언리얼 RenderShadowDepthMaps: 할당된 그림자 맵마다 Caster 깊이를 아틀라스에 그린다.
 	FTexture2D* ShadowDepthAtlas = RenderData.ViewLightResources.GetShadowDepthAtlas();
 	const bool bAnyShadowAllocated = std::any_of(RenderData.ProjectedShadows.begin(), RenderData.ProjectedShadows.end(),
@@ -391,134 +339,7 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 			})) return false;
 	}
 
-	if (Options.RenderingPath == ERenderingPath::Deferred) // Deferred rendering
-	{
-		const FRenderGraphTextureDesc GBufferDesc{ Width, Height, ETextureFormat::R8G8B8A8_UNorm };
-		const FRenderGraphTextureRef BaseColor = Graph.CreateTexture(GBufferDesc, "BaseColorMetallic"); // 임시 텍스쳐 생성
-		const FRenderGraphTextureRef Normal = Graph.CreateTexture(HDRDesc, "NormalRoughness");
-		if (!BaseColor || !Normal)
-			return false;
-
-		if (Options.bDrawPrimitives)
-		{
-			FRenderGraphRasterPassDesc GBuffer{};
-			GBuffer.Name = "GBuffer";
-			GBuffer.ColorAttachments = {
-				{ BaseColor, ERenderGraphLoadAction::Clear, { 0.0f, 0.0f, 0.0f, 0.0f } },
-				{ Normal, ERenderGraphLoadAction::Clear, { 0.0f, 0.0f, 0.0f, 0.0f } }
-			}; // GBuffer Pass 에는 BaseColor 와 Normal Texture가 Clear된 상태로 필요하다
-
-			GBuffer.DepthAttachment = { Depth, ERenderGraphLoadAction::Clear, 1.0f, 0 }; // GBuffer Pass 에는 Depth Texture가 Clear된 상태로 필요하다
-
-			if (!Graph.AddRasterPass(std::move(GBuffer), [this, Renderer]
-				{
-					TArray<FMeshDrawBatch> Batches;
-					FMeshPassProcessor Processor;
-					bCorePassSucceeded = Processor.Build(View, RenderData.RenderQueue,
-						&RenderData, EMeshPassType::GBuffer, Batches);
-					if (bCorePassSucceeded)
-					{
-						Renderer->UploadViewMatrix(View.ViewProjectionMatrix);
-						Renderer->DrawMeshes(Batches);
-					}
-				})) return false;
-
-			// 언리얼 RenderLights: 그림자 없는 광원은 한 번에 그리고, 그림자 광원은 광원마다
-			// 마스크를 지우고 → 그 광원의 그림자를 Projection하고 → 그 광원만 가산 블렌드로 더한다. 마스크 한 장을 계속 재사용한다.
-			const FRenderGraphTextureRef ShadowMask = ShadowAtlasRef && !ShadowedLights.IsEmpty()
-				? Graph.CreateTexture({ Width, Height, ETextureFormat::R8G8B8A8_UNorm }, "ScreenShadowMask") : FRenderGraphTextureRef{};
-			auto AddDeferredLightPass = [&](const char* Name, int32 SingleLightIndex) -> bool
-				{
-					FRenderGraphRasterPassDesc LightingPass{};
-					LightingPass.Name = Name;
-					LightingPass.ReadTextures = { BaseColor, Normal, Depth };
-					if (SingleLightIndex >= 0) LightingPass.ReadTextures.push_back(ShadowMask);   // t3
-					LightingPass.ColorAttachments = { { LightingHDR, ERenderGraphLoadAction::Load } };
-					return Graph.AddRasterPass(std::move(LightingPass), [this, Renderer, Width, Height, SingleLightIndex]
-						{
-							if (!bCorePassSucceeded) return;
-							if (!BindDeferredLighting(Renderer, Width, Height, SingleLightIndex))
-							{
-								bCorePassSucceeded = false;
-								return;
-							}
-
-							// 단일 광원 패스는 같은 셰이더에 가산 블렌드 상태를 쓴다.
-							FPipelineState* Pipeline = FRenderResourceManager::GetPSO(SingleLightIndex >= 0 ? EPSOType::DeferredPointLighting : EPSOType::DeferredLighting);
-							if (Pipeline && Pipeline->Shader && Pipeline->Shader->VertexShader && Pipeline->Shader->PixelShader)
-							{
-								RenderCommand::BindPipelineState(*Pipeline);
-								RenderCommand::BindVertexBuffer(nullptr);
-								RenderCommand::Draw(3);
-							}
-							else
-							{
-								bCorePassSucceeded = false;
-							}
-							RenderCommand::UnbindShaderResources(3, 2, EShaderBindFlagBits::Pixel);
-						});
-				};
-			if (!AddDeferredLightPass("DeferredLighting", -1)) return false;
-
-			if (ShadowMask)
-			{
-				for (const FShadowedLight& Light : ShadowedLights)
-				{
-					FRenderGraphRasterPassDesc Projection{};
-					Projection.Name = "ShadowProjection";
-					Projection.ReadTextures = { Depth, ShadowAtlasRef };   // t0 장면 깊이, t1 깊이 아틀라스
-					Projection.ColorAttachments = { { ShadowMask, ERenderGraphLoadAction::Clear, { 1.0f, 1.0f, 1.0f, 1.0f } } };
-					if (!Graph.AddRasterPass(std::move(Projection), [this, Width, Height, LightId = Light.LightId]
-						{
-							if (!bCorePassSucceeded) return;
-							RenderShadowProjectionsForLight(RenderData.VisibleLightInfos[LightId], 0, Width, Height);
-							RenderCommand::BindConstantBuffer(0, nullptr, EShaderBindFlagBits::Pixel);
-						})) return false;
-
-					if (!AddDeferredLightPass("DeferredShadowedLight", Light.VisibleLightIndex)) return false;
-				}
-			}
-
-			// Shadow Mask 뷰 모드: 그림자 광원을 최대 4개까지 채널 하나씩 그려 조명 대신 보여 준다.
-			if (Options.bShowShadowMask && ShadowAtlasRef)
-			{
-				const FRenderGraphTextureRef ShadowMask = Graph.CreateTexture({ Width, Height, ETextureFormat::R8G8B8A8_UNorm }, "ShadowMaskVisualization");
-				if (!ShadowMask) return false;
-
-				FRenderGraphRasterPassDesc Projection{};
-				Projection.Name = "ShadowProjection";
-				Projection.ReadTextures = { Depth, ShadowAtlasRef };   // t0 장면 깊이, t1 깊이 아틀라스
-				Projection.ColorAttachments = { { ShadowMask, ERenderGraphLoadAction::Clear, { 1.0f, 1.0f, 1.0f, 1.0f } } };
-				if (!Graph.AddRasterPass(std::move(Projection), [this, Width, Height]
-					{
-						RenderShadowMaskVisualizationProjections(Width, Height);
-					})) return false;
-
-				FRenderGraphRasterPassDesc Visualize{};
-				Visualize.Name = "ShadowMaskVisualization";
-				Visualize.ReadTextures = { ShadowMask };
-				Visualize.ColorAttachments = { { LightingHDR, ERenderGraphLoadAction::Load } };
-				if (!Graph.AddRasterPass(std::move(Visualize), [this]
-					{
-						if (!bCorePassSucceeded) return;
-						FPipelineState* Pipeline = FRenderResourceManager::GetPSO(EPSOType::ShadowMaskVisualize);
-						if (!Pipeline || !Pipeline->Shader || !Pipeline->Shader->VertexShader || !Pipeline->Shader->PixelShader) return;
-						RenderCommand::BindPipelineState(*Pipeline);
-						RenderCommand::BindVertexBuffer(nullptr);
-						RenderCommand::Draw(3);
-					})) return false;
-			}
-		}
-		else
-		{
-			FRenderGraphRasterPassDesc ClearDepth{};
-			ClearDepth.Name = "ClearSceneDepth";
-			ClearDepth.DepthAttachment = { Depth, ERenderGraphLoadAction::Clear, 1.0f, 0 };
-			if (!Graph.AddRasterPass(std::move(ClearDepth), [] {})) return false;
-		}
-	}
-	else // Forward Rendering
-	{
+	{ // Opaque forward rendering
 		ForwardBatches.Reset();
 		if (Options.bDrawPrimitives)
 		{
@@ -600,11 +421,8 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 		{
 			// 선택한 알고리즘에 맞는 컴퓨트 패스를 등록한다.
 			FRenderGraphComputePassDesc Culling{};
-			Culling.Name = CullingMode == ELightCullingMode::Clustered
-				? "ClusterLightCulling" : "TileLightCulling";
+			Culling.Name = "TileLightCulling";
 			Culling.ReadResources = { SceneLights->GetBuffer() };
-			if (CullingMode == ELightCullingMode::Tiled25D)
-				Culling.ReadResources.push_back(Targets.Depth->GetRawPtr());
 
 			const std::array<ID3D11Resource*, 4> Writes = Tiles.GetWriteResources();
 			Culling.WriteResources.assign(Writes.begin(), Writes.end());
@@ -619,7 +437,7 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 		FRenderGraphRasterPassDesc Forward{};
 		Forward.Name = "ForwardOpaque";
 		Forward.ColorAttachments = {
-			{ LightingHDR, ERenderGraphLoadAction::Load }
+			{ LightingHDR, ERenderGraphLoadAction::Clear, { 0.0f, 0.0f, 0.0f, 1.0f } }
 		};
 		Forward.DepthAttachment = { Depth, bUseDepthPrepass ? ERenderGraphLoadAction::Load : ERenderGraphLoadAction::Clear, 1.0f, 0 };
 		if (!Graph.AddRasterPass(std::move(Forward), [this, Renderer, &Graph, LightingOptions = Options, bUseDepthPrepass, ForwardShadowMask]
@@ -831,22 +649,16 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 }
 
 bool FSceneRenderer::AddViewportPasses(FRenderGraphBuilder& Graph, FRenderer* Renderer,
-	FSceneViewTargets& Targets, const FSceneRenderOptions& Options, FSkyboxRenderer* Skybox,
+	FSceneViewTargets& Targets, const FSceneRenderOptions& Options,
 	const FScenePassCallbacks& Callbacks) // 뷰포트에 그려져야 되는 패스들을 옵션에 따라 정해진 순서로 Graph에 등록
 {
 	FSceneRenderOptions CoreOptions = Options;
 	if (Options.bShowLightCulling)
 	{
 		// 디버그 보기에서 현재 뷰의 실제 타일 목록을 생성한다.
-		CoreOptions.RenderingPath = ERenderingPath::Forward;
 		CoreOptions.LightingModel = ELightingModel::Lambert;
 	}
-	else if (Options.LightingModel == ELightingModel::Unlit)
-	{
-		// Deferred 조명 패스는 Unlit 변형이 없다. 조명이 필요 없으므로 Uber Shader의 Unlit 변형으로 바로 그린다.
-		CoreOptions.RenderingPath = ERenderingPath::Forward;
-	}
-	if (!AddCorePasses(Graph, Renderer, Targets, CoreOptions, Skybox)) // 기본적으로 그려져야 되는 Core Pass 들
+	if (!AddCorePasses(Graph, Renderer, Targets, CoreOptions)) // 기본적으로 그려져야 되는 Core Pass 들
 		return false;
 	
 	const FRenderGraphTextureRef SceneColor = Graph.ImportTexture(Targets.SceneColor.get(), "SceneColor");
@@ -996,7 +808,7 @@ bool FSceneRenderer::Render(FRenderer* Renderer, FSceneViewTargets& Targets, con
 	if (ExtraPasses) ExtraPasses(Callbacks);
 
 	FRenderGraphBuilder Graph;
-	if (!AddViewportPasses(Graph, Renderer, Targets, Options, Renderer->GetSkybox(), Callbacks) ||
+	if (!AddViewportPasses(Graph, Renderer, Targets, Options, Callbacks) ||
 		!Graph.Execute() || !DidCorePassSucceed() || !DidFXAAPassSucceed())
 		return false;
 	if (bUseFXAA && !Targets.SwapSceneColorAndBind(FXAA->GetOutputTarget()))
@@ -1034,8 +846,6 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 	FRenderQueue& RenderQueue = Data.RenderQueue;
 	FRenderStats& RenderStats = Data.RenderStats;
 	auto& VisibleProxies = Data.VisibleProxies;
-	auto& LODInputs = Data.LODInputs;
-	auto& SelectedLODs = Data.SelectedLODs;
 	auto& GatherChunks = Data.GatherChunks;
 	using FGatherChunk = FSceneRenderData::FGatherChunk;
 
@@ -1065,31 +875,6 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 
 	RenderStats.TotalPrimitives = Scene.PrimitiveSceneProxies.Num();
 
-	// GPU 오클루전: 프러스텀을 통과한 물체를 GPU에서 가림 판정하고 결과를 이번 프레임에 받아 온다.
-	// Cull이 켜져 있으면 가려진 물체를 목록에서 빼서 이후 Gather·정렬·드로우를 모두 건너뛴다.
-	// 꺼져 있으면(검증 모드) 목록은 그대로 두고 패킷에 판정만 표시한다.
-	const uint8* OccludedMask = nullptr;
-	if (Renderer && Renderer->GetGPUOcclusion().GetSettings().bEnabled)
-	{
-		FGPUOcclusion& Occlusion = Renderer->GetGPUOcclusion();
-		if (Occlusion.Run(VisibleProxies.GetData(), VisibleProxies.Num(), View))
-		{
-			const auto& Occluded = Occlusion.GetOccluded();
-			if (Occlusion.GetSettings().bCull)
-			{
-				uint32 Kept = 0;
-				for (uint32 i = 0; i < VisibleProxies.Num(); ++i)
-					if (!Occluded[i])
-						VisibleProxies[Kept++] = VisibleProxies[i];
-				VisibleProxies.SetNum(Kept);
-			}
-			else
-			{
-				OccludedMask = Occluded.data();
-			}
-		}
-	}
-
 	RenderStats.VisiblePrimitives = VisibleProxies.Num();
 
 	constexpr uint32 ExtraSlots = 4096;
@@ -1113,27 +898,22 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 	{
 		SCOPE_CYCLE_COUNTER(STAT_GatherElements);
 
-		LODInputs.Reset();
-		LODInputs.Reserve(VisibleProxies.Num());
-		for (const FPrimitiveSceneProxy* Proxy : VisibleProxies)
-			LODInputs.Add({Proxy->GetLODSphere(), Proxy->GetRenderState()});
-		SelectLODs(LODInputs, View, SelectedLODs);
 		Tasks::ParallelForChunks(VisibleCount, ChunkCount, [&](uint32 Begin, uint32 End, uint32 ChunkIndex)
 			{
 				FGatherChunk& Out = GatherChunks[ChunkIndex];      // 이 조각 전용. 다른 스레드는 절대 안 건드림
-				// (머티리얼, 메시, LOD) 묶음 찾기. 조합이 몇 개뿐이라 선형 탐색이면 충분하고, 바로 전 묶음을 먼저 본다.
-				const auto FindGroup = [&Out](UMaterial* Material, UStaticMesh* Mesh, uint8 LOD) -> FStaticDrawGroup&
+				// (머티리얼, 메시) 묶음 찾기. 조합이 몇 개뿐이라 선형 탐색이면 충분하고, 바로 전 묶음을 먼저 본다.
+				const auto FindGroup = [&Out](UMaterial* Material, UStaticMesh* Mesh) -> FStaticDrawGroup&
 					{
 						if (Out.LastGroup < Out.Groups.size())
 						{
 							FStaticDrawGroup& Last = Out.Groups[Out.LastGroup];
-							if (Last.Material == Material && Last.Mesh == Mesh && Last.LODIndex == LOD)
+							if (Last.Material == Material && Last.Mesh == Mesh)
 								return Last;
 						}
 						for (uint32 g = 0; g < Out.Groups.size(); ++g)
 						{
 							FStaticDrawGroup& Group = Out.Groups[g];
-							if (Group.Material == Material && Group.Mesh == Mesh && Group.LODIndex == LOD)
+							if (Group.Material == Material && Group.Mesh == Mesh)
 							{
 								Out.LastGroup = g;
 								return Group;
@@ -1143,7 +923,6 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 						FStaticDrawGroup& Group = Out.Groups.emplace_back();
 						Group.Material = Material;
 						Group.Mesh = Mesh;
-						Group.LODIndex = LOD;
 						return Group;
 					};
 
@@ -1159,9 +938,7 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 						continue;
 					}
 
-					const uint32 LOD = SelectedLODs[VisibleIndex];
-					const FCachedMeshLOD& CachedLOD = Proxy->GetLOD(LOD);
-					++Out.LODCounts[LOD];                          // RenderStats 대신 조각 전용 통계
+					const FMeshRenderState& MeshState = *Proxy->GetRenderState();
 
 					uint32 Slot = InvalidObjectSlot;
 					if (bPrepareObjectSlots)
@@ -1175,16 +952,15 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 						Slot = VisibleIndex;
 					}
 
-					const bool bOccludedByGpu = OccludedMask && OccludedMask[VisibleIndex];
-					for (uint32 i = 0; i < CachedLOD.NumSections; ++i)
+					for (uint32 i = 0; i < MeshState.Sections.Num(); ++i)
 					{
-						const FCachedMeshSection& Section = Proxy->GetSection(CachedLOD.FirstSection + i);
-						Out.LODTriangles[LOD] += Section.IndexCount / 3;
+						const FCachedMeshSection& Section = Proxy->GetSection(i);
+						Out.Triangles += Section.IndexCount / 3;
 
 						if (bStaticGroups && Section.Material && Section.Material->PSOType == EPSOType::StaticMesh_Opaque)
 						{
-							FStaticDrawGroup& Group = FindGroup(Section.Material, Mesh, static_cast<uint8>(LOD));
-							Group.Items.push_back({ Proxy, Slot, Section.StartIndex, Section.IndexCount, bOccludedByGpu ? 1u : 0u });
+							FStaticDrawGroup& Group = FindGroup(Section.Material, Mesh);
+							Group.Items.push_back({ Proxy, Slot, Section.StartIndex, Section.IndexCount });
 							++Out.StaticDrawCount;
 							continue;
 						}
@@ -1195,9 +971,7 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 						Packet.Material = Section.Material;
 						Packet.StartIndex = Section.StartIndex;
 						Packet.IndexCount = Section.IndexCount;
-						Packet.LODIndex = static_cast<uint8>(LOD);
 						Packet.Slot = Slot;
-						Packet.bOccludedByGpu = bOccludedByGpu;
 					}
 				}
 			});
@@ -1235,17 +1009,7 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 
 				const uint32 FirstNew = RenderQueue.Num();
 
-				// 프록시 캐시가 없는 스태틱 메시는 기존처럼 LOD를 골라 제출하고, 그 외는 컴포넌트에 맡긴다.
-				UStaticMeshComponent* StaticMeshComponent = Cast<UStaticMeshComponent>(Primitive);
-				if (StaticMeshComponent && StaticMeshComponent->GetStaticMesh())
-				{
-					const uint32 LOD = SelectedLODs[VisibleIndex];
-					StaticMeshComponent->SubmitToRenderQueue(RenderQueue, LOD);
-				}
-				else
-				{
-					Proxy->GetDynamicMeshElements(RenderQueue, View); 
-				}
+				Proxy->GetDynamicMeshElements(RenderQueue, View);
 
 				// continue 없이 항상 여기까지 와서 새 패킷에 여유 칸을 배정한다.
 				for (uint32 p = FirstNew; p < RenderQueue.Num(); ++p)
@@ -1260,15 +1024,10 @@ void FSceneRenderer::GatherRenderPackets(FScene& Scene, FSceneRenderData& Data,
 		}
 
 		for (uint32 c = 0; c < ChunkCount; ++c)
-			for (uint32 L = 0; L < 4; ++L)
-			{
-				RenderStats.LODCounts[L] += GatherChunks[c].LODCounts[L];
-				RenderStats.LODTriangles[L] += GatherChunks[c].LODTriangles[L];
-			}
+			RenderStats.Triangles += GatherChunks[c].Triangles;
 
 		if (bPrepareObjectSlots) Data.ObjectConstants.SetNum(NextExtraSlot);
 		RenderStats.DrawCalls = RenderQueue.Num() + StaticDraws;
-		for (uint64 T : RenderStats.LODTriangles) RenderStats.Triangles += T;
 	}
 }
 

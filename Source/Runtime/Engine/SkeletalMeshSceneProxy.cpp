@@ -39,10 +39,9 @@ void FSkeletalMeshSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, const 
 	const FVector Delta = GetBounds().Center - View.CameraPosition;
 	const float DistanceSq = Delta.Dot(Delta);
 
-	const FCachedMeshLOD& LOD = GetLOD(0);
-	for (uint32 i = 0; i < LOD.NumSections; ++i)
+	for (uint32 i = 0; i < RenderState->Sections.Num(); ++i)
 	{
-		const FCachedMeshSection& Section = GetSection(LOD.FirstSection + i);
+		const FCachedMeshSection& Section = GetSection(i);
 		FRenderPacket& Packet = Queue.AddDefaulted_GetRef();
 		Packet.Proxy = this;
 		Packet.VertexBuffer = VB;

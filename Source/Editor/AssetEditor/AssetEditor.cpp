@@ -161,7 +161,6 @@ FAssetEditorViewportClient::FAssetEditorViewportClient(FAssetEditor& InAssetEdit
 	EngineShowFlags.bEnableFXAA = true;
 	EngineShowFlags.bShowVignette = false;
 	EngineShowFlags.bShowCameraOverlay = false;
-	EngineShowFlags.RenderingPath = ERenderingPath::Forward;   // 웨이트 히트맵은 Forward 패스에만 있다
 }
 
 // 미리보기 씬 위에 에디터가 주는 선과 기즈모를 올린다. 씬은 기반 클래스의 Draw가 그린다.

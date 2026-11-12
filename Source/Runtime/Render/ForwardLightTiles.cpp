@@ -29,10 +29,8 @@ bool FForwardLightTileGrid::Init()
 	LightingInfoCB = RenderCommand::CreateConstantBuffer(sizeof(FGridConstants));
 	if (!CullingCB || !LightingInfoCB || !EnsureCapacity(Allocator, 2, sizeof(uint32))) return false;
 	ComputeShader = RenderCommand::CreateComputeShader(
-		RenderUtil::CompileShader("Resources/Shader/TileBasedLightCulling.hlsl", "mainCS", EShaderType::Compute));
-	Tiled25DComputeShader = RenderCommand::CreateComputeShader(
-		RenderUtil::CompileShader("Resources/Shader/TiledLightCulling25D.hlsl", "mainCS", EShaderType::Compute));
-	return ComputeShader && ComputeShader->IsValid() && Tiled25DComputeShader && Tiled25DComputeShader->IsValid();
+		RenderUtil::CompileShader("EngineResources/Shaders/TileBasedLightCulling.hlsl", "mainCS", EShaderType::Compute));
+	return ComputeShader && ComputeShader->IsValid();
 }
 
 bool FForwardLightTileGrid::PrepareBuild(const FSceneView& View, const FForwardLightingConstants& Lighting, 
@@ -41,7 +39,7 @@ bool FForwardLightTileGrid::PrepareBuild(const FSceneView& View, const FForwardL
 	bPixelTilesValid = false;
 	Constants = {};
 	Constants.GridView = View.ViewMatrix;
-	Constants.GridSliceCount = 1;
+
 	Constants.GridIsPerspective = View.bIsPerspective ? 1u : 0u;
 	Constants.GridPointCount = Lighting.LightCounts[0];
 	Constants.GridSpotCount = Lighting.LightCounts[1];
@@ -57,12 +55,9 @@ bool FForwardLightTileGrid::PrepareBuild(const FSceneView& View, const FForwardL
 	if (InMode == ELightCullingMode::Off || (!Constants.GridPointCount && !Constants.GridSpotCount))
 		return true;
 
-	const bool bClustered = InMode == ELightCullingMode::Clustered;
-	const bool bTiled25D = InMode == ELightCullingMode::Tiled25D;
-	FComputeShader* Shader = bTiled25D ? Tiled25DComputeShader.get() : ComputeShader.get();
-	if (!Shader || !SceneLights || !SceneLights->GetSRV() || (bTiled25D && !Depth->GetSRV()))
+	FComputeShader* Shader = ComputeShader.get();
+	if (!Shader || !SceneLights || !SceneLights->GetSRV())
 		return false;
-
 
 	const FMatrix& Projection = View.ProjectionMatrix;
 	if (!std::isfinite(Projection.M[1][0]) || std::abs(Projection.M[1][0]) < 1.0e-8f ||
@@ -75,28 +70,13 @@ bool FForwardLightTileGrid::PrepareBuild(const FSceneView& View, const FForwardL
 	Constants.GridProjectionParams = FVector4(1.0f / Projection.M[1][0], 1.0f / Projection.M[2][1],
 		Projection.M[0][2], Projection.M[3][2]);
 	Constants.GridProjection = Projection;
-	Constants.GridSliceCount = bClustered ? ClusterDepthSlices : 1;
 
-	// 원근은 log2(depth), 직교는 선형 depth에 scale과 bias를 적용한다.
-	const float SliceCount = static_cast<float>(Constants.GridSliceCount);
-	float DepthScale, DepthBias;
-	if (View.bIsPerspective)
-	{
-		const float NearLog = std::log2(View.NearClip);
-		DepthScale = SliceCount / (std::log2(View.FarClip) - NearLog);
-		DepthBias = -NearLog * DepthScale;
-	}
-	else
-	{
-		DepthScale = SliceCount / (View.FarClip - View.NearClip);
-		DepthBias = -View.NearClip * DepthScale;
-	}
-	Constants.GridDepthParams = FVector4(View.NearClip, View.FarClip, DepthScale, DepthBias);
+	Constants.GridDepthParams = FVector4(View.NearClip, View.FarClip, 0.0f, 0.0f);
 
 	// 셀마다 메타데이터 하나를 만들고, 인덱스 풀은 평균 예산으로 확보한다.
 	const uint64 CellCount = static_cast<uint64>(Constants.GridTileCountX) *
-		Constants.GridTileCountY * Constants.GridSliceCount;
-	const uint32 AverageLightsPerCell = bClustered ? ClusterAverageLightsPerCell : TiledAverageLightsPerCell;
+		Constants.GridTileCountY ;
+	const uint32 AverageLightsPerCell = TiledAverageLightsPerCell;
 	if (CellCount > UINT32_MAX / (AverageLightsPerCell * sizeof(uint32))) return false;
 
 	const uint32 IndexBudget = static_cast<uint32>(CellCount) * AverageLightsPerCell;
@@ -114,13 +94,10 @@ bool FForwardLightTileGrid::PrepareBuild(const FSceneView& View, const FForwardL
 
 bool FForwardLightTileGrid::ExecuteBuild(FRenderer* Renderer, FTexture2D* Depth, const FStructuredBuffer* SceneLights)
 {
-	// 깊이 텍스처는 2.5D만 읽는다. Tiled와 Clustered는 고정 깊이 구간의 경계를 만든다.
-	const bool bTiled25D = Constants.GridMode == static_cast<uint32>(ELightCullingMode::Tiled25D);
-	FComputeShader* Shader = bTiled25D ? Tiled25DComputeShader.get() : ComputeShader.get();
+	FComputeShader* Shader = ComputeShader.get();
 	if (Constants.GridMode == static_cast<uint32>(ELightCullingMode::Off) ||
 		!Renderer || !SceneLights || !SceneLights->GetSRV() || !Shader ||
-		!Ranges || !PointIndices || !SpotIndices || !Allocator ||
-		(bTiled25D && (!Depth || !Depth->GetSRV())))
+		!Ranges || !PointIndices || !SpotIndices || !Allocator)
 		return false;
 
 	RenderCommand::UpdateBufferData(CullingCB.get(), &Constants, sizeof(Constants));
@@ -129,14 +106,14 @@ bool FForwardLightTileGrid::ExecuteBuild(FRenderer* Renderer, FTexture2D* Depth,
 	// 기존 입력·출력 슬롯과 목록 버퍼를 유지한다.
 	RenderCommand::BindComputeShader(Shader);
 	RenderCommand::BindConstantBuffer(0, CullingCB.get(), EShaderBindFlagBits::Compute);
-	RenderCommand::BindShaderResource(0, bTiled25D ? Depth : nullptr, EShaderBindFlagBits::Compute);
+	RenderCommand::UnbindShaderResources(0, 1, EShaderBindFlagBits::Compute);
 	RenderCommand::BindShaderResource(1, SceneLights, EShaderBindFlagBits::Compute);
 	RenderCommand::BindUnorderedAccess(0, Ranges.get());
 	RenderCommand::BindUnorderedAccess(1, PointIndices.get());
 	RenderCommand::BindUnorderedAccess(2, SpotIndices.get());
 	RenderCommand::BindUnorderedAccess(3, Allocator.get());
 
-	RenderCommand::Dispatch(Constants.GridTileCountX, Constants.GridTileCountY, Constants.GridSliceCount);
+	RenderCommand::Dispatch(Constants.GridTileCountX, Constants.GridTileCountY, 1);
 
 	RenderCommand::UnbindShaderResources(0, 2, EShaderBindFlagBits::Compute);
 	RenderCommand::BindConstantBuffer(0, nullptr, EShaderBindFlagBits::Compute);

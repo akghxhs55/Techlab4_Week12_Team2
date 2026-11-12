@@ -26,7 +26,7 @@ void FStaticMeshInfoPanel::DrawContent()
 	ImGui::TextWrapped("%s", Editor.GetAssetPath().c_str());
 	ImGui::Separator();
 
-	// 현재 화면에서 선택된 LOD가 아닌 원본 LOD0의 통계를 표시합니다.
+	// 원본 정적 메시의 통계를 표시합니다.
 	const FStaticMeshData& Data = Mesh->GetMeshData();
 	ImGui::Text("Vertices: %d", static_cast<int>(Data.Vertices.Num()));
 	ImGui::Text("Triangles: %d", static_cast<int>(Data.Indices.Num() / 3));

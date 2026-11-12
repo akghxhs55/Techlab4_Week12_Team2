@@ -16,13 +16,6 @@ namespace
 	}
 
 	// 문자열 값은 editor.ini가 저장하는 표기와 같다.
-	ERenderingPath ParseRenderingPath(const FString& Name, ERenderingPath Fallback)
-	{
-		if (Name == "Forward") return ERenderingPath::Forward;
-		if (Name == "Deferred") return ERenderingPath::Deferred;
-		return Fallback;
-	}
-
 	ELightingModel ParseLightingModel(const FString& Name, ELightingModel Fallback)
 	{
 		if (Name == "Gouraud") return ELightingModel::Gouraud;
@@ -36,8 +29,6 @@ namespace
 	{
 		if (Name == "Off") return ELightCullingMode::Off;
 		if (Name == "Tiled") return ELightCullingMode::Tiled;
-		if (Name == "Clustered") return ELightCullingMode::Clustered;
-		if (Name == "Tiled25D") return ELightCullingMode::Tiled25D;
 		return Fallback;
 	}
 }
@@ -53,7 +44,6 @@ FGameSettings FGameSettings::Load(const FString& Path)
 	}
 
 	Settings.StartupMap = Config.GetString("Game", "GameDefaultMap", Settings.StartupMap);
-	Settings.SkyPanorama = Config.GetString("Game", "SkyPanorama", Settings.SkyPanorama);
 
 	// 음수는 잘못된 값으로 보고 기본값을 쓴다. 0은 주 모니터 해상도라는 뜻이라 허용한다.
 	const auto GetUInt = [&Config](const char* Section, const char* Key, uint32 Default, bool bAllowZero)
@@ -69,7 +59,6 @@ FGameSettings FGameSettings::Load(const FString& Path)
 	Settings.bVSync = Config.GetBool("Window", "VSync", Settings.bVSync);
 
 	FSceneRenderOptions& Options = Settings.RenderOptions;
-	Options.RenderingPath = ParseRenderingPath(Config.GetString("Rendering", "RenderingPath", ""), Options.RenderingPath);
 	Options.LightingModel = ParseLightingModel(Config.GetString("Rendering", "LightingModel", ""), Options.LightingModel);
 	Options.LightCullingMode = ParseLightCullingMode(Config.GetString("Rendering", "LightCullingMode", ""), Options.LightCullingMode);
 	Options.bEnableFXAA = Config.GetBool("Rendering", "EnableFXAA", Options.bEnableFXAA);

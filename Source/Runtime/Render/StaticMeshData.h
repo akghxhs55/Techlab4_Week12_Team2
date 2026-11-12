@@ -21,13 +21,6 @@ struct FStaticMaterialSlot
 	FString NormalTexturePath{};
 };
 
-struct FLODSourceVertex
-{
-	int32 PositionIndex = -1;
-	int32 UVIndex = -1;
-	int32 NormalIndex = -1;
-};
-
 struct FMeshTriangleElement
 {
 	FVector V0;
@@ -44,8 +37,6 @@ struct FStaticMeshData
 	TArray<FStaticMaterialSlot> MaterialSlots;
 	FBox AABB;
 
-	// LOD0 생성용 CPU 메타데이터. GPU vertex layout에는 포함하지 않는다.
-	TArray<FLODSourceVertex> LODSourceVertices;
 
 	std::optional<TBVH<FMeshTriangleElement>> TriangleBVH;
 	std::optional<FOBBTree> OBBTree;

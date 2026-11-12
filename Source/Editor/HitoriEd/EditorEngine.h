@@ -25,7 +25,6 @@
 #include "Editor/Details/DetailsPanel.h"
 #include "Editor/EditorControls/EditorControlsPanel.h"
 #include "Editor/Settings/SettingsPanel.h"
-#include "Editor/Sequencer/SequencerPanel.h"
 #include "Editor/Viewports/ViewportsPanel.h"
 #include "Editor/LevelViewportLayout.h"
 #include "Editor/ContentDrawer/ContentDrawerPanel.h"
@@ -176,7 +175,6 @@ private:
 	FDetailsPanel* DetailsPanel = nullptr;
 	FEditorControlsPanel* EditorControlsPanel = nullptr;
 	FSettingsPanel* SettingsPanel = nullptr;
-	FSequencerPanel* SequencerPanel = nullptr;
 	FViewportsPanel* ViewportsPanel = nullptr;
 	FSplitRatio ViewportSplitRatio{0.5f, 0.5f};
 	ELayoutMode ViewportLayoutMode = ELayoutMode::QuadSplit;

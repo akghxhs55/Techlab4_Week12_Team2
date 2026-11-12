@@ -20,13 +20,10 @@ struct FRenderStats
 	uint32 VisiblePrimitives = 0;
 	uint32 DrawCalls = 0;
 	uint64 Triangles = 0;
-	uint32 LODCounts[4] = {};
-	uint64 LODTriangles[4] = {};
 
 	uint32 DirectionalCount = 0;
 	uint32 PointCount = 0;
 	uint32 SpotCount = 0;
-	uint32 RectCount = 0;
 	float AtlasCapacity = 0.0f;
 	float ShadowTiles = 0.0f;
 	uint32 ShadowViewsRedrawn = 0; // 이번 프레임에 다시 그린 그림자 뷰(큐브 면, cascade) 수
@@ -57,7 +54,6 @@ struct FSceneRenderData
 	static constexpr int32 PointLightSlotIndex = 0;
 	static constexpr int32 SpotLightSlotIndex = 1;
 	static constexpr int32 DirectionalLightSlotIndex = 2;
-	static constexpr int32 RectLightSlotIndex = 3;
 
 	static constexpr uint32 ShadowMapSize = 4096;
 	static constexpr uint32 MaxCascadeShadowCount = 4;
@@ -69,26 +65,21 @@ struct FSceneRenderData
 	{
 		TArray<FRenderPacket> Packets;              // 스태틱 묶음에 못 들어가는 것 (반투명 섹션, Renderer 없는 호출)
 		TArray<uint32> SlowPathIndices;
-		std::vector<FStaticDrawGroup> Groups;       // 불투명 스태틱 메시: (머티리얼, 메시, LOD)별 묶음. 항목만 매 프레임 비운다
+		std::vector<FStaticDrawGroup> Groups;       // 불투명 스태틱 메시: (머티리얼, 메시)별 묶음. 항목만 매 프레임 비운다
 		uint32 LastGroup = 0;                       // 바로 전 물체가 들어간 묶음 (연속한 물체는 대개 같은 묶음)
 		uint32 StaticDrawCount = 0;
-		uint32 LODCounts[4] = {};
-		uint64 LODTriangles[4] = {};
+		uint64 Triangles = 0;
 	};
 
 	FRenderQueue RenderQueue;
 	FRenderStats RenderStats;
 	TArray<FPrimitiveSceneProxy*> VisibleProxies;
-	TArray<FLODSelectionInput> LODInputs;
-	TArray<uint8> SelectedLODs;
 	TArray<FGatherChunk> GatherChunks;
 
 	TArray<FPerObjectConstants> ObjectConstants;
 	FSceneLightResources ViewLightResources;
 
 	FAmbientLightRenderData AmbientLight{};
-	FSkyLightRenderData SkyLight{};
-	bool bHasSkyLight = false;
 
 	TArray<FLightRenderParameters> VisibleLights; // 모든 종류의 광원. 업로드할 때 종류별 구간으로 정렬한다
 	TArray<const FLightSceneProxy*> VisibleLightProxies; // VisibleLights와 같은 순서의 Proxy (그림자 채널 배정에 씀)
@@ -158,12 +149,8 @@ struct FSceneRenderData
 		RenderQueue.Reset();
 		RenderStats.Reset();
 		VisibleProxies.Reset();
-		LODInputs.Reset();
-		SelectedLODs.Reset();
 		ObjectConstants.Reset();
 		AmbientLight = {};
-		SkyLight = {};
-		bHasSkyLight = false;
 		VisibleLights.Reset();
 		VisibleLightProxies.Reset();
 		VisibleLightShadowViews.Reset();
@@ -183,8 +170,7 @@ struct FSceneRenderData
 			Chunk.Packets.Reset();
 			Chunk.SlowPathIndices.Reset();
 			Chunk.StaticDrawCount = 0;
-			std::fill(std::begin(Chunk.LODCounts), std::end(Chunk.LODCounts), 0u);
-			std::fill(std::begin(Chunk.LODTriangles), std::end(Chunk.LODTriangles), 0ull);
+			Chunk.Triangles = 0;
 			for (FStaticDrawGroup& Group : Chunk.Groups) Group.Items.clear();
 		}
 	}
@@ -197,12 +183,11 @@ struct FSceneRenderData
 
 		if (VisibleLights.Num())
 		{
-			constexpr uint32 TypeCount = 4;
+			constexpr uint32 TypeCount = 3;
 			constexpr uint32 TypeToSlot[TypeCount] = {
 				FSceneRenderData::DirectionalLightSlotIndex,
 				FSceneRenderData::PointLightSlotIndex,
 				FSceneRenderData::SpotLightSlotIndex,
-				FSceneRenderData::RectLightSlotIndex,
 			};
 
 			// Sort indices so the selected light's identity survives sorting, including identical lights.
@@ -281,6 +266,5 @@ struct FSceneRenderData
 	inline uint32 GetSpotLightOffset() { return LightParameterOffsets[SpotLightSlotIndex]; }
 	inline uint32 GetSpotLightCount() { return LightParameterCounts[SpotLightSlotIndex]; }
 
-	inline bool HasRectLights() { return LightParameterCounts[RectLightSlotIndex]; }
-	inline bool HasLights() { return HasDirectionalLight() || HasPointLights() || HasSpotLights() || HasRectLights(); }
+	inline bool HasLights() { return HasDirectionalLight() || HasPointLights() || HasSpotLights(); }
 };

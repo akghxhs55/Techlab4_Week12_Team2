@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "UI/WidgetSerializer.h"
+#include "Asset/AssetUtils.h"
 
 #include "UObject/UObjectHash.h"
 #include "Serialization/MemoryWriter.h"
@@ -105,7 +106,7 @@ bool FWidgetSerializer::SaveAsset(FWidgetAssetData& Asset, const FString& Path)
 	if (!SaveAssetToBytes(Asset, Bytes))
 		return false;
 
-	std::ofstream File(Path, std::ios::binary);
+	std::ofstream File(FAssetUtils::ResolveAssetFilePath(Path), std::ios::binary);
 	if (!File.is_open())
 		return false;
 	File.write(reinterpret_cast<const char*>(Bytes.GetData()), Bytes.Num());
@@ -114,7 +115,7 @@ bool FWidgetSerializer::SaveAsset(FWidgetAssetData& Asset, const FString& Path)
 
 bool FWidgetSerializer::ReadFileBytes(const FString& Path, TArray<uint8>& OutBytes)
 {
-	std::ifstream File(Path, std::ios::binary | std::ios::ate);
+	std::ifstream File(FAssetUtils::ResolveAssetFilePath(Path), std::ios::binary | std::ios::ate);
 	if (!File.is_open())
 		return false;
 

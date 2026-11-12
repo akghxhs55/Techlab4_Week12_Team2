@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 #include "AudioMixer.h"
-#include "Engine/Classes/Sound/SoundWave.h"
+#include "Audio/SoundWave.h"
 #include <algorithm>
 #include <cmath>
 

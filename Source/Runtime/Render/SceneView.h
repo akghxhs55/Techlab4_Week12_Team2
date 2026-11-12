@@ -6,7 +6,7 @@
 #include "Math/Matrix.h"
 #include "Math/Frustum.h"
 #include "Math/Rect.h"
-#include "Asset/LOD/StaticMeshLODSelector.h"
+#include "Render/RenderPacket.h"
 #include <algorithm>
 
 // Immutable description of one camera view for the duration of a render.
@@ -59,11 +59,6 @@ struct FSceneView
 		Context.ProjectionScaleSquared = std::max(ScaleX * ScaleX, ScaleY * ScaleY);
 		Context.Prepare();
 		return Context;
-	}
-
-	FViewContext ToLODViewContext() const
-	{
-		return ToViewContext();
 	}
 };
 

@@ -426,25 +426,6 @@ void FSceneRenderer::RenderShadowProjectionsForLight(const FVisibleLightInfo& Vi
 		RenderShadowProjection(*Shadow, Channel, Width, Height);
 }
 
-void FSceneRenderer::RenderShadowMaskVisualizationProjections(uint32 Width, uint32 Height)
-{
-	if (!bCorePassSucceeded || !World) return;
-	const FScene& Scene = World->GetScene();
-
-	// Directional을 R에 먼저, 나머지는 광원 순서대로 G, B, A
-	TArray<int32> LightIds;
-	for (int32 Id = 0; Id < RenderData.VisibleLightInfos.Num(); ++Id)
-	{
-		if (RenderData.VisibleLightInfos[Id].ShadowsToProject.IsEmpty() || Id >= Scene.Lights.Num() || !Scene.Lights[Id]) continue;
-		if (Scene.Lights[Id]->IsDirectional()) LightIds.Insert(Id, 0);
-		else LightIds.Add(Id);
-	}
-	const uint32 Count = std::min<uint32>(static_cast<uint32>(LightIds.Num()), 4u);
-	for (uint32 Channel = 0; Channel < Count; ++Channel)
-		RenderShadowProjectionsForLight(RenderData.VisibleLightInfos[LightIds[Channel]], Channel, Width, Height);
-	RenderCommand::BindConstantBuffer(0, nullptr, EShaderBindFlagBits::Pixel);
-}
-
 bool FSceneRenderer::HasVisibleReceiverInBounds(const FLightSceneInfo* LightSceneInfo) const
 {
 	for (const FPrimitiveSceneProxy* Proxy : RenderData.VisibleProxies)
@@ -509,9 +490,8 @@ void FSceneRenderer::FinalizeShadowLights(const FSceneRenderOptions& Options)
 	RenderData.VisibleLightShadowViews.SetNum(LightCount);
 	for (int32 i = 0; i < LightCount; ++i) RenderData.VisibleLightShadowViews[i] = FSceneRenderData::InvalidShadowView;
 
-	const bool bForward = Options.RenderingPath != ERenderingPath::Deferred;
 	// Gouraud는 정점에서 조명을 끝내므로 화면 마스크를 광원별로 곱할 수 없다.
-	const bool bAllowChannels = !(bForward && Options.LightingModel == ELightingModel::Gouraud);
+	const bool bAllowChannels = Options.LightingModel != ELightingModel::Gouraud;
 
 	// Forward 채널 배정 (언리얼 AssignAvailableShadowMapChannelForLight): 영향 범위가 겹치는 광원끼리만 다른 채널을 받는다.
 	struct FAssignedChannel { FSphere Bounds; bool bDirectional; uint32 Channel; };
@@ -561,11 +541,7 @@ void FSceneRenderer::FinalizeShadowLights(const FSceneRenderOptions& Options)
 		bCascadesFilled |= bFillCascades;
 
 		uint32 Channel = FLightRenderParameters::InvalidShadowMapChannel;
-		if (bAllowChannels && !bForward)
-		{
-			Channel = 0;   // Deferred: 광원마다 마스크를 새로 만드므로 항상 R
-		}
-		else if (bAllowChannels)
+		if (bAllowChannels)
 		{
 			const FSphere Bounds = Info->GetBoundingSphere();
 			uint32 UsedMask = 0;

@@ -3,7 +3,6 @@
 #include "UObject/Object.h"
 #include "UObject/Property.h"
 #include "Render/Renderer.h"
-#include "Asset/LOD/StaticMeshLODGenerator.h"
 
 #include <filesystem>
 #include <functional>
@@ -54,7 +53,7 @@ public:
 	void CreateParticleMaterial();
 	void CreateEditorArrowMaterial();
 
-	// 경로는 "Assets/Models/a.obj"와 "Models/a.obj"를 같은 에셋으로 본다.
+	// 경로는 "Content/Game/Models/a.obj"와 "Models/a.obj"를 같은 에셋으로 본다.
 	// 아직 로드되지 않았으면 여기서 로드하므로 GPU 자원을 만들 수 있는 메인 스레드에서만 부른다.
 	template <typename T>
 	static T* GetAssetByPath(const FString& Path)
@@ -88,10 +87,9 @@ public:
 	static UAnimSequence* LoadAnimSequence(const FString& Path);
 	static UBlendSpace1D* LoadBlendSpace(const FString& Path);
 
-	FLODGenerateResult GenerateStaticMeshLODs(UStaticMesh& Mesh,const FLODGenerateRequest& Request);
 
 	// 원본 좌표축이 엔진과 다른 메시를 로드 후 돌린다 (정점·법선·AABB·삼각형 BVH·GPU 정점 버퍼를 다시 만든다).
-	// LOD는 LOD0에서 만들어지므로 LOD를 만들기 전에만 부를 수 있다. Rotate는 회전(길이·손잡이 보존)이어야 한다.
+	// Rotate는 회전(길이·손잡이 보존)이어야 한다.
 	static bool ReorientStaticMesh(UStaticMesh& Mesh, const std::function<FVector(const FVector&)>& Rotate);
 
 	// OBJ 스태틱 메시(키가 .obj로 끝나는 것)마다 부른다. 아직 로드되지 않은 메시는 먼저 로드한다. 기본 도형·기즈모 메시는 제외된다.

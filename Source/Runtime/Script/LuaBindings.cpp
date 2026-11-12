@@ -28,11 +28,9 @@
 #include "Camera/CameraComponent.h"
 #include "Asset/AssetManager.h"
 #include "Components/AudioComponent.h"
-#include "Engine/Classes/Sound/SoundWave.h"
+#include "Audio/SoundWave.h"
 #include "Camera/CameraShakeBase.h"
 
-#include "LevelSequence/LevelSequenceActor.h"
-#include "LevelSequence/LevelSequencePlayer.h"
 
 #include "Components/SkeletalMeshComponent.h"
 #include "Animation/AnimGraphInstance.h"
@@ -72,14 +70,6 @@ namespace
 		if (!World)
 			throw sol::error(FString(FuncName) + " must be called from an actor script.");
 		return World;
-	}
-
-	static ULevelSequencePlayer* SequencePlayerOf(const FLuaActorRef& Ref)
-	{
-		ALevelSequenceActor* SeqActor = Cast<ALevelSequenceActor>(&Deref(Ref));
-		if (!SeqActor) throw sol::error("Actor is not a LevelSequenceActor.");
-		if (!SeqActor->GetSequencePlayer()) SeqActor->InitializePlayer();
-		return SeqActor->GetSequencePlayer();
 	}
 
 	void RegisterAudio(sol::state& Lua)
@@ -234,14 +224,6 @@ namespace
 		Lua.new_usertype<FLuaActorRef>("Actor",
 			sol::no_constructor, // 액터는 Lua에서 생성할 수 없음
 
-			"PlaySequence", [](const FLuaActorRef& Ref) { if (ULevelSequencePlayer* P = SequencePlayerOf(Ref)) P->Play(); },
-			"PauseSequence", [](const FLuaActorRef& Ref) { if (ULevelSequencePlayer* P = SequencePlayerOf(Ref)) P->Pause(); },
-			"StopSequence", [](const FLuaActorRef& Ref) { if (ULevelSequencePlayer* P = SequencePlayerOf(Ref)) P->Stop(); },
-			"IsSequencePlaying", [](const FLuaActorRef& Ref)
-			{
-				ULevelSequencePlayer* P = SequencePlayerOf(Ref);
-				return P && P->IsPlaying();
-			},
 			"PlayAudio", [](const FLuaActorRef& Ref)
 			{
 				for (UActorComponent* Component : Deref(Ref).GetComponents())

@@ -17,8 +17,7 @@
 #include "Editor/EditorUI/ImGuiRenderer.h"
 #include "Components/DirectionalLightComponent.h"
 #include "Components/PointLightComponent.h"
-#include "Components/RectLightComponent.h"
-#include "Components/SkyLightComponent.h"
+#include "Components/AmbientLightComponent.h"
 
 #include "Components/RotatingMovementComponent.h"
 #include "Components/ProjectileMovementComponent.h"
@@ -427,7 +426,7 @@ namespace
                 Paths.clear();
                 ScanMessage.clear();
                 std::error_code Error;
-                std::filesystem::recursive_directory_iterator It("Assets", Error);
+                std::filesystem::recursive_directory_iterator It(FPaths::ProjectContentDir(), Error);
                 const std::filesystem::recursive_directory_iterator End;
 
                 while (!Error && It != End)
@@ -1367,7 +1366,7 @@ bool FDetailsPanel::Init()
 	io.Fonts->AddFontDefaultBitmap();
 
 	// 폰트 파일은 엔진 폴더 루트에 있다. 작업 디렉터리는 프로젝트 폴더이므로 절대 경로로 연다.
-	const FString fontPath = FPaths::EngineFileUtf8("NanumSquareR.TTF");
+	const FString fontPath = FPaths::EngineFileUtf8("EngineResources/Fonts/NanumSquareR.ttf");
 	float fontSize = 15.0f;
 	const ImWchar* koreanRanges = io.Fonts->GetGlyphRangesKorean();
 

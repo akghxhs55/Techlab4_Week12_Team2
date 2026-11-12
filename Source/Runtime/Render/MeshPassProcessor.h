@@ -34,7 +34,6 @@ struct FMeshDrawBatch
 		uint32 StartIndex = 0;
 		uint32 IndexCount = 0;
 		const void* ObjectKey = nullptr;
-		bool bOccludedByGpu = false;
 		bool bReceivesDecals = true;
 		FAABB Bounds{};
 		const FPrimitiveSceneProxy* Proxy = nullptr;
@@ -61,24 +60,9 @@ struct FMeshDrawBatch
 	TArray<FItem> Items;
 };
 
-struct FOcclusionMeasureResult
-{
-	bool bValid = false;
-	uint32 TotalObjects = 0;
-	uint32 VisibleObjects = 0;
-	uint32 TotalDraws = 0;
-	uint32 VisibleDraws = 0;
-	uint64 TotalTriangles = 0;
-	uint64 VisibleTriangles = 0;
-	double ElapsedMs = 0.0;
-	uint32 GPUOccludedDraws = 0;
-	uint32 FalseCulls = 0;
-};
-
 enum class EMeshPassType : uint8
 {
 	Opaque,
-	GBuffer,
 	Forward,
 	Translucent,
 	WorldNormal,

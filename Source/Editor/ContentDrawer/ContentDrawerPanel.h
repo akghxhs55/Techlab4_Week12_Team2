@@ -5,6 +5,7 @@
 #include "Editor/AnimBlueprintEditor/AnimBlueprintAssetCreator.h"
 
 #include <filesystem>
+#include "Core/Misc/Paths.h"
 #include <functional>
 
 namespace fs = std::filesystem;
@@ -40,8 +41,8 @@ private:
 	char NewAssetName[64] = "NewWidget";
 	bool bOpenCreateWidget = false;
 
-	fs::path AssetRootPath = "Assets";
-	fs::path CurrentPath = "Assets";
+	fs::path AssetRootPath = FPaths::ProjectContentDir();
+	fs::path CurrentPath = AssetRootPath;
 
 	const FString FolderIconPath = "Engine/Icons/Folder.png";
 	const FString FileIconPath = "Engine/Icons/File.png";

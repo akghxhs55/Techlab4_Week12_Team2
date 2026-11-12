@@ -34,7 +34,7 @@ bool FGizmoRenderer::Init(FRenderer* InRenderer)
 	AxisDataArray.Add({ FRotator(0.0f, 0.0f, 0.0f) ,FVector4(0.0f, 0.0f, 1.0f, 1.0f) });
 	AxisDataArray.Add({ FRotator(0.0f, 0.0f, 0.0f) ,FVector4(1.0f, 1.0f, 1.0f, 1.0f) }); // ScreenAxis
 
-	Shader = FRenderResourceManager::GetShaderProgram("Resources/Shader/GizmoShader.hlsl");
+	Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/GizmoShader.hlsl");
 
 	PipelineState.Shader = Shader;
 	PipelineState.Topology = EPrimitiveTopology::TriangleList;

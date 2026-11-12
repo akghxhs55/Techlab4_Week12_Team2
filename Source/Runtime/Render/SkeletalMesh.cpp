@@ -145,18 +145,14 @@ TSharedPtr<const FMeshRenderState> USkeletalMesh::GetRenderState(const TArray<UM
 
 	// LOD는 하나뿐이라 임계값 없이 LOD 0 범위만 채운다
 	auto State = MakeShared<FMeshRenderState>();
-	State->LODCount = 1;
 	if (!RenderData.LODRenderData.IsEmpty())
 	{
-		auto& Range = State->LODs[0];
-		Range.FirstSection = 0;
 		for (const FSkeletalMeshSection& Section : RenderData.LODRenderData[0].Sections)
 		{
 			UMaterial* Material = Section.MaterialSlotIndex < InMaterials.size()
 				? InMaterials[Section.MaterialSlotIndex] : GetMaterial(Section.MaterialSlotIndex);
 			if (Material) State->Sections.Add({ Material, Section.StartIndex, Section.IndexCount });
 		}
-		Range.NumSections = State->Sections.Num();
 	}
 	WeakState = State;
 	return State;

@@ -27,25 +27,22 @@ public:
 
 private:
 	static constexpr uint32 LightTileSize = 32;
-	static constexpr uint32 ClusterDepthSlices = 24; // 클러스터에서 사용
 	static constexpr uint32 TiledAverageLightsPerCell = 64;
-	static constexpr uint32 ClusterAverageLightsPerCell = 16;
 
 	struct FGridConstants
 	{
 		FMatrix GridView;
 		FVector4 GridProjectionParams;
 		uint32 GridViewWidth = 0, GridViewHeight = 0, GridTileCountX = 0, GridTileCountY = 0;
-		uint32 GridMode = 0, GridSliceCount = 1, GridIsPerspective = 0, GridPadding = 0;
+		uint32 GridMode = 0, GridIsPerspective = 0, GridPadding[2]{};
 		uint32 GridPointCount = 0, GridSpotCount = 0, GridPointIndexCapacity = 0, GridSpotIndexCapacity = 0;
 		uint32 GridLightOffsets[4]{};
-		FVector4 GridDepthParams; // Near, Far, SliceScale, SliceBias
+		FVector4 GridDepthParams; // Near, Far, padding
 		FMatrix GridProjection;
 	};
 	static_assert(sizeof(FGridConstants) == 224);
 
 	TUniquePtr<FComputeShader> ComputeShader;
-	TUniquePtr<FComputeShader> Tiled25DComputeShader;
 	TUniquePtr<FConstantBuffer> CullingCB;
 	TUniquePtr<FConstantBuffer> LightingInfoCB;
 	TUniquePtr<FStructuredBuffer> Ranges, PointIndices, SpotIndices, Allocator;

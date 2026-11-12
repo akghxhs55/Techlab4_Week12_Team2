@@ -8,12 +8,10 @@
 #include "Components/DecalComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SpotLightComponent.h"
-#include "Components/RectLightComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Actor/DecalActor.h"
 #include "GameFramework/Actor/PointLightActor.h"
 #include "GameFramework/Actor/SpotLightActor.h"
-#include "GameFramework/Actor/RectLightActor.h"
 #include "Engine/World.h"
 #include "Engine/Level.h"
 #include "GameFramework/Actor.h"
@@ -55,7 +53,6 @@ void FLevelEditorViewportClient::Draw(FRenderer* Renderer)
 		EngineShowFlags.bEnableFXAA = S.bEnableFXAA;
 		EngineShowFlags.bCacheShadows = S.bCacheShadows;
 		EngineShowFlags.PcfMode = S.PcfMode;
-		EngineShowFlags.RenderingPath = S.RenderingPath;
 		EngineShowFlags.LightingModel = S.LightingModel;
 		EngineShowFlags.LightCullingMode = S.LightCullingMode;
 		EngineShowFlags.DirectionalShadowMapSize = S.GetDirectionalShadowMapSize();
@@ -77,7 +74,6 @@ void FLevelEditorViewportClient::Draw(FRenderer* Renderer)
 		EngineShowFlags.bEnableFog = ViewportMode == EViewportMode::Solid;
 		EngineShowFlags.bShowSceneDepth = IsSceneDepth();
 		EngineShowFlags.bShowCascade = IsCascade();
-		EngineShowFlags.bShowShadowMask = IsShadowMask();
 		EngineShowFlags.bShowWorldNormal = IsWorldNormal();
 		EngineShowFlags.bShowLightCulling = IsLightCulling();
 		EngineShowFlags.SceneDepthRange = MaxRange;
@@ -119,7 +115,6 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 	const bool bDrawSelectedLight = bIsActiveViewport && Gizmo->GetTarget() &&
 		(Cast<ASpotLightActor>(Gizmo->GetTarget()->GetOwner()) ||
 			Cast<APointLightActor>(Gizmo->GetTarget()->GetOwner()) ||
-			Cast<ARectLightActor>(Gizmo->GetTarget()->GetOwner()) ||
 			Cast<ADecalActor>(Gizmo->GetTarget()->GetOwner()));
 
 	const bool bDrawCascadeBounds = Settings.bDrawCascadeBounds;
@@ -164,8 +159,6 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 						Light->GetSpotLightComponent()->DrawDebug(LineBatcher);
 					else if (APointLightActor* Light = Cast<APointLightActor>(Gizmo->GetTarget()->GetOwner()))
 						Light->GetPointLightComponent()->DrawDebug(LineBatcher);
-					else if (ARectLightActor* Light = Cast<ARectLightActor>(Gizmo->GetTarget()->GetOwner()))
-						Light->GetRectLightComponent()->DrawDebug(LineBatcher);
 					else if (ADecalActor* Decal = Cast<ADecalActor>(Gizmo->GetTarget()->GetOwner()))
 						Decal->GetDecalComponent()->DrawDebug(LineBatcher);
 				}

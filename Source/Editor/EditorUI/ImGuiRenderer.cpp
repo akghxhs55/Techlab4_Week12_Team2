@@ -17,6 +17,7 @@ void ImGui_ImplDX11_SetSwapChainDescs(const DXGI_SWAP_CHAIN_DESC* desc_templates
 
 namespace
 {
+	FString GImGuiSettingsPath;
 	// FWindow가 ImGui를 직접 알지 않도록 메시지 처리기를 훅으로 등록한다.
 	bool ImGuiWndProcHook(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
@@ -224,6 +225,11 @@ bool FImGuiRenderer::Init(HWND WindowHandle, ID3D11Device* Device, ID3D11DeviceC
 	ImGui::CreateContext();
 
 	ImGuiIO& io = ImGui::GetIO();
+	std::error_code SettingsError;
+	const auto SettingsDir = FPaths::ProjectSavedDir() / "Editor";
+	std::filesystem::create_directories(SettingsDir, SettingsError);
+	GImGuiSettingsPath = FPaths::ToUtf8(SettingsDir / "imgui.ini");
+	io.IniFilename = GImGuiSettingsPath.c_str();
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
@@ -244,7 +250,7 @@ bool FImGuiRenderer::Init(HWND WindowHandle, ID3D11Device* Device, ID3D11DeviceC
 	// Reuse ImGui's vertex shader and draw commands; only array-depth sampling differs.
 	ComPtr<ID3DBlob> Bytecode;
 	ComPtr<ID3DBlob> Errors;
-	HRESULT PreviewResult = D3DCompileFromFile(FPaths::EngineFile(L"Resources/Shader/ShadowPreview.hlsl").c_str(), nullptr,
+	HRESULT PreviewResult = D3DCompileFromFile(FPaths::EngineFile(L"EngineResources/Shaders/ShadowPreview.hlsl").c_str(), nullptr,
 		D3D_COMPILE_STANDARD_FILE_INCLUDE, "mainPS", "ps_5_0", D3DCOMPILE_ENABLE_STRICTNESS, 0,
 		Bytecode.GetAddressOf(), Errors.GetAddressOf());
 	if (FAILED(PreviewResult))

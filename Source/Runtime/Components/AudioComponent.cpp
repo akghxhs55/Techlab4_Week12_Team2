@@ -4,7 +4,7 @@
 #include "Engine/Engine.h"
 #include "Engine/World.h"
 #include "Asset/AssetManager.h"
-#include "Engine/Classes/Sound/SoundWave.h"
+#include "Audio/SoundWave.h"
 
 uint64 UAudioComponent::AudioComponentIDCounter = 0;
 TMap<uint64, UAudioComponent*> UAudioComponent::AudioIDToComponentMap;

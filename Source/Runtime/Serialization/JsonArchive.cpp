@@ -1,4 +1,5 @@
 ﻿#include "EnginePCH.h"
+#include "Core/Misc/Paths.h"
 #include "JsonArchive.h"
 
 #include "Engine/World.h"
@@ -85,7 +86,7 @@ bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
 	if (!SaveWorldToBytes(World, Bytes))
 		return false;
 
-	std::ofstream File(Path, std::ios::binary);
+	std::ofstream File(FPaths::FromUtf8(FPaths::ResolveContentPath(Path)), std::ios::binary);
 	if (!File.is_open())
 		return false;
 	File.write(reinterpret_cast<const char*>(Bytes.GetData()), Bytes.Num());
@@ -94,13 +95,13 @@ bool FJsonArchive::SaveWorld(UWorld* World, const FString& Path)
 
 bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 {
-	if (!std::filesystem::exists(Path))
+	if (!std::filesystem::exists(FPaths::FromUtf8(FPaths::ResolveContentPath(Path))))
 	{
 		HTR_LOG(Warning, "{} is Not Exist!", Path);
 		return false;
 	}
 
-	std::ifstream File(Path, std::ios::binary);
+	std::ifstream File(FPaths::FromUtf8(FPaths::ResolveContentPath(Path)), std::ios::binary);
 	if (!File.is_open())
 		return false;
 

@@ -57,7 +57,7 @@ FShaderByteCode RenderUtil::CompileShader(FString Path, const char* EntryPoint, 
 
 	FShaderByteCode ByteCode;
 
-	// 셰이더 키는 엔진 상대 경로(Resources/Shader/...)라서 엔진 폴더 기준으로 바꿔 연다.
+	// 셰이더 키는 엔진 상대 경로(EngineResources/Shaders/...)라서 엔진 폴더 기준으로 바꿔 연다.
 	const std::wstring WPath = FPaths::ResolveEngineRelative(Path).wstring();
 
 	//for (const auto& D : Defines)
@@ -110,7 +110,7 @@ FShaderByteCode RenderUtil::LoadByteCode(const FString& CsoPath)
 
 FString RenderUtil::GetCsoPath(const FString& ShaderPath, EShaderType ShaderType, const D3D_SHADER_MACRO* Macros)
 {
-	const fs::path Rel = FPaths::ResolveEngineRelative(ShaderPath).lexically_relative(FPaths::EngineFile("Resources/Shader"));
+	const fs::path Rel = FPaths::ResolveEngineRelative(ShaderPath).lexically_relative(FPaths::EngineFile("EngineResources/Shaders"));
 	const char* Suffix = GetShaderPrefix(ShaderType);
 	FString MacroSuffix;
 	while (Macros && Macros->Name)
@@ -121,9 +121,9 @@ FString RenderUtil::GetCsoPath(const FString& ShaderPath, EShaderType ShaderType
 
 	// Debug는 최적화를 끄고(D3DCOMPILE_SKIP_OPTIMIZATION) 컴파일하므로 구성마다 캐시를 따로 둔다.
 #ifdef _DEBUG
-	fs::path Out = fs::path("Intermediate/Shaders/Debug") / Rel.parent_path();
+	fs::path Out = fs::path("Build/Cache/Shaders/Debug") / Rel.parent_path();
 #else
-	fs::path Out = fs::path("Intermediate/Shaders/Release") / Rel.parent_path();
+	fs::path Out = fs::path("Build/Cache/Shaders/Release") / Rel.parent_path();
 #endif
 	Out /= Rel.stem().generic_string() + MacroSuffix.c_str() + Suffix;
 	return Out.generic_string();
