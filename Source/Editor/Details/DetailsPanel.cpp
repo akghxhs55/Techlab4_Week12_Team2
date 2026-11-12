@@ -1396,10 +1396,36 @@ namespace
 
 		static char ComponentNameInputBuf[256] = {};
 
-		ImGui::Text("Actor: %s", Actor->GetName().c_str());
-		ImGui::Text("UUID: %u", Actor->GetUUID());
+		// UE 디테일 패널 머리: 왼쪽에 액터 이름, 오른쪽 끝에 초록 + 가 붙은 "Add" 버튼
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted(Actor->GetName().c_str());
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("UUID: %u", Actor->GetUUID());
 
-		if (ImGui::Button("Add Component"))
+		const char* AddLabel = "Add";
+		const float PlusSize = EditorStyle::Scale(10.0f);
+		const float PlusGap = EditorStyle::Scale(6.0f);
+		const ImVec2 FramePadding = ImGui::GetStyle().FramePadding;
+		const float AddWidth = FramePadding.x * 2.0f + PlusSize + PlusGap + ImGui::CalcTextSize(AddLabel).x + EditorStyle::Scale(4.0f);
+		ImGui::SameLine();
+		ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - AddWidth));
+		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(52, 52, 52, 255));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(68, 68, 68, 255));
+		const bool bAddClicked = ImGui::Button("##AddComponent", { AddWidth, ImGui::GetFrameHeight() });
+		ImGui::PopStyleColor(2);
+		{
+			const ImVec2 Min = ImGui::GetItemRectMin(), Max = ImGui::GetItemRectMax();
+			const float CenterY = (Min.y + Max.y) * 0.5f;
+			const float PlusX = Min.x + FramePadding.x + PlusSize * 0.5f;
+			const float Thick = std::max(2.0f, EditorStyle::Scale(2.0f));
+			const ImU32 Green = IM_COL32(110, 200, 70, 255);
+			ImDrawList* DrawList = ImGui::GetWindowDrawList();
+			DrawList->AddRectFilled({ PlusX - PlusSize * 0.5f, CenterY - Thick * 0.5f }, { PlusX + PlusSize * 0.5f, CenterY + Thick * 0.5f }, Green);
+			DrawList->AddRectFilled({ PlusX - Thick * 0.5f, CenterY - PlusSize * 0.5f }, { PlusX + Thick * 0.5f, CenterY + PlusSize * 0.5f }, Green);
+			DrawList->AddText({ PlusX + PlusSize * 0.5f + PlusGap, CenterY - ImGui::GetTextLineHeight() * 0.5f },
+				ImGui::GetColorU32(ImGuiCol_Text), AddLabel);
+		}
+		if (ImGui::IsItemHovered()) ImGui::SetTooltip("Add a component to this actor");
+		if (bAddClicked)
 		{
 			ImGui::OpenPopup("AddComponentPopup");
 		}
@@ -1667,18 +1693,40 @@ void FDetailsPanel::DrawCompoenetList(AActor* SelectedActor, UActorComponent*& O
     }
     USceneComponent* Root = SelectedActor->GetRootComponent();
 
-    const bool bExpanded = ImGui::CollapsingHeader("Components", ImGuiTreeNodeFlags_DefaultOpen);
-    if (ImGui::BeginDragDropTarget())
+    // UE처럼 컴포넌트 트리를 액터 이름 아래 별도 테두리 상자에 둔다. 아래 가장자리를 끌어 높이를 바꿀 수 있다.
+    int32 RowCount = 1;
+    for (UActorComponent* Component : SelectedActor->GetComponents())
+        if (Component && !Component->IsHiddenInDetails()) ++RowCount;
+    const float RowHeight = ImGui::GetFrameHeight();
+    const float BoxHeight = std::clamp(static_cast<float>(RowCount), 3.0f, 10.0f) * RowHeight + ImGui::GetStyle().WindowPadding.y * 2.0f;
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(21, 21, 21, 255));
+    const bool bBoxVisible = ImGui::BeginChild("##ComponentTree", { 0.0f, BoxHeight },
+        ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY);
+    ImGui::PopStyleColor();
+    if (!bBoxVisible) { ImGui::EndChild(); return; }
+
+    // 첫 줄: "액터 이름 (Instance)". 누르면 루트 컴포넌트를 고른다. 여기에 끌어 놓으면 루트에 붙는다.
     {
-        USceneComponent* Child = nullptr;
-        if (const auto* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Component))
-            Child = *static_cast<USceneComponent* const*>(Payload->Data);
-        if (const auto* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Actor))
-            Child = (*static_cast<AActor* const*>(Payload->Data))->GetRootComponent();
-        if (EditorHierarchy::CanAttach(Child, Root)) { PendingDroppedComponent = Child; PendingDragComponent = Root; }
-        ImGui::EndDragDropTarget();
+        const FString InstanceLabel = SelectedActor->GetName() + " (Instance)";
+        // 선택 표시는 아래 루트 컴포넌트 줄이 맡으므로 이 줄은 강조하지 않는다.
+        if (ImGui::Selectable(InstanceLabel.c_str(), false) && Root)
+            OutSelectedComponent = Root;
+        if (ImGui::BeginDragDropTarget())
+        {
+            USceneComponent* Child = nullptr;
+            if (const auto* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Component))
+                Child = *static_cast<USceneComponent* const*>(Payload->Data);
+            if (const auto* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::Actor))
+                Child = (*static_cast<AActor* const*>(Payload->Data))->GetRootComponent();
+            if (EditorHierarchy::CanAttach(Child, Root)) { PendingDroppedComponent = Child; PendingDragComponent = Root; }
+            ImGui::EndDragDropTarget();
+        }
     }
-    if (!bExpanded) return;
+    ImGui::Indent(EditorStyle::Scale(12.0f));
+    struct FTreeScope
+    {
+        ~FTreeScope() { ImGui::Unindent(EditorStyle::Scale(12.0f)); ImGui::EndChild(); }
+    } TreeScope;
     if (Root) DrawSceneComponentNode(Root, Root, OutSelectedComponent);
     bool bNeedsSeparator = Root && !Root->IsHiddenInDetails();
 

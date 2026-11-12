@@ -8,6 +8,48 @@
 #include "Components/PrimitiveComponent.h"
 #include "Editor/HitoriEd/EditorDragDrop.h"
 #include "Editor/HitoriEd/EditorHierarchy.h"
+#include "Editor/EditorUI/EditorStyle.h"
+
+#include <cctype>
+
+namespace
+{
+    bool ContainsIgnoreCase(const FString& Text, const char* Pattern)
+    {
+        const size_t PatternLength = std::strlen(Pattern);
+        if (PatternLength == 0) return true;
+        if (Text.size() < PatternLength) return false;
+        for (size_t Start = 0; Start + PatternLength <= Text.size(); ++Start)
+        {
+            size_t i = 0;
+            while (i < PatternLength &&
+                std::tolower(static_cast<unsigned char>(Text[Start + i])) == std::tolower(static_cast<unsigned char>(Pattern[i])))
+                ++i;
+            if (i == PatternLength) return true;
+        }
+        return false;
+    }
+
+    // UE처럼 클래스 이름 앞의 A/U 접두사를 떼고 보여 준다 (AStaticMeshActor → StaticMeshActor).
+    FString GetDisplayTypeName(const AActor* Actor)
+    {
+        if (!Actor || !Actor->GetClass()) return FString();
+        FString Name = Actor->GetClass()->Name;
+        if (Name.size() > 1 && (Name[0] == 'A' || Name[0] == 'U') && std::isupper(static_cast<unsigned char>(Name[1])))
+            Name.erase(0, 1);
+        return Name;
+    }
+}
+
+bool FOutlinerPanel::MatchesSearch(AActor* Actor) const
+{
+    if (!Actor) return false;
+    if (!IsFiltering() || ContainsIgnoreCase(Actor->GetName(), SearchBuffer)) return true;
+    if (const auto* Children = ActorChildren.Find(Actor))
+        for (AActor* Child : *Children)
+            if (MatchesSearch(Child)) return true;
+    return false;
+}
 
 bool FOutlinerPanel::Init()
 {
@@ -40,7 +82,28 @@ void FOutlinerPanel::OnRender()
             bFocusRename = true;
         }
 
-    DrawActors(Level);
+    // UE 아웃라이너처럼 맨 위에 검색창
+    ImGui::SetNextItemWidth(-FLT_MIN);
+    ImGui::InputTextWithHint("##OutlinerSearch", "Search...", SearchBuffer, sizeof(SearchBuffer));
+
+    // 아이템 라벨 / 타입 두 열. 줄마다 배경색을 번갈아 칠한다.
+    ImGui::PushStyleColor(ImGuiCol_TableRowBg, IM_COL32(26, 26, 26, 255));
+    ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, IM_COL32(36, 36, 36, 255));
+    // PadOuterX + 셀 여백: 헤더 글자와 첫 열이 창 왼쪽 끝에 붙지 않게 한다.
+    const ImGuiTableFlags TableFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
+        ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX;
+    ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(EditorStyle::Scale(8.0f), ImGui::GetStyle().CellPadding.y));
+    const bool bTableOpen = ImGui::BeginTable("##OutlinerTable", 2, TableFlags);
+    ImGui::PopStyleVar();
+    if (bTableOpen)
+    {
+        ImGui::TableSetupColumn("Item Label", ImGuiTableColumnFlags_WidthStretch, 0.62f);
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthStretch, 0.38f);
+        ImGui::TableHeadersRow();
+        DrawActors(Level);
+        ImGui::EndTable();
+    }
+    ImGui::PopStyleColor(2);
 
     const ImVec2 Space = ImGui::GetContentRegionAvail();
     ImGui::InvisibleButton("##DetachActors", ImVec2(FMath::Max(Space.x, 1.0f), FMath::Max(Space.y, ImGui::GetFrameHeight())));
@@ -96,9 +159,8 @@ void FOutlinerPanel::DrawActors(ULevel* Level)
     for (AActor* Actor : Actors)
     {
         AActor* Parent = EditorHierarchy::GetParentActor(Actor);
-        if (Actor && (!Parent || Actors.Find(Parent) == INDEX_NONE)) DrawActorNode(Actor);
+        if (Actor && (!Parent || Actors.Find(Parent) == INDEX_NONE) && MatchesSearch(Actor)) DrawActorNode(Actor);
     }
-
 }
 
 // Actor를 ImGui TreeNode로 출력
@@ -115,6 +177,11 @@ void FOutlinerPanel::DrawActorNode(AActor* Actor)
     if (!bHasChildren) Flags |= ImGuiTreeNodeFlags_Leaf | ImGuiTreeNodeFlags_NoTreePushOnOpen;
     for (AActor* Ancestor = RenamingActor; Ancestor; Ancestor = EditorHierarchy::GetParentActor(Ancestor))
         if (Ancestor == Actor) { ImGui::SetNextItemOpen(true); break; }
+    // 검색 중에는 찾은 자손이 보이도록 펼친다.
+    if (IsFiltering() && bHasChildren) ImGui::SetNextItemOpen(true);
+
+    ImGui::TableNextRow();
+    ImGui::TableSetColumnIndex(0);
 
     // Actor 선택 시 UI 선택 상태
     if (SelectedObject == Actor)
@@ -192,9 +259,16 @@ void FOutlinerPanel::DrawActorNode(AActor* Actor)
 		// without submitting an item triggers ImGui's window-boundary assertion.
 		ImGui::PopID();
 	}
+
+    // 타입 열
+    ImGui::TableSetColumnIndex(1);
+    ImGui::TextDisabled("%s", GetDisplayTypeName(Actor).c_str());
+    ImGui::TableSetColumnIndex(0);
+
     if (bOpen && bHasChildren)
     {
-        for (AActor* Child : *Children) DrawActorNode(Child);
+        for (AActor* Child : *Children)
+            if (MatchesSearch(Child)) DrawActorNode(Child);
         ImGui::TreePop();
     }
 }

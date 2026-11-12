@@ -93,8 +93,10 @@ FVector2 FViewportsPanel::GetLocalMousePosition() const {
 // 엔진 입력 처리는 ImGui NewFrame보다 먼저 실행되므로 현재 OS 커서로 버튼
 // 영역을 검사한다.
 bool FViewportsPanel::IsHovered() const {
+	// 패널 경계(도킹 분할선, 창 크기 조절 테두리)와 뷰포트 분할선은 ImGui 항목이라 hover 상태가 된다.
+	// 누르는 프레임에는 아직 Active가 아니므로 hover도 함께 막아야 클릭이 뷰포트 카메라 조작으로 새지 않는다.
 	if (ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) ||
-		ImGui::IsAnyItemActive()) return false;
+		ImGui::IsAnyItemActive() || ImGui::IsAnyItemHovered()) return false;
 	POINT ToolbarCursor{};
 	if (::GetCursorPos(&ToolbarCursor))
 		for (const auto& Rect : ToolbarRects)

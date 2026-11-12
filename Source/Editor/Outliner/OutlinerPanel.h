@@ -54,4 +54,9 @@ private:
 	USceneComponent* PendingAttachChild = nullptr;
 	USceneComponent* PendingAttachParent = nullptr;
 	bool bPendingDetach = false;
+
+	// 검색어. 이름에 포함되거나(대소문자 무시) 자손 중에 포함된 액터만 보인다.
+	char SearchBuffer[128] = {};
+	bool IsFiltering() const { return SearchBuffer[0] != '\0'; }
+	bool MatchesSearch(AActor* Actor) const;
 };
