@@ -61,14 +61,3 @@ struct FSceneView
 		return Context;
 	}
 };
-
-struct FCameraOverlayDebug
-{
-	bool  bOverride = false;
-	float FadeColor[3] = { 0.0f, 0.0f, 0.0f };
-	float FadeAmount = 0.0f;
-	float LetterboxAmount = 0.0f;
-	float LetterboxAspect = 2.39f;
-	float VignetteIntensity = 0.0f;
-};
-inline FCameraOverlayDebug GCameraOverlayDebug;

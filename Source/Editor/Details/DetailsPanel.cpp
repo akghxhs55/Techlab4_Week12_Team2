@@ -20,6 +20,8 @@
 #include "Components/AmbientLightComponent.h"
 
 #include "Components/RotatingMovementComponent.h"
+#include "Components/ScriptComponent.h"
+#include <commdlg.h>
 #include "Components/ProjectileMovementComponent.h"
 
 #include "Animation/AnimSingleNodeInstance.h"
@@ -80,42 +82,118 @@ namespace
 		}
 	}
 
-	void DrawScriptSection(AActor* Actor)
+	// Lua 파일을 고르는 대화상자. bCreate면 새 파일 이름을 받는다. 프로젝트 Scripts 폴더에서 시작한다.
+	bool PickScriptFile(bool bCreate, const FString& DefaultName, fs::path& OutFile)
 	{
-		ImGui::SeparatorText("Lua Script");
+		wchar_t Buffer[MAX_PATH] = {};
+		wcsncpy_s(Buffer, FPaths::FromUtf8(DefaultName).c_str(), _TRUNCATE);
 
-		if (Actor->ScriptPath.empty())
+		std::error_code Ec;
+		const fs::path ScriptsDir = fs::absolute(FPaths::ProjectScriptsDir(), Ec);
+		fs::create_directories(ScriptsDir, Ec);
+		const std::wstring InitialDir = ScriptsDir.wstring();
+
+		OPENFILENAMEW Dialog = {};
+		Dialog.lStructSize = sizeof(Dialog);
+		Dialog.hwndOwner = GetActiveWindow();
+		Dialog.lpstrFile = Buffer;
+		Dialog.nMaxFile = static_cast<DWORD>(std::size(Buffer));
+		Dialog.lpstrFilter = L"Lua Script (*.lua)\0*.lua\0";
+		Dialog.lpstrDefExt = L"lua";
+		Dialog.lpstrInitialDir = InitialDir.c_str();
+		Dialog.lpstrTitle = bCreate ? L"New Lua Script" : L"Select Lua Script";
+		Dialog.Flags = OFN_PATHMUSTEXIST | OFN_NOCHANGEDIR | (bCreate ? 0 : OFN_FILEMUSTEXIST);
+
+		if (!(bCreate ? GetSaveFileNameW(&Dialog) : GetOpenFileNameW(&Dialog)))
+			return false;
+
+		OutFile = Buffer;
+		return true;
+	}
+
+	// 대화상자로 스크립트를 고르고 씬에 저장할 프로젝트 상대 경로를 돌려준다. 취소하거나 실패하면 빈 문자열.
+	// bCreate에서 이미 있는 파일을 고르면 덮어쓰지 않고 그 파일을 연결한다.
+	FString PickScriptPath(bool bCreate, AActor* Actor)
+	{
+		FString DefaultName;
+		if (bCreate)
 		{
-			if (ImGui::Button("Create Script"))
-			{
-				const FString& ScenePath = FEditorFileUtils::CurrentScenePath;
-				if (ScenePath.empty())
-				{
-					HTR_LOG(Warning, "[Lua] Save the scene first. The scene name will be included in the script name.");
-				}
-				else
-				{
-					const FString SceneName = FLuaScriptManager::FromPath(FLuaScriptManager::ToPath(ScenePath).stem());
-					const FString NewPath = FLuaScriptManager::MakeScriptPath(SceneName, Actor->GetName());
-					if (FLuaScriptManager::Get().CreateScriptFromTemplate(NewPath))
-					{
-						Actor->ScriptPath = NewPath;   // 리플렉션 프로퍼티라 씬 저장 때 같이 저장된다
-					}
-				}
-			}
+			const FString& ScenePath = FEditorFileUtils::CurrentScenePath;
+			if (!ScenePath.empty())
+				DefaultName = FLuaScriptManager::FromPath(FLuaScriptManager::ToPath(ScenePath).stem()) + "_";
+			DefaultName += Actor->GetName() + ".lua";
+		}
+
+		fs::path File;
+		if (!PickScriptFile(bCreate, DefaultName, File))
+			return {};
+
+		const FString Key = FLuaScriptManager::MakeScriptKey(File);
+		if (bCreate && !FLuaScriptManager::Get().CreateScriptFromTemplate(Key))
+			return {};
+
+		if (FPaths::FromUtf8(Key).is_absolute())
+			HTR_LOG(Warning, "[Lua] {} is outside the project. It is saved as an absolute path and will not be packaged.", Key);
+		return Key;
+	}
+
+	// 선택한 ScriptComponent의 스크립트 경로 입력과 파일 연결 버튼.
+	void DrawScriptSlot(UScriptComponent* Script, ImFont* CustomFont)
+	{
+		const FString Path = Script->GetScriptPath();
+		const bool bHasPath = !Path.empty();
+
+		// 입력 중에는 버퍼를 유지하고, Enter나 포커스 이동으로 확정할 때만 경로를 바꾼다.
+		// 글자마다 반영하면 치는 도중의 경로가 정규화되고 플레이 중에는 스크립트가 매번 다시 시작된다.
+		static char Buffer[512] = {};
+		static const UScriptComponent* BufferOwner = nullptr;
+		static FString BufferSource;
+		if (BufferOwner != Script || BufferSource != Path)
+		{
+			strncpy_s(Buffer, Path.c_str(), _TRUNCATE);
+			BufferOwner = Script;
+			BufferSource = Path;
+		}
+
+		if (CustomFont) ImGui::PushFont(CustomFont);
+		ImGui::InputTextWithHint("Script Path", "Content/Game/Scripts/MyScript.lua", Buffer, sizeof(Buffer));
+		const bool bCommitted = ImGui::IsItemDeactivatedAfterEdit();
+		if (CustomFont) ImGui::PopFont();
+		if (bCommitted)
+		{
+			Script->SetScriptPath(Buffer);
+			BufferOwner = nullptr;   // 정규화된 경로로 다시 채운다
 			return;
 		}
 
-		ImGui::TextWrapped("%s", Actor->ScriptPath.c_str());
-		if (ImGui::Button("Edit Script"))
+		std::error_code Ec;
+		if (bHasPath && !fs::exists(FLuaScriptManager::ToPath(Path), Ec))
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "File not found");
+
+		// 기존 파일 연결
+		if (ImGui::Button("Browse"))
 		{
-			FLuaScriptManager::Get().OpenScriptInEditor(Actor->ScriptPath);
+			const FString Picked = PickScriptPath(false, Script->GetOwner());
+			if (!Picked.empty())
+				Script->SetScriptPath(Picked);
 		}
 		ImGui::SameLine();
-		if (ImGui::Button("Detach"))
+		// 템플릿에서 새 파일을 만들어 연결
+		if (ImGui::Button("New"))
 		{
-			Actor->ScriptPath.clear();   // 연결만 끊고 파일은 지우지 않는다
+			const FString Picked = PickScriptPath(true, Script->GetOwner());
+			if (!Picked.empty())
+				Script->SetScriptPath(Picked);
 		}
+		ImGui::SameLine();
+		ImGui::BeginDisabled(!bHasPath);
+		if (ImGui::Button("Edit"))
+			FLuaScriptManager::Get().OpenScriptInEditor(Path);
+		ImGui::SameLine();
+		// 연결만 끊는다. 파일은 남는다.
+		if (ImGui::Button("Clear"))
+			Script->SetScriptPath({});
+		ImGui::EndDisabled();
 	}
 
 	bool DrawAxisControl(const FString& _label, float& _value, float _speed, float _minValue, float _maxValue, float _resetValue, FVector4 _color)
@@ -1338,7 +1416,6 @@ namespace
 			}
 			ImGui::EndPopup();
 		}
-		DrawScriptSection(Actor);
 	}
 }
 
@@ -1464,6 +1541,10 @@ void FDetailsPanel::OnRender()
 			ImGui::PushID(TargetComponent);
 			ImGui::SeparatorText("Component Properties");
 			DrawProperties(TargetComponent, CustomFont);
+			if (auto* Component = Cast<UScriptComponent>(TargetComponent))
+			{
+				DrawScriptSlot(Component, CustomFont);
+			}
 			if (auto* Component = Cast<USkinnedMeshComponent>(TargetComponent))
 			{
 				ImGui::TextUnformatted("Skeletal Mesh");
@@ -1495,16 +1576,16 @@ void FDetailsPanel::OnRender()
 				DrawMaterialSlots(MeshComponent);
 			}
 			ImGui::PopID();
+		}
 
-			if (PendingDeleteComponent)
+		if (PendingDeleteComponent)
+		{
+			if (DeleteCallback)
 			{
-				if (DeleteCallback)
-				{
-					DeleteCallback(PendingDeleteComponent);
-				}
-
-				PendingDeleteComponent = nullptr;
+				DeleteCallback(PendingDeleteComponent);
 			}
+
+			PendingDeleteComponent = nullptr;
 		}
 	}
 	ImGui::End();

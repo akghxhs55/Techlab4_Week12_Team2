@@ -29,17 +29,7 @@ void FDockedAssetEditorTab::DrawMenuBar()
         ImGui::EndMenu();
     }
 
-    if (ImGui::BeginMenu("Window"))
-    {
-        for (auto& Panel : Panels)
-        {
-            if (ImGui::MenuItem(Panel->GetPanelName(), nullptr, Panel->IsOpen()))
-            {
-                Panel->SetOpen(!Panel->IsOpen());
-            }
-        }
-        ImGui::EndMenu();
-    }
+    EditorDock::DrawWindowMenu(Panels);
 }
 
 void FDockedAssetEditorTab::OnRender(bool bActive)
@@ -61,9 +51,7 @@ void FDockedAssetEditorTab::OnRender(bool bActive)
             bLayoutInitialized = true;
         }
 
-        ImGuiWindowClass WindowClass;
-        WindowClass.ClassId = PanelClassId;
-        WindowClass.DockingAllowUnclassed = false;
+        const ImGuiWindowClass WindowClass = EditorDock::MakeDockSpaceClass(PanelClassId);
         const ImGuiDockNodeFlags Flags = bActive ? ImGuiDockNodeFlags_None : ImGuiDockNodeFlags_KeepAliveOnly;
         if (bActive || ImGui::DockBuilderGetNode(DockSpaceId))
         {

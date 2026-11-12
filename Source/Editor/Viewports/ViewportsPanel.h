@@ -6,6 +6,8 @@
 #include <functional>
 
 class FGameViewportClient;
+class FGizmo;
+class FEditorSettingsManager;
 
 class FViewportsPanel : public IEditorPanel {
 public:
@@ -62,8 +64,26 @@ public:
 	}
 
 	void SetShowNoCamera(bool bValue) { bShowNoCamera = bValue; }
+	void SetWorld(UWorld* InWorld) { World = InWorld; }
+	void SetGizmo(FGizmo* InGizmo) { Gizmo = InGizmo; }
+	void SetEditorSettings(FEditorSettingsManager* InSettings) { EditorSettings = InSettings; }
+	void SetActorSpawnedCallback(std::function<void(AActor*)> Callback) { OnActorSpawned = std::move(Callback); }
+	void SetIsPlayingQuery(std::function<bool()> Query) { IsPlayingQuery = std::move(Query); }
 
 private:
+	void DrawViewportToolbar(int32 ViewIndex);
+	void DrawSpawnMenu(FEditorViewportClient& Client);
+	void DrawCameraMenu(FEditorViewportClient& Client);
+	void DrawGridMenu();
+	void DrawShowMenu();
+	void DrawRenderMenu();
+	UWorld* World = nullptr;
+	FGizmo* Gizmo = nullptr;
+	FEditorSettingsManager* EditorSettings = nullptr;
+	std::function<void(AActor*)> OnActorSpawned;
+	std::function<bool()> IsPlayingQuery;
+	FRect ToolbarRects[4]{}; // OS screen coordinates, retained for input before ImGui NewFrame.
+	float ToolbarHeights[4]{};
 	int32 ActiveViewIndex = 0;
 	bool bShowNoCamera = false;
 
@@ -78,9 +98,6 @@ private:
 	ImVec2 ContentSize{1.0f, 1.0f};
 	bool bHovered = false;
 	bool bFocused = false;
-	bool bStatResetButtonVisible = false;
-	ImVec2 StatResetButtonMin{};
-	ImVec2 StatResetButtonMax{};
 	float PendingHorizontalDrag = 0.0f;
 	float PendingVerticalDrag = 0.0f;
 	// 누른 뒤 커서가 Splitter 영역을 벗어나도 버튼을 놓을 때까지 드래그를 유지한다.

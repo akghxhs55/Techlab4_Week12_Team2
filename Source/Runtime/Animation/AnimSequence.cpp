@@ -338,8 +338,6 @@ const FBoneAnimationTrack* UAnimSequence::FindRootTrack() const
 	return Tracks.IsEmpty() ? nullptr : &Tracks[0];
 }
 
-bool GDebugSkipRootLock = false;
-
 void UAnimSequence::GetAnimationPose(float Time, FCompactPose& OutPose, const TArray<FBoneInfo>& RefSkeleton, bool bExtractRootMotion) const
 {
     OutPose.ResetToRefPose(RefSkeleton);
@@ -407,7 +405,7 @@ void UAnimSequence::GetAnimationPose(float Time, FCompactPose& OutPose, const TA
 	// 선택한 기준으로 포즈의 root 위치·회전을 고정한다.
 	// - Enable Root Motion: 이동은 ExtractRootMotion으로 Actor에 넘겼으므로 포즈에서는 뺀다
 	// - Force Root Lock    : Actor로 넘기지 않아도 root를 묶어 제자리 재생한다 (RM 클립을 in-place처럼 사용)
-	if (!GDebugSkipRootLock && ((bExtractRootMotion && bEnableRootMotion) || bForceRootLock))
+	if ((bExtractRootMotion && bEnableRootMotion) || bForceRootLock)
 	{
 		const FBoneAnimationTrack* RootTrack = FindRootTrack();
 		if (!RootTrack)

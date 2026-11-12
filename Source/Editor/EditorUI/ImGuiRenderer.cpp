@@ -18,6 +18,25 @@ void ImGui_ImplDX11_SetSwapChainDescs(const DXGI_SWAP_CHAIN_DESC* desc_templates
 namespace
 {
 	FString GImGuiSettingsPath;
+
+	void MigrateEditorSettings(const std::filesystem::path& ConfigDir)
+	{
+		for (const wchar_t* Filename : { L"editor.ini", L"imgui.ini" })
+		{
+			std::error_code Error;
+			const auto Target = ConfigDir / Filename;
+			if (std::filesystem::exists(Target, Error)) continue;
+			for (const auto& OldDir : { FPaths::ProjectSavedDir() / "Editor", FPaths::ProjectDir() })
+			{
+				const auto Source = OldDir / Filename;
+				if (!std::filesystem::is_regular_file(Source, Error)) continue;
+				std::filesystem::rename(Source, Target, Error);
+				if (Error)
+					HTR_LOG(Warning, "Cannot move editor settings to Config: {} ({})", FPaths::ToUtf8(Source), Error.message());
+				break;
+			}
+		}
+	}
 	// FWindow가 ImGui를 직접 알지 않도록 메시지 처리기를 훅으로 등록한다.
 	bool ImGuiWndProcHook(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	{
@@ -226,8 +245,9 @@ bool FImGuiRenderer::Init(HWND WindowHandle, ID3D11Device* Device, ID3D11DeviceC
 
 	ImGuiIO& io = ImGui::GetIO();
 	std::error_code SettingsError;
-	const auto SettingsDir = FPaths::ProjectSavedDir() / "Editor";
+	const auto SettingsDir = FPaths::EditorSettingsFile().parent_path();
 	std::filesystem::create_directories(SettingsDir, SettingsError);
+	MigrateEditorSettings(SettingsDir);
 	GImGuiSettingsPath = FPaths::ToUtf8(SettingsDir / "imgui.ini");
 	io.IniFilename = GImGuiSettingsPath.c_str();
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;

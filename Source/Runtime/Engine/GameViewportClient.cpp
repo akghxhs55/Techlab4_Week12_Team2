@@ -197,16 +197,6 @@ FSceneView FGameViewportClient::CalcSceneView(const FRect& InViewRect)
 			OutView.LetterboxAspect = PCM->LetterboxAspect;
 			OutView.VignetteIntensity = PCM->VignetteIntensity;
 
-			// 시퀀서 Fade 트랙 / Settings 슬라이더가 PCM 값을 덮어씀
-			if (GCameraOverlayDebug.bOverride)
-			{
-				const FCameraOverlayDebug& D = GCameraOverlayDebug;
-				OutView.OverlayColor = FLinearColor{ D.FadeColor[0], D.FadeColor[1], D.FadeColor[2], D.FadeAmount };
-				OutView.LetterboxAmount = D.LetterboxAmount;
-				OutView.LetterboxAspect = D.LetterboxAspect;
-				OutView.VignetteIntensity = D.VignetteIntensity;
-			}
-
 			return OutView;
 		}
 	}
@@ -244,16 +234,6 @@ FSceneView FGameViewportClient::CalcSceneView(const FRect& InViewRect)
 
 	OutView.Frustum = ExtractFrustumPlanes(OutView.ViewProjectionMatrix);
 	OutView.FrustumCorners = GenerateFrustumCorners(OutView.ViewProjectionMatrix.Inverse());
-
-	if (GCameraOverlayDebug.bOverride)
-	{
-		const FCameraOverlayDebug& D = GCameraOverlayDebug;
-		OutView.OverlayColor = FLinearColor{ D.FadeColor[0], D.FadeColor[1], D.FadeColor[2], D.FadeAmount };
-		OutView.LetterboxAmount = D.LetterboxAmount;
-		OutView.LetterboxAspect = D.LetterboxAspect;
-		OutView.VignetteIntensity = D.VignetteIntensity;
-	}
-
 
 	return OutView;
 }

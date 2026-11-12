@@ -38,6 +38,9 @@ void FContentDrawerPanel::OnRender()
 		return;
 	}
 
+	RenderNavigationBar();
+	ImGui::Separator();
+
 	float treeViewWidth = 200.0f;
 	ImGui::BeginChild("FolderTreeView", ImVec2(treeViewWidth, 0));
 	{
@@ -107,6 +110,28 @@ void FContentDrawerPanel::OnRender()
 
 			// 폴더를 열 때 멈추지 않도록 썸네일은 프레임당 하나씩 로드한다. 그동안은 파일 아이콘을 보여 준다.
 			bool bLoadedThumbnail = false;
+
+			// 맨 앞 칸: ".." 를 더블클릭하면 상위 폴더로 간다. 루트에서는 보이지 않는다.
+			bool bGoToParent = false;
+			if (CurrentPath != AssetRootPath)
+			{
+				ImGui::TableNextColumn();
+				ImGui::PushID("##ParentFolder");
+				if (UTexture2D* FolderIcon = UAssetManager::GetAssetByPath<UTexture2D>(FolderIconPath))
+				{
+					ImGui::ImageButton("##ParentFolderButton", (ImTextureID)FolderIcon->GetResource()->GetSRV(), { thumbnailSize, thumbnailSize });
+				}
+				else
+				{
+					ImGui::Button("##ParentFolderButton", { thumbnailSize, thumbnailSize });
+				}
+				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+				{
+					bGoToParent = true;   // 순회 중인 폴더를 바꾸지 않도록 루프가 끝난 뒤 이동한다
+				}
+				ImGui::TextWrapped("..");
+				ImGui::PopID();
+			}
 
 			for (; !IterateError && It != End; It.increment(IterateError))
 			{
@@ -237,6 +262,11 @@ void FContentDrawerPanel::OnRender()
 				ImGui::PopID();
 			}
 			ImGui::EndTable();
+
+			if (bGoToParent)
+			{
+				CurrentPath = CurrentPath.parent_path();
+			}
 		}
 	}
 	BlendSpaceCreator.ProcessCreateRequest();
@@ -244,6 +274,45 @@ void FContentDrawerPanel::OnRender()
 
 	ImGui::EndChild();
 	ImGui::End();
+}
+
+void FContentDrawerPanel::RenderNavigationBar()
+{
+	// 경로 표시: 각 조각을 누르면 그 폴더로 이동한다.
+	fs::path Accumulated = AssetRootPath;
+	fs::path NavigateTarget;
+
+	const std::string RootLabel = AssetRootPath.filename().string();
+	if (ImGui::Button((RootLabel + "##Crumb_Root").c_str()))
+	{
+		NavigateTarget = AssetRootPath;
+	}
+
+	const fs::path Relative = CurrentPath.lexically_relative(AssetRootPath);
+	int CrumbIndex = 0;
+	for (const fs::path& Part : Relative)
+	{
+		if (Part.empty() || Part == ".")
+			continue;
+
+		Accumulated /= Part;
+
+		ImGui::SameLine(0.0f, 4.0f);
+		ImGui::TextUnformatted(">");
+		ImGui::SameLine(0.0f, 4.0f);
+
+		ImGui::PushID(CrumbIndex++);
+		if (ImGui::Button(Part.string().c_str()))
+		{
+			NavigateTarget = Accumulated;
+		}
+		ImGui::PopID();
+	}
+
+	if (!NavigateTarget.empty())
+	{
+		CurrentPath = NavigateTarget;
+	}
 }
 
 void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& SelectedPath)

@@ -11,7 +11,6 @@
 
 class UWorld;
 class ULevel;
-struct FLuaScriptInstance;
 struct FMinimalViewInfo;
 
 UCLASS()
@@ -73,17 +72,18 @@ public:
 	// Parameter : 바로 다시 Register 할껀지
 	virtual void UnregisterAllComponents();
 
-	// Lua 스크립트 (담당: A). ScriptPath가 비어 있으면 Script를 만들지 않는다.
-	// 이 헤더에서 sol.hpp를 include하지 않도록 포인터로 둔다.
-	UPROPERTY(EditAnywhere)
+	// Lua 스크립트는 UScriptComponent가 맡는다. 액터 하나에 여러 개를 붙일 수 있다.
+	// 옛 씬(액터에 절대 경로 하나를 저장하던 형식)을 읽기 위한 자리. 로드 직후 UScriptComponent로 옮기고 비운다.
+	UPROPERTY()
 	FString ScriptPath;
-	FLuaScriptInstance* Script = nullptr;
 
 	// 컴포넌트 충돌 이벤트를 액터 단위로 받는 지점 (C가 호출, A가 Lua로 넘김)
 	virtual void NotifyActorBeginOverlap(AActor* OtherActor);
 	virtual void NotifyActorEndOverlap(AActor* OtherActor);
 	virtual void NotifyHit(AActor* OtherActor);
 	virtual void NotifyDeath(AActor* OtherActor);
+	// 이 액터에 붙은 모든 스크립트의 같은 이름 함수를 붙인 순서대로 부른다.
+	void CallScripts(const char* Name, AActor* Other);
 
 	// 담당: C
 	bool IsOverlappingActor(const AActor* Other) const;

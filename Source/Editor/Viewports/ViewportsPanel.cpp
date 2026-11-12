@@ -17,14 +17,14 @@
 #include "Render/SkinningStats.h"
 #include "Render/SkeletalMeshObject.h"
 #include "Components/SkinnedMeshComponent.h"
+#include "Editor/Gizmo/Gizmo.h"
+#include "Input/InputSystem.h"
 
 
 namespace {
 constexpr float SplitterThickness = 6.0f;
 constexpr ImU32 SplitterColor = IM_COL32(55, 55, 55, 230);
 constexpr ImU32 SplitterHoverColor = IM_COL32(255, 192, 0, 255);
-constexpr const char *ViewportTypeLabels[] = {
-		"Perspective", "Top", "Front", "Right"};
 
 // Stat Overlay
 constexpr float StatOverlayMargin = 8.0f;
@@ -52,7 +52,14 @@ bool FViewportsPanel::Init() {
 }
 
 // 패널의 프레임 갱신 인터페이스이며 별도 계산은 하지 않는다.
-void FViewportsPanel::Tick(float DeltaTime) { (void)DeltaTime; }
+void FViewportsPanel::Tick(float DeltaTime)
+{
+	(void)DeltaTime;
+	if (Gizmo && bFocused && IsHovered() && !ImGui::GetIO().WantTextInput &&
+		(!GameViewportClient || ActiveViewIndex != GameViewportIndex) &&
+		FInputSystem::IsKeyPressed(EKeyCode::Space))
+		Gizmo->SetMode(static_cast<EGizmoMode>((static_cast<int>(Gizmo->GetMode()) + 1) % 3));
+}
 
 // Core Rect에 맞춰 View 활성 상태와 타깃 크기를 갱신한다.
 void FViewportsPanel::SetView(const int32 ViewIndex, const FRect &Rect,
@@ -86,13 +93,13 @@ FVector2 FViewportsPanel::GetLocalMousePosition() const {
 // 엔진 입력 처리는 ImGui NewFrame보다 먼저 실행되므로 현재 OS 커서로 버튼
 // 영역을 검사한다.
 bool FViewportsPanel::IsHovered() const {
-	if (bStatResetButtonVisible && FStatOverlay::IsAnyEnabled()) {
-		POINT Cursor{};
-		if (::GetCursorPos(&Cursor) && Cursor.x >= StatResetButtonMin.x &&
-				Cursor.x < StatResetButtonMax.x && Cursor.y >= StatResetButtonMin.y &&
-				Cursor.y < StatResetButtonMax.y)
-			return false;
-	}
+	if (ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) ||
+		ImGui::IsAnyItemActive()) return false;
+	POINT ToolbarCursor{};
+	if (::GetCursorPos(&ToolbarCursor))
+		for (const auto& Rect : ToolbarRects)
+			if (Rect.Width > 0.0f && ToolbarCursor.x >= Rect.X && ToolbarCursor.x < Rect.X + Rect.Width &&
+				ToolbarCursor.y >= Rect.Y && ToolbarCursor.y < Rect.Y + Rect.Height) return false;
 	const FVector2 Mouse = GetLocalMousePosition();
 	return bHovered && Mouse.X >= 0.0f && Mouse.Y >= 0.0f &&
 		Mouse.X < ContentSize.x && Mouse.Y < ContentSize.y;
@@ -141,7 +148,6 @@ void FViewportsPanel::OnRender() {
 	ContentSize.y = std::max(1.0f, ContentSize.y);
 	bHovered = ImGui::IsWindowHovered();
 	bFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
-	bStatResetButtonVisible = false;
 
 	// 전체 캔버스를 한 번 확보한 뒤 각 렌더 타깃을 창 DrawList에 직접 그린다.
 	// Image 항목 네 개를 따로 배치하면 ImGui 레이아웃과 클리핑 상태가 삽입 순서에
@@ -274,57 +280,12 @@ void FViewportsPanel::OnRender() {
 		bDraggingHorizontalSplitter = false;
 	}
 
-	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex) {
-		FEditorViewportClient *Client = ViewportClients[ViewIndex].get();
-		if (!Client || !Client->IsActive())
-			continue;
-		const FRect &Rect = Client->GetRect();
-		ImGui::SetCursorScreenPos(
-				{ContentOrigin.x + Rect.X + 8.0f,
-				 ContentOrigin.y + Rect.Y + 8.0f});
-		ImGui::PushID(100 + ViewIndex);
-		int SelectedType = static_cast<int>(Client->GetViewportType());
-		ImGui::SetNextItemWidth(120.0f);
-		if (ImGui::Combo("##ViewportType", &SelectedType, ViewportTypeLabels,
-			IM_ARRAYSIZE(ViewportTypeLabels))) {
-			Client->SetViewportType(static_cast<ELevelViewportType>(SelectedType));
-		}
-		ImGui::SameLine();
-		// 장면 채우기 모드 설정
-		int Mode = static_cast<int>(Client->GetViewportMode());
-		const char *Labels[] = {"Solid", "Wireframe", "Scene Depth", "World Normal", "Light Culling", "Cascade"};
-		ImGui::SetNextItemWidth(120.0f);
-		if (ImGui::Combo("##FillMode", &Mode, Labels, IM_ARRAYSIZE(Labels))) {
-			Client->SetViewportMode(static_cast<EViewportMode>(Mode));
-		}
-		ImGui::SameLine();
-		if (CurrentLayoutMode == ELayoutMode::QuadSplit) {
-			if (ImGui::SmallButton("Single")) {
-				RequestedLayoutMode = ELayoutMode::Single;
-				RequestedSingleViewIndex = ViewIndex;
-				bHasLayoutRequest = true;
-			}
-		} else if (ViewIndex == CurrentSingleViewIndex &&
-			ImGui::SmallButton("Quad")) {
-			RequestedLayoutMode = ELayoutMode::QuadSplit;
-			RequestedSingleViewIndex = ViewIndex;
-			bHasLayoutRequest = true;
-		}
-		if (ViewIndex == ActiveViewIndex && !Client->IsLightCulling() &&
-				FStatOverlay::IsAnyEnabled() &&
-				(FStatOverlay::IsEnabled(EStatFlags::Profile) ||
-				 FStatRegistry::Find(EditorStats::STAT_PickingTime))) {
-			ImGui::SameLine();
-			if (ImGui::SmallButton("Reset Stats"))
-				FStatRegistry::Reset();
-			StatResetButtonMin = ImGui::GetItemRectMin();
-			StatResetButtonMax = ImGui::GetItemRectMax();
-			bStatResetButtonVisible = true;
-		}
-		ImGui::PopID();
+	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex)
+	{
+		ToolbarRects[ViewIndex] = {};
+		ToolbarHeights[ViewIndex] = 0.0f;
+		DrawViewportToolbar(ViewIndex);
 	}
-
-
 
 	// 마지막으로 선택된 뷰포트만 오버레이
 	for (int32 ViewIndex = 0; ViewIndex < 4; ++ViewIndex) {
@@ -546,8 +507,7 @@ const FRenderStats& Stats = RenderData.RenderStats;
 	// 제어 위젯 한 줄 아래에서 시작해 Combo와 겹치지 않게 한다.
 	const float LineHeight = ImGui::GetTextLineHeight();
 	const ImVec2 Origin{ViewMin.x + StatOverlayMargin,
-			ViewMin.y + StatOverlayMargin + ImGui::GetFrameHeight() +
-			StatOverlayMargin};
+			ViewMin.y + StatOverlayMargin + ToolbarHeights[Client->GetViewIndex()] + StatOverlayMargin};
 
 	// 최대 너비 계산
 	float MaxWidth = 0.0f;

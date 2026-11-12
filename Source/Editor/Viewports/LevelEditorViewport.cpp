@@ -184,14 +184,10 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 				case ELevelViewportType::Right: GridPlane = EGridPlane::XZ; break;
 				default: break;
 				}
-				if (Settings.bDrawPSGrid && SceneView.bIsPerspective)
-					DrawHelper.OnRenderPSGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
-						Settings, ViewportSetting);
-				else
-					DrawHelper.OnRenderBatchGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
-						SceneView.ViewForward, GridPlane,
-						static_cast<float>(Settings.GridSpacing),
-						SceneView.bIsPerspective, ViewportSetting);
+				DrawHelper.OnRenderBatchGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
+					SceneView.ViewForward, GridPlane,
+					static_cast<float>(Settings.GridSpacing),
+					SceneView.bIsPerspective, ViewportSetting);
 			};
 	}
 	if (bIsActiveViewport && Outline->GetTarget())

@@ -51,6 +51,13 @@ void UActorComponent::BeginPlayComponent()
 	BeginPlay();
 }
 
+void UActorComponent::EndPlayComponent()
+{
+	if (!bHasBegunPlay) return;
+	EndPlay();
+	bHasBegunPlay = false;
+}
+
 void UActorComponent::Activate(bool bReset)
 {
 	if (!bReset && !ShouldActivate()) return;

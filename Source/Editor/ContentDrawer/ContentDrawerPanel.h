@@ -35,6 +35,9 @@ public:
     }
 
 private:
+	// 상단 바: 현재 경로
+	void RenderNavigationBar();
+
 	std::function<void(const FString&)> OnOpenWidget;
 	std::function<void(const FString&)> OnCreateWidget;
 	std::function<void(const FString&)> OnOpenMesh;

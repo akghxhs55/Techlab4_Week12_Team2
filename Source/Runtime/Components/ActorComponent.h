@@ -21,6 +21,9 @@ public:
 	virtual void InitializeComponent() { bIsInitialized = true; }
 	virtual void BeginPlay() {};
 	void BeginPlayComponent();
+	virtual void EndPlay() {}
+	// BeginPlay를 거친 컴포넌트만 EndPlay를 한 번 받는다.
+	void EndPlayComponent();
 	bool HasBegunPlay() const { return bHasBegunPlay; }
 	virtual void TickComponent(float DeltaTime)
 	{

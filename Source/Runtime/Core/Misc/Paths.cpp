@@ -84,7 +84,7 @@ fs::path FPaths::EngineBuildDir() { return GEngineDir / L"Build"; }
 fs::path FPaths::ProjectBuildDir() { return ProjectRoot() / L"Build"; }
 fs::path FPaths::EngineSavedDir() { return EngineBuildDir() / L"Saved"; }
 fs::path FPaths::ProjectSavedDir() { return ProjectBuildDir() / L"Saved"; }
-fs::path FPaths::EditorSettingsFile() { return ProjectSavedDir() / L"Editor/editor.ini"; }
+fs::path FPaths::EditorSettingsFile() { return ProjectRoot() / L"Config/editor.ini"; }
 
 bool FPaths::IsEngineContentPath(const FString& Path)
 {

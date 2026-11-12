@@ -23,8 +23,7 @@
 #include "Editor/AssetEditor/EditorManager.h"
 #include "Editor/OutputLog/OutputLogPanel.h"
 #include "Editor/Details/DetailsPanel.h"
-#include "Editor/EditorControls/EditorControlsPanel.h"
-#include "Editor/Settings/SettingsPanel.h"
+#include "Editor/Settings/EditorSettings.h"
 #include "Editor/Viewports/ViewportsPanel.h"
 #include "Editor/LevelViewportLayout.h"
 #include "Editor/ContentDrawer/ContentDrawerPanel.h"
@@ -91,7 +90,7 @@ public:
 	// UE도 선택과 설정은 에디터 전역이 갖고 뷰포트 클라이언트가 읽어 간다(GEditor->GetSelectedActors(),
 	// GetDefault<ULevelEditorViewportSettings>()). 다만 이 세 함수의 이름은 UE에 없는, 이 엔진 고유의 이름이다.
 	// 설정 패널이 아직 없으면 nullptr이다.
-	const FEditorSettings* GetEditorSettings() const { return SettingsPanel ? &SettingsPanel->GetSettings() : nullptr; }
+	const FEditorSettings* GetEditorSettings() const { return EditorSettings ? &EditorSettings->GetSettings() : nullptr; }
 	// 지금 선택된 컴포넌트와 조작 모드를 가진 기즈모
 	FGizmo* GetGizmo() const { return Gizmo.get(); }
 	// 지금 선택된 메시의 외곽선
@@ -173,8 +172,7 @@ private:
 	FOutputLogPanel* OutputLogPanel = nullptr;
 
 	FDetailsPanel* DetailsPanel = nullptr;
-	FEditorControlsPanel* EditorControlsPanel = nullptr;
-	FSettingsPanel* SettingsPanel = nullptr;
+	TUniquePtr<FEditorSettingsManager> EditorSettings;
 	FViewportsPanel* ViewportsPanel = nullptr;
 	FSplitRatio ViewportSplitRatio{0.5f, 0.5f};
 	ELayoutMode ViewportLayoutMode = ELayoutMode::QuadSplit;

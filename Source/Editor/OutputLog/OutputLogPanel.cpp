@@ -4,7 +4,7 @@
 #include "Core/StatOverlay.h"
 #include "Render/SceneRenderer.h"
 
-#include "Editor/Settings/SettingsPanel.h"
+#include "Editor/Settings/EditorSettings.h"
 
 #include "Components/SkinnedMeshComponent.h"
 

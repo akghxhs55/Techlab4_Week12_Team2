@@ -198,15 +198,6 @@ FSceneView FEditorViewportClient::CalcSceneView(const FRect &InViewRect) const {
     OutView.bIsPerspective = bIsPerspective;
     OutView.bIsWireframe = ViewportMode == EViewportMode::Wireframe;
 
-    if (GCameraOverlayDebug.bOverride)
-    {
-        const FCameraOverlayDebug& D = GCameraOverlayDebug;
-        OutView.OverlayColor = FLinearColor{ D.FadeColor[0], D.FadeColor[1], D.FadeColor[2], D.FadeAmount };
-        OutView.LetterboxAmount = D.LetterboxAmount;
-        OutView.LetterboxAspect = D.LetterboxAspect;
-        OutView.VignetteIntensity = D.VignetteIntensity;
-    }
-
     return OutView;
 }
 

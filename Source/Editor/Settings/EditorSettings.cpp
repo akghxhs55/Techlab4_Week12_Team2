@@ -1,27 +1,17 @@
 #include "EnginePCH.h"
 #include "Core/Misc/Paths.h"
-#include "Editor/Settings/SettingsPanel.h"
-#include "Animation/AnimSequence.h"
-#include "Asset/AssetManager.h"
-#include "Camera/CameraActor.h"
-#include "Camera/CameraComponent.h"
-
-#include "Engine/World.h"
+#include "Editor/Settings/EditorSettings.h"
 #include "Editor/Viewports/ViewportsPanel.h"
-#include "Editor/Viewports/EditorViewportClient.h"
-#include "GameFramework/DefaultPawn.h"
-#include "Components/StaticMeshComponent.h"
-#include "UObject/UObjectIterator.h"
 
 // 종료 시 렌더·에디터·뷰포트 설정을 함께 저장한다.
-FSettingsPanel::~FSettingsPanel()
+FEditorSettingsManager::~FEditorSettingsManager()
 {
 	ViewportsPanel = nullptr;
 	SaveSettings();
 }
 
 // 설정 파일을 읽어 패널 상태를 초기화한다.
-bool FSettingsPanel::Init()
+bool FEditorSettingsManager::Init()
 {
 	LoadSettings();
 	return true;
@@ -29,167 +19,7 @@ bool FSettingsPanel::Init()
 
 
 // 설정 패널의 프레임 갱신 진입점이다.
-void FSettingsPanel::Tick(float DeltaTime)
-{
-}
-
-// ImGui 조작으로 렌더·카메라 설정과 저장·복원 요청을 처리한다.
-void FSettingsPanel::OnRender()
-{
-	ImGui::SetNextWindowSize(ImVec2(400, 300), ImGuiCond_FirstUseEver);
-	ImGui::Begin("Settings");
-
-	//////////////////////////////////////////////////////////
-
-	// 렌더링 옵션 (Toggles)
-	ImGui::SeparatorText("Rendering");
-
-	ImGui::TextDisabled("Fill mode is configured per viewport.");
-	ImGui::Checkbox("Draw Primitives", &Settings.bDrawPrimitives);
-	ImGui::Checkbox("Cache Shadows", &Settings.bCacheShadows);
-	ImGui::Checkbox("Draw Bounding Box", &Settings.bDrawBoundingBox);
-	ImGui::Checkbox("Show Object UUID", &Settings.bShowUUID);
-	ImGui::Checkbox("Draw Decals", &Settings.bDrawDecals);
-	const char* DecalBroadPhases[] = { "Off", "Linear AABB", "BVH" };
-	int DecalBroadPhaseIndex = Settings.bDecalBVHCulling ? 2 : (Settings.bDecalCulling ? 1 : 0);
-	ImGui::SetNextItemWidth(200.0f);
-	if (ImGui::Combo("Decal Broad Phase", &DecalBroadPhaseIndex,
-		DecalBroadPhases, IM_ARRAYSIZE(DecalBroadPhases)))
-	{
-		Settings.bDecalCulling = DecalBroadPhaseIndex != 0;
-		Settings.bDecalBVHCulling = DecalBroadPhaseIndex == 2;
-	}
-	ImGui::Checkbox("Decal Narrow Phase (SAT)", &Settings.bDecalNarrowCulling);
-	ImGui::Indent();
-	ImGui::Checkbox("Use OBBTree", &Settings.bDecalOBBTree);
-	ImGui::Unindent();
-
-	const char* LightingModels[] = { "Gouraud", "Lambert", "Phong", "Unlit" };
-	int LightingModelIndex = static_cast<int>(Settings.LightingModel);
-	ImGui::SetNextItemWidth(200.0f);
-	if (ImGui::Combo("Lighting Model", &LightingModelIndex, LightingModels, IM_ARRAYSIZE(LightingModels)))
-		Settings.LightingModel = static_cast<ELightingModel>(LightingModelIndex);
-	const char* LightCullingModes[] = { "Off", "Tiled" };
-	int LightCullingModeIndex = static_cast<int>(Settings.LightCullingMode);
-	ImGui::SetNextItemWidth(200.0f);
-	if (ImGui::Combo("Light Culling", &LightCullingModeIndex,
-		LightCullingModes, IM_ARRAYSIZE(LightCullingModes)))
-	{
-		Settings.LightCullingMode = static_cast<ELightCullingMode>(LightCullingModeIndex);
-	}
-	ImGui::TextDisabled("Forward Lambert/Phong only; Off evaluates all uploaded local lights.");
-
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-	ImGui::SeparatorText("Debug Draw (PIE)");
-	ImGui::Checkbox("Show Collision", &Settings.bShowCollision);
-	ImGui::Checkbox("Show Root", &Settings.bShowRootDebug);
-	ImGui::TextDisabled("PIE only.");
-	// 저장하지 않는 디버그 토글. root 고정을 끄면 루트 모션 이동량이 캡슐 + 메시에 두 번 들어간다
-	ImGui::Checkbox("Skip Root Lock (2x move)", &GDebugSkipRootLock);
-
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-	ImGui::SeparatorText("Scene Depth");
-	ImGui::SetNextItemWidth(200.0f);
-	if (ImGui::DragFloat("Max Distance", &Settings.SceneDepthMaxRange, 0.5f,
-		0.1f, 10000.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp))
-		ApplySceneDepthRange();
-	ImGui::TextDisabled("White represents this distance from the camera.");
-
-	//////////////////////////////////////////////////////////
-
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-	ImGui::SeparatorText("Anti-Aliasing");
-
-	ImGui::Checkbox("Enable FXAA", &Settings.bEnableFXAA);
-
-	//////////////////////////////////////////////////////////
-
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-	ImGui::SeparatorText("Post Process");
-
-	ImGui::Checkbox("Gamma Correction", &Settings.bGammaCorrection);
-	ImGui::BeginDisabled(!Settings.bGammaCorrection);
-	ImGui::SetNextItemWidth(200.0f);
-	ImGui::SliderFloat("Display Gamma", &Settings.DisplayGamma, 1.0f, 3.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-	ImGui::EndDisabled();
-	ImGui::Checkbox("Vignette", &Settings.bShowVignette);
-	ImGui::Checkbox("Camera Fade / Letterbox", &Settings.bShowCameraOverlay);
-	ImGui::Checkbox("Skeletal Mesh", &Settings.bShowSkeletalMesh);
-
-	if (ImGui::TreeNode("Camera Overlay Debug"))
-	{
-		FCameraOverlayDebug& D = GCameraOverlayDebug;
-		ImGui::Checkbox("Override (PIE)", &D.bOverride);
-		ImGui::ColorEdit3("Fade Color", D.FadeColor);
-		ImGui::SliderFloat("Fade Amount", &D.FadeAmount, 0.0f, 1.0f);
-		ImGui::SliderFloat("Letterbox", &D.LetterboxAmount, 0.0f, 1.0f);
-		ImGui::SliderFloat("Letterbox Aspect", &D.LetterboxAspect, 1.0f, 3.0f, "%.2f");
-		ImGui::SliderFloat("Vignette", &D.VignetteIntensity, 0.0f, 2.0f);
-		ImGui::TreePop();
-	}
-
-	//////////////////////////////////////////////////////////
-	
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-	ImGui::SeparatorText("Grid");
-
-	ImGui::Checkbox("Draw Batch Line / Grid", &Settings.bDrawBatchLine);
-	ImGui::Checkbox("Draw PS Grid", &Settings.bDrawPSGrid);
-
-	ImGui::SetNextItemWidth(200.0f);
-	ImGui::SliderInt("Grid Spacing", &Settings.GridSpacing, 1, 100);
-
-	//////////////////////////////////////////////////////////
-
-	// 에디터 수치 설정 (Values)
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-	ImGui::SeparatorText("Editor Settings");
-
-	UCameraComponent* CamCom = World->GetMainCamera()->GetCameraComponent();
-
-	ImGui::SetNextItemWidth(200.0f);
-	ImGui::SliderFloat("Camera Rotate Sensitivity", &Settings.MouseSensitivity, 0.01f, 1.0f, "%.2f");
-	CamCom->SetMouseSensitivity(Settings.MouseSensitivity);
-
-	ImGui::SetNextItemWidth(200.0f);
-	ImGui::SliderFloat("Camera Speed", &Settings.CameraSpeed, 0.1f, 10.0f, "%.2f");
-	CamCom->SetMoveSpeed(Settings.CameraSpeed);
-
-	//////////////////////////////////////////////////////////
-	DrawShadowMapSettings();
-	//////////////////////////////////////////////////////////
-
-	//////////////////////////////////////////////////////////
-	DrawDefaultPawnSettings();
-
-	//////////////////////////////////////////////////////////
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-	ImGui::SeparatorText("Load Settings");
-
-	if (ImGui::Button("Load Settings"))
-	{
-		LoadSettings();
-	}
-
-	if (ImGui::IsItemHovered())
-	{
-		ImGui::SetTooltip("Load settings from editor.ini");
-	}
-
-	ImGui::SameLine();
-
-	if (ImGui::Button("Save Settings"))
-	{
-		SaveSettings();
-	}
-
-	//////////////////////////////////////////////////////////
-
-	ImGui::End();
-}
-
-// 알려진 설정 섹션을 editor.ini에 함께 기록해 뷰포트 값 유실을 막는다.
-bool FSettingsPanel::SaveSettings() const
+bool FEditorSettingsManager::SaveSettings() const
 {
 	FEditorSettings Snapshot = Settings;
 	ReadViewportSettings(Snapshot);
@@ -204,7 +34,6 @@ bool FSettingsPanel::SaveSettings() const
 	}
 
 	File << "[Rendering]\n";
-	File << "Wireframe=" << Settings.bWireframe << "\n";
 	File << "DrawPrimitives=" << Settings.bDrawPrimitives << "\n";
 	File << "CacheShadows=" << Settings.bCacheShadows << "\n";
 	File << "PcfMode=" << static_cast<uint32_t>(Settings.PcfMode) << "\n";
@@ -219,7 +48,6 @@ bool FSettingsPanel::SaveSettings() const
 	File << "DecalOBBTree=" << Settings.bDecalOBBTree << "\n";
 	File << "DrawBatchLine=" << Settings.bDrawBatchLine << "\n";
 	File << "DrawCascadeBounds=" << Settings.bDrawCascadeBounds << "\n";
-	File << "DrawPSGrid=" << Settings.bDrawPSGrid << "\n";
 	File << "SceneDepthMaxRange=" << Settings.SceneDepthMaxRange << "\n";
 	File << "EnableFXAA=" << Settings.bEnableFXAA << "\n";
 
@@ -252,7 +80,6 @@ bool FSettingsPanel::SaveSettings() const
         File << "View" << Index << "Fov=" << Snapshot.ViewFov[Index] << "\n";
         File << "View" << Index << "OrthoWidth=" << Snapshot.ViewOrthoWidth[Index] << "\n";
         File << "View" << Index << "Preset=" << Snapshot.ViewPreset[Index] << "\n";
-        File << "View" << Index << "Wireframe=" << Snapshot.ViewWireframe[Index] << "\n";
         File << "View" << Index << "Mode=" << Snapshot.ViewMode[Index] << "\n";
         File << "View" << Index << "LocationX=" << Snapshot.ViewLocation[Index].X << "\n";
         File << "View" << Index << "LocationY=" << Snapshot.ViewLocation[Index].Y << "\n";
@@ -272,10 +99,11 @@ bool FSettingsPanel::SaveSettings() const
 }
 
 // 파일의 키를 파싱해 렌더·카메라·레이아웃 설정을 복원한다.
-bool FSettingsPanel::LoadSettings()
+bool FEditorSettingsManager::LoadSettings()
 {
-	const auto FilePath = std::filesystem::exists(FPaths::EditorSettingsFile()) ?
-		FPaths::EditorSettingsFile() : FPaths::ProjectDir() / "editor.ini";
+	auto FilePath = FPaths::EditorSettingsFile();
+	if (!std::filesystem::exists(FilePath)) FilePath = FPaths::ProjectSavedDir() / "Editor/editor.ini";
+	if (!std::filesystem::exists(FilePath)) FilePath = FPaths::ProjectDir() / "editor.ini";
 	std::ifstream File(FilePath);
 	if (!File.is_open())
 	{
@@ -317,8 +145,6 @@ bool FSettingsPanel::LoadSettings()
                         Settings.ViewOrthoWidth[Index] = FMath::Clamp(Value, 0.01f, 1000000.0f);
                     else if (Key == Prefix + "Preset" && Value >= 0 && Value <= 7 && Value == static_cast<int32>(Value))
                         Settings.ViewPreset[Index] = static_cast<int32>(Value);
-                    else if (Key == Prefix + "Wireframe" && (Value == 0 || Value == 1))
-                        Settings.ViewWireframe[Index] = static_cast<int32>(Value);
 					else if (Key == Prefix + "Mode" && Value >= 0 &&
 						Value <= static_cast<int32>(EViewportMode::Cascade) && Value == static_cast<int32>(Value))
 						Settings.ViewMode[Index] = static_cast<int32>(Value);
@@ -358,8 +184,7 @@ bool FSettingsPanel::LoadSettings()
                         RotationComponentMasks[Index] |= 1 << 3;
                     }
                 }
-                if (Key == "Wireframe") Settings.bWireframe = std::stoi(ValueStr);
-				else if (Key == "DrawPrimitives") Settings.bDrawPrimitives = std::stoi(ValueStr);
+                if (Key == "DrawPrimitives") Settings.bDrawPrimitives = std::stoi(ValueStr);
 				else if (Key == "CacheShadows") Settings.bCacheShadows = std::stoi(ValueStr);
 				else if (Key == "PcfMode")
 				{
@@ -378,7 +203,6 @@ bool FSettingsPanel::LoadSettings()
 				else if (Key == "DecalOBBTree") Settings.bDecalOBBTree = std::stoi(ValueStr);
 				else if (Key == "DrawBatchLine") Settings.bDrawBatchLine = std::stoi(ValueStr);
 				else if (Key == "DrawCascadeBounds") Settings.bDrawCascadeBounds = std::stoi(ValueStr);
-				else if (Key == "DrawPSGrid") Settings.bDrawPSGrid = std::stoi(ValueStr);
 				else if (Key == "SceneDepthMaxRange") Settings.SceneDepthMaxRange = std::stof(ValueStr);
 				else if (Key == "EnableFXAA") Settings.bEnableFXAA = std::stoi(ValueStr);
 
@@ -459,7 +283,7 @@ bool FSettingsPanel::LoadSettings()
 }
 
 // 뷰포트 설정 복사
-void FSettingsPanel::ReadViewportSettings(FEditorSettings& Out) const
+void FEditorSettingsManager::ReadViewportSettings(FEditorSettings& Out) const
 {
 	if (!ViewportsPanel)
 		return;
@@ -470,9 +294,9 @@ void FSettingsPanel::ReadViewportSettings(FEditorSettings& Out) const
 		if (!Client)
 			continue;
 
+		Out.ViewPreset[Index] = static_cast<int32>(Client->GetViewportType());
 		Out.ViewFov[Index] = Client->GetViewFOV();
 		Out.ViewOrthoWidth[Index] = Client->GetOrthoWidth();
-		Out.ViewWireframe[Index] = Client->IsWireframe() ? 1 : 0;
 		Out.ViewMode[Index] = static_cast<int32>(Client->GetViewportMode());
 		Out.ViewLocation[Index] = Client->GetViewLocation();
 		Out.ViewRotation[Index] = Client->GetViewRotation().Quaternion();
@@ -480,10 +304,10 @@ void FSettingsPanel::ReadViewportSettings(FEditorSettings& Out) const
 }
 
 // 종료 시 설정 갱신
-void FSettingsPanel::CaptureViewportSettings() { ReadViewportSettings(Settings); }
+void FEditorSettingsManager::CaptureViewportSettings() { ReadViewportSettings(Settings); }
 
 // 뷰포트 설정 적용
-void FSettingsPanel::ApplyViewportSettings()
+void FEditorSettingsManager::ApplyViewportSettings()
 {
 	if (!ViewportsPanel)
 		return;
@@ -495,16 +319,20 @@ void FSettingsPanel::ApplyViewportSettings()
 		if (!Client)
 			continue;
 
+		if (Settings.ViewPreset[Index] >= 0 && Settings.ViewPreset[Index] < 4)
+			Client->SetViewportType(static_cast<ELevelViewportType>(Settings.ViewPreset[Index]));
 		if (Settings.ViewFov[Index] > 0.0f)
 			Client->SetViewFOV(Settings.ViewFov[Index]);
-		if (Settings.ViewWireframe[Index] >= 0)
-			Client->SetViewportMode(Settings.ViewWireframe[Index] == 1 ? EViewportMode::Wireframe : EViewportMode::Solid);
-		if (Settings.ViewMode[Index] >= 0)
+		if (Settings.ViewOrthoWidth[Index] > 0.0f)
+			Client->SetOrthoWidth(Settings.ViewOrthoWidth[Index]);
+		if (Settings.bViewLocationSaved[Index]) Client->SetViewLocation(Settings.ViewLocation[Index]);
+		if (Settings.bViewRotationSaved[Index]) Client->SetViewRotation(Settings.ViewRotation[Index].ToFRotator());
+		if (Settings.ViewMode[Index] >= 0 && Settings.ViewMode[Index] < 6)
 			Client->SetViewportMode(static_cast<EViewportMode>(Settings.ViewMode[Index]));
 	}
 }
 
-void FSettingsPanel::ApplySceneDepthRange()
+void FEditorSettingsManager::ApplySceneDepthRange()
 {
 	if (!ViewportsPanel)
 		return;
@@ -514,114 +342,5 @@ void FSettingsPanel::ApplySceneDepthRange()
 		if (FEditorViewportClient* Client = ViewportsPanel->GetViewportClient(Index))
 			Client->SetMaxRange(Settings.SceneDepthMaxRange);
 	}
-}
-
-void FSettingsPanel::DrawDefaultPawnSettings()
-{
-    ImGui::Dummy(ImVec2(0.0f, SectionGap));
-    ImGui::SeparatorText("DefaultPawn Settings");
-    ADefaultPawn* Pawn = World ? Cast<ADefaultPawn>(World->GetPlayerPawn()) : nullptr;
-    if (!Pawn)
-    {
-        ImGui::TextDisabled("Start PIE with a DefaultPawn to edit these settings.");
-        return;
-    }
-
-    const auto DrawMeshPicker = [](const char* Label, UStaticMesh*& SelectedMesh)
-    {
-        const auto GetMeshDisplayName = [](const UStaticMesh* Mesh) -> FString
-        {
-            if (!Mesh) return "None";
-            const fs::path Path(Mesh->GetPath());
-            return Path.stem() == "Atlas"
-                ? Path.parent_path().filename().string()
-                : Path.stem().string();
-        };
-        const FString Preview = GetMeshDisplayName(SelectedMesh);
-        bool bChanged = false;
-        const bool bOpen = ImGui::BeginCombo(Label, Preview.c_str());
-        if (SelectedMesh && ImGui::IsItemHovered())
-            ImGui::SetTooltip("%s", SelectedMesh->GetPath().c_str());
-        if (bOpen)
-        {
-            if (ImGui::Selectable("None", SelectedMesh == nullptr))
-            {
-                SelectedMesh = nullptr;
-                bChanged = true;
-            }
-            for (TObjectIterator<UStaticMesh> Mesh; Mesh; ++Mesh)
-            {
-                const FString Name = GetMeshDisplayName(*Mesh);
-                const bool bSelected = *Mesh == SelectedMesh;
-                ImGui::PushID(*Mesh);
-                if (ImGui::Selectable(Name.c_str(), bSelected))
-                {
-                    SelectedMesh = *Mesh;
-                    bChanged = true;
-                }
-                if (bSelected) ImGui::SetItemDefaultFocus();
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", Mesh->GetPath().c_str());
-                ImGui::PopID();
-            }
-
-            // 아직 로드되지 않은 메시는 경로만 보여 주고 고를 때 로드한다
-            for (const FString& ItemPath : UAssetManager::GetUnloadedAssetPaths(EAssetType::StaticMesh))
-            {
-                ImGui::PushID(ItemPath.c_str());
-                if (ImGui::Selectable(fs::path(ItemPath).stem().string().c_str(), false))
-                {
-                    if (UStaticMesh* Mesh = UAssetManager::GetAssetByPath<UStaticMesh>(ItemPath))
-                    {
-                        SelectedMesh = Mesh;
-                        bChanged = true;
-                    }
-                }
-                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ItemPath.c_str());
-                ImGui::PopID();
-            }
-            ImGui::EndCombo();
-        }
-        return bChanged;
-    };
-
-    UStaticMeshComponent* PawnMesh = Pawn->GetStaticMeshComponent();
-    if (PawnMesh)
-    {
-        UStaticMesh* Mesh = PawnMesh->GetStaticMesh();
-        if (DrawMeshPicker("Pawn Mesh", Mesh)) PawnMesh->SetStaticMesh(Mesh);
-    }
-}
-
-void FSettingsPanel::DrawShadowMapSettings()
-{
-	ImGui::Dummy(ImVec2(0.0f, SectionGap));
-
-	ImGui::SeparatorText("ShadowMap Settings");
-	ImGui::Checkbox("Draw Cascade Bounds", &Settings.bDrawCascadeBounds);
-	if (Settings.bDrawCascadeBounds)
-		ImGui::TextDisabled("Cascade 0-3: red, yellow, green, blue");
-
-	const char* QualityLevelStr[] = { "Very Low", "Low", "Middle", "Hight", "Very High" };
-	
-	if (ImGui::Combo("Directional", &Settings.DirectionalShadowMapSizeLevel, QualityLevelStr, IM_ARRAYSIZE(QualityLevelStr)))
-	{
-		Settings.DirectionalShadowMapSizeLevel = FMath::Clamp(Settings.DirectionalShadowMapSizeLevel, 0, IM_ARRAYSIZE(QualityLevelStr) - 1);
-	}
-
-	if (ImGui::Combo("Point", &Settings.PointShadowMapSizeLevel, QualityLevelStr, IM_ARRAYSIZE(QualityLevelStr)))
-	{
-		Settings.PointShadowMapSizeLevel = FMath::Clamp(Settings.PointShadowMapSizeLevel, 0, IM_ARRAYSIZE(QualityLevelStr) - 1);
-	}
-
-	if (ImGui::Combo("Spot", &Settings.SpotShadowMapSizeLevel, QualityLevelStr, IM_ARRAYSIZE(QualityLevelStr)))
-	{
-		Settings.SpotShadowMapSizeLevel = FMath::Clamp(Settings.SpotShadowMapSizeLevel, 0, IM_ARRAYSIZE(QualityLevelStr) - 1);
-	}
-
-	const char* PcfModes[] = { "Off", "8 (Samples)", "16 (Samples)", "32 (Samples)", "PCSS" };
-	int PcfModeIndex = static_cast<int>(Settings.PcfMode);
-	ImGui::SetNextItemWidth(200.0f);
-	if (ImGui::Combo("Shadow Filter", &PcfModeIndex, PcfModes, IM_ARRAYSIZE(PcfModes)))
-		Settings.PcfMode = static_cast<EPcfMode>(PcfModeIndex);
 }
 

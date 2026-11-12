@@ -52,6 +52,7 @@ void FAnimSequenceEditorTab::DrawMenuBar()
         ImGui::EndMenu();
     }
 
+    EditorDock::DrawWindowMenu(Panels);
 }
 
 void FAnimSequenceEditorTab::BuildDefaultLayout(ImGuiID InDockSpaceId, const ImVec2& Size)

@@ -214,12 +214,12 @@ void UEditorEngine::InitPanels()
 		});
 
 
-	EditorControlsPanel = LevelEditorTab->AddPanel<FEditorControlsPanel>();
 	ViewportsPanel = LevelEditorTab->AddPanel<FViewportsPanel>();
 	ContentDrawerPanel = LevelEditorTab->AddPanel<FContentDrawerPanel>();
 
-	SettingsPanel = LevelEditorTab->AddPanel<FSettingsPanel>();
-	OutputLogPanel->SetEditorSettings(&SettingsPanel->GetMutableSettings());
+	EditorSettings = MakeUnique<FEditorSettingsManager>();
+	EditorSettings->Init();
+	OutputLogPanel->SetEditorSettings(&EditorSettings->GetMutableSettings());
 
 	// 위젯 에셋은 다른 에셋처럼 EditorManager가 여는 탭에서 편집한다.
 	// 새로 만들 때는 디스크에 바로 만들어 콘텐츠 드로어에 곧장 보이도록 한 뒤 연다.
@@ -240,13 +240,13 @@ void UEditorEngine::InitPanels()
 
 	// 화면 나눔 비율 설정 가져오기
 	ViewportSplitRatio = {
-		SettingsPanel->GetSettings().MultipleViewportsHorizontal,
-		SettingsPanel->GetSettings().MultipleViewportsVertical
+		EditorSettings->GetSettings().MultipleViewportsHorizontal,
+		EditorSettings->GetSettings().MultipleViewportsVertical
 	};
 	// SingleView에 사용할 인덱스 설정
-	SingleViewportIndex = SettingsPanel->GetSettings().MultipleViewportsSingleViewIndex;
+	SingleViewportIndex = EditorSettings->GetSettings().MultipleViewportsSingleViewIndex;
 	// 뷰포트 레이아웃 설정
-	ViewportLayoutMode = SettingsPanel->GetSettings().bMultipleViewportsSingle
+	ViewportLayoutMode = EditorSettings->GetSettings().bMultipleViewportsSingle
 		? ELayoutMode::Single
 		: ELayoutMode::QuadSplit;
 	EditorWorld->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(true);
@@ -305,13 +305,13 @@ void UEditorEngine::InitPanels()
 
 	DetailsPanel->SetWorld(GetActiveWorld());
 
-	EditorControlsPanel->SetWorld(EditorWorld);
-	EditorControlsPanel->SetIsPlayingQuery([this]() { return IsPlaying(); });
-	EditorControlsPanel->SetGizmo(Gizmo.get());
-	EditorControlsPanel->SetViewportsPanel(ViewportsPanel);
+	ViewportsPanel->SetWorld(EditorWorld);
+	ViewportsPanel->SetIsPlayingQuery([this]() { return IsPlaying(); });
+	ViewportsPanel->SetGizmo(Gizmo.get());
+	ViewportsPanel->SetEditorSettings(EditorSettings.get());
+	ViewportsPanel->SetActorSpawnedCallback([this](AActor* Actor) { OutlinerPanel->SelectActor(Actor); });
 
-	SettingsPanel->SetWorld(EditorWorld);
-	SettingsPanel->SetViewportsPanel(ViewportsPanel);
+	EditorSettings->SetViewportsPanel(ViewportsPanel);
 	ViewportsPanel->SetLayoutMode(ViewportLayoutMode, SingleViewportIndex);
 
 	for (int32 i = 0; i < 4; ++i)
@@ -322,7 +322,7 @@ void UEditorEngine::InitPanels()
 			AllViewportClients.Add(Client);
 		}
 	}
-	SettingsPanel->ApplyViewportSettings();
+	EditorSettings->ApplyViewportSettings();
 }
 
 // 저장·열기·Play 같은 에디터 명령과 단축키를 정의하고 툴바에 넘긴다.
@@ -409,7 +409,6 @@ void UEditorEngine::Tick(const float DeltaTime)
 	// 패키징 진행, 통계 표시, 패널에 넘길 DeltaTime을 갱신하고 Delete 키를 처리한다.
 	Packager.Tick();
 	FStatOverlay::Tick(DeltaTime);
-	EditorControlsPanel->FEditorControlsPanel::DeltaTime = DeltaTime;
 
 	if (!ImGui::GetIO().WantTextInput && FInputSystem::IsKeyPressed(EKeyCode::Delete))
 		DeleteActor(OutlinerPanel->GetSelectedActor());
@@ -431,7 +430,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 				SingleViewportIndex = RequestedSingleViewIndex;
 			ViewportLayoutMode = RequestedLayout;
 
-			FEditorSettings& Settings = SettingsPanel->GetMutableSettings();
+			FEditorSettings& Settings = EditorSettings->GetMutableSettings();
 			Settings.bMultipleViewportsSingle = RequestedLayout == ELayoutMode::Single;
 			Settings.MultipleViewportsSingleViewIndex = RequestedSingleViewIndex;
 		}
@@ -444,8 +443,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 			ViewportSplitRatio = ApplySplitterDrag(ViewportSplitRatio, EDragAxis::Vertical, VerticalDrag, ViewportSize, 0.1f);
 		if (HorizontalDrag != 0.0f || VerticalDrag != 0.0f)
 		{
-			SettingsPanel->GetMutableSettings().MultipleViewportsHorizontal = ViewportSplitRatio.Horizontal;
-			SettingsPanel->GetMutableSettings().MultipleViewportsVertical = ViewportSplitRatio.Vertical;
+			EditorSettings->GetMutableSettings().MultipleViewportsHorizontal = ViewportSplitRatio.Horizontal;
+			EditorSettings->GetMutableSettings().MultipleViewportsVertical = ViewportSplitRatio.Vertical;
 		}
 
 		FRect ViewRects[4]{};
@@ -510,8 +509,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 		}
 
 		const int32 WheelDelta = FInputSystem::GetWheelDelta();
-		const float MoveSpeed = 10.0f * SettingsPanel->GetSettings().CameraSpeed;
-		const float MouseSens = 0.2f * SettingsPanel->GetSettings().MouseSensitivity;
+		const float MoveSpeed = 10.0f * EditorSettings->GetSettings().CameraSpeed;
+		const float MouseSens = 0.2f * EditorSettings->GetSettings().MouseSensitivity;
 
 		// PIE 게임 화면을 보여 주는 뷰의 카메라는 게임이 소유한다.
 		// 여기서 에디터 카메라까지 움직이면 같은 마우스 입력이 두 번 적용된다.
@@ -542,6 +541,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 					CamCom->SetRelativeRotation(ActiveClient->GetViewRotation());
 					CamCom->SetFieldOfView(ActiveClient->GetViewFOV());
 					CamCom->SetOrthoWidth(ActiveClient->GetOrthoWidth());
+					CamCom->SetNearZ(ActiveClient->GetNearClip());
+					CamCom->SetFarZ(ActiveClient->GetFarClip());
 					CamCom->SetIsOrthogonal(!ActiveClient->IsPerspective());
 				}
 			}
@@ -622,9 +623,9 @@ void UEditorEngine::Tick(const float DeltaTime)
 				Context->GameViewport->GetRenderData().PreviewShadowRange = {};
 
 				// PIE 게임 화면은 에디터 설정 창의 값으로 그린다. 게임 뷰포트는 에디터를 모르므로 여기서 넘겨 준다.
-				if (SettingsPanel)
+				if (EditorSettings)
 				{
-					const FEditorSettings& S = SettingsPanel->GetSettings();
+					const FEditorSettings& S = EditorSettings->GetSettings();
 					FSceneRenderOptions& ShowFlags = Context->GameViewport->EngineShowFlags;
 					ShowFlags.bEnableFXAA = S.bEnableFXAA;
 					ShowFlags.bCacheShadows = S.bCacheShadows;
@@ -699,7 +700,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 	if (bPIEWindowRendered && PIESwapchain)
 		PIESwapchain->SwapBuffers(0);
 	// UI 변경 후 설정을 복사해 종료 시 카메라 수명에 의존하지 않는다.
-	SettingsPanel->CaptureViewportSettings();
+	EditorSettings->CaptureViewportSettings();
 	// 프로파일러 반영
 	FStatRegistry::EndFrame();
 
@@ -880,8 +881,11 @@ void UEditorEngine::PreExit()
 	LevelEditorTab = nullptr;
 	OutputLogPanel = nullptr;
 	DetailsPanel = nullptr;
-	EditorControlsPanel = nullptr;
-	SettingsPanel = nullptr;
+	if (EditorSettings)
+	{
+		EditorSettings->SetViewportsPanel(nullptr);
+		EditorSettings.reset();
+	}
 	ViewportsPanel = nullptr;
 	ContentDrawerPanel = nullptr;
 	OutlinerPanel = nullptr;
@@ -939,8 +943,7 @@ void UEditorEngine::OnActiveWorldChanged()
 
 	if (OutlinerPanel) OutlinerPanel->SetWorld(ActiveWorld);
 	if (DetailsPanel) DetailsPanel->SetWorld(ActiveWorld);
-	if (EditorControlsPanel) EditorControlsPanel->SetWorld(ActiveWorld);
-	if (SettingsPanel) SettingsPanel->SetWorld(ActiveWorld);
+	if (ViewportsPanel) ViewportsPanel->SetWorld(ActiveWorld);
 }
 
 // 씬 변경으로 무효화된 에디터의 선택 참조를 모두 해제한다.
@@ -1008,7 +1011,7 @@ void UEditorEngine::SaveSceneAs()
 // PIE 디버그 표시 (Settings > Debug Draw (PIE))
 void UEditorEngine::DrawPIEDebug(UWorld* World, const FMatrix& ViewProjection)
 {
-	const FEditorSettings& Settings = SettingsPanel->GetSettings();
+	const FEditorSettings& Settings = EditorSettings->GetSettings();
 	GShowSkeletalRootDebug = Settings.bShowRootDebug;  // 런타임 "root" 라벨 표시용
 
 	FLineBatcher* LineBatcher = World->LineBatcher.get();

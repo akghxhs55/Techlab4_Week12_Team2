@@ -10,10 +10,7 @@ FAssetEditorPanelBase::FAssetEditorPanelBase(const char* InName, const FString& 
 void FAssetEditorPanelBase::OnRender()
 {
 	// 같은 탭의 패널끼리만 도킹되도록 탭이 정한 클래스를 지정합니다.
-	ImGuiWindowClass WindowClass;
-	WindowClass.ClassId = DockClassId;
-	WindowClass.DockingAllowUnclassed = false;
-	WindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_NoCloseButton;
+	const ImGuiWindowClass WindowClass = EditorDock::MakePanelClass(DockClassId);
 	ImGui::SetNextWindowClass(&WindowClass);
 	ImGui::SetNextWindowSize(ImVec2(480.0f, 320.0f), ImGuiCond_FirstUseEver);
 

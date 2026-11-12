@@ -4,10 +4,6 @@
 #include "Animation/BonePose.h"
 #include "AnimSequence.generated.h"
 
-// 디버그: root 고정을 건너뛴다. 루트 모션은 그대로 캡슐을 움직이므로 메시가 2배로 이동하는 문제를 재현한다
-// Settings > Debug Draw (PIE) > Skip Root Lock
-extern bool GDebugSkipRootLock;
-
 // Unreal ERootMotionRootLock: root를 고정할 때 어느 위치에 고정할지.
 UENUM()
 enum class ERootMotionRootLock : uint8

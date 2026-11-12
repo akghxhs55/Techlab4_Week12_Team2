@@ -21,10 +21,7 @@ void FStaticMeshEditorPanel::Tick(float DeltaTime)
 void FStaticMeshEditorPanel::OnRender()
 {
 	// 같은 Viewer의 패널끼리 도킹하고, 다른 탭의 도킹 영역과 섞이지 않도록 합니다.
-	ImGuiWindowClass WindowClass;
-	WindowClass.ClassId = DockClassId;
-	WindowClass.DockingAllowUnclassed = false;
-	WindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_NoCloseButton;
+	const ImGuiWindowClass WindowClass = EditorDock::MakePanelClass(DockClassId);
 	ImGui::SetNextWindowClass(&WindowClass);
 	ImGui::SetNextWindowSize(ImVec2(480.0f, 320.0f), ImGuiCond_FirstUseEver);
 

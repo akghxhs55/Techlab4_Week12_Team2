@@ -8,7 +8,7 @@
 #include <cstddef>
 #include <limits>
 
-#include "Editor/Settings/SettingsPanel.h"
+#include "Editor/Settings/EditorSettings.h"
 #include "Render/RenderResourceManager.h"
 
 namespace {
@@ -151,22 +151,11 @@ bool FGridRenderer::Init(FRenderer *InRenderer) {
   BatchGridConstantBuffer =
       RenderCommand::CreateConstantBuffer(sizeof(FBatchGridData));
 
-  PSGridShader = FRenderResourceManager::GetShaderProgram(
-      "EngineResources/Shaders/GridShader.hlsl");
-  PSGridConstantBuffer =
-      RenderCommand::CreateConstantBuffer(sizeof(FPSGridData));
-
   BatchGridPipelineState.Shader = BatchGridShader;
   BatchGridPipelineState.Topology = EPrimitiveTopology::TriangleList;
   BatchGridPipelineState.RasterizerState = ERasterizerState::SolidNone;
   BatchGridPipelineState.BlendState = EBlendState::AlphaBlend;
   BatchGridPipelineState.DepthStencilState = EDepthStencilState::ReadOnly;
-
-  PSGridPipelineState.Shader = PSGridShader;
-  PSGridPipelineState.Topology = EPrimitiveTopology::TriangleStrip;
-  PSGridPipelineState.RasterizerState = ERasterizerState::SolidNone;
-  PSGridPipelineState.BlendState = EBlendState::AlphaBlend;
-  PSGridPipelineState.DepthStencilState = EDepthStencilState::ReadOnly;
   return true;
 }
 
@@ -348,49 +337,4 @@ void FGridRenderer::OnRenderBatchGrid(const FMatrix &ViewProj,
                  NormalColor(FrontExtent), 1.5f, Count);
     DrawWorldLines(Count, ViewProj, Viewport, FadeOrigin, FadeRadius);
   }
-}
-
-// 반투명 XY Grid를 기준으로 Z축을 나눠 뒤쪽 축·Grid·앞쪽 축 순서로 합성한다.
-void FGridRenderer::OnRenderPSGrid(const FMatrix &ViewProj,
-                                   const FVector &CameraPos,
-                                   const FEditorSettings &InEditorSettings,
-                                   const FViewportSettings &Viewport) {
-  FGridFrustum Frustum{};
-  if (!BuildGridFrustum(ViewProj, Frustum))
-    return;
-  // 원근 축은 Grid의 거리 페이드를 공유하고 직교의 무한 가시 범위 정책과
-  // 분리한다.
-  const FVector FadeOrigin(CameraPos.X, CameraPos.Y, 0);
-  const float FadeRadius =
-      std::clamp(std::fabs(CameraPos.Z) * 25.0f, 5.0f, 50.0f);
-  FPSGridData Data{};
-  Data.invViewProj = ViewProj;
-  Data.CameraPos = CameraPos;
-  Data.CellSize = std::max(1, InEditorSettings.GridSpacing);
-  Data.SubCellSize = Data.CellSize * 0.1f;
-  // 깊이를 기록하지 않는 Grid 위로 뒤쪽 Z축이 덮이지 않도록 평면 반대편부터
-  // 그린다.
-  const float AxisExtent = Frustum.AxisExtent.Z;
-  const float FrontZ = CameraPos.Z >= 0.0f ? AxisExtent : -AxisExtent;
-  // 카메라 기준 앞뒤가 아니라 월드 Z 부호로 불투명도를 정한다.
-  const FVector4 BackColor(0.25f, 0.45f, 0.90f, FrontZ > 0.0f ? 0.3f : 1.0f);
-  const FVector4 FrontColor(0.25f, 0.45f, 0.90f, FrontZ > 0.0f ? 1.0f : 0.3f);
-  uint32 Count = 0;
-  AddWorldLine(FVector(0, 0, -FrontZ), FVector(0, 0, 0), BackColor, 1.5f,
-               Count);
-  DrawWorldLines(Count, ViewProj, Viewport, FadeOrigin, FadeRadius);
-  RenderCommand::BindPipelineState(PSGridPipelineState);
-  RenderCommand::BindVertexBuffer(nullptr);
-  RenderCommand::UpdateBufferData(PSGridConstantBuffer.get(), &Data,
-                                  sizeof(Data));
-  RenderCommand::BindConstantBuffer(0, PSGridConstantBuffer.get(),
-                                    EShaderBindFlagBits::Vertex);
-  RenderCommand::BindConstantBuffer(0, PSGridConstantBuffer.get(),
-                                    EShaderBindFlagBits::Pixel);
-  RenderCommand::Draw(4);
-  Count = 0;
-  AddWorldAxes(EGridPlane::XY, false, Frustum.AxisExtent, Count);
-  AddWorldLine(FVector(0, 0, 0), FVector(0, 0, FrontZ), FrontColor, 1.5f,
-               Count);
-  DrawWorldLines(Count, ViewProj, Viewport, FadeOrigin, FadeRadius);
 }

@@ -48,6 +48,7 @@ try {
         $destination = Join-Path $out $RelativeTarget
         New-Item -ItemType Directory -Path $destination -Force | Out-Null
         foreach ($file in Get-ChildItem -LiteralPath $sourceRoot -Recurse -File) {
+            if ($RelativeTarget -eq 'Config' -and $file.Name -in @('editor.ini', 'imgui.ini')) { continue }
             # OBJ bake files can be regenerated; FBX/animation .bin assets must ship.
             if ($file.Name.EndsWith('.obj.bin', [StringComparison]::OrdinalIgnoreCase)) { continue }
             $relative = $file.FullName.Substring($sourceRoot.Length + 1)

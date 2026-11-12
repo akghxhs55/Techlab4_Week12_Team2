@@ -59,9 +59,48 @@ sol::state& FLuaScriptManager::GetState()
 	return *State;
 }
 
-FString FLuaScriptManager::MakeScriptPath(const FString& SceneName, const FString& ActorName)
+namespace
 {
-	return FromPath(FPaths::ProjectScriptsDir() / (SceneName + "_" + ActorName + ".lua"));
+	// File이 Dir 안에 있으면 Dir 기준 상대 경로를 채운다.
+	bool RelativeInside(const fs::path& File, const fs::path& Dir, fs::path& OutRelative)
+	{
+		std::error_code Ec;
+		const fs::path Base = fs::absolute(Dir, Ec).lexically_normal();
+		OutRelative = File.lexically_relative(Base);
+		return !OutRelative.empty() && !OutRelative.is_absolute() && *OutRelative.begin() != "..";
+	}
+}
+
+FString FLuaScriptManager::MakeScriptKey(const fs::path& File)
+{
+	std::error_code Ec;
+	const fs::path Full = fs::absolute(File, Ec).lexically_normal();
+
+	fs::path Relative;
+	if (RelativeInside(Full, FPaths::ProjectContentDir(), Relative))
+		return "Content/Game/" + FromPath(Relative.generic_wstring());
+	// 옛 프로젝트 배치(루트/Scripts)는 콘텐츠 폴더 밖에 스크립트가 있다.
+	if (RelativeInside(Full, FPaths::ProjectScriptsDir(), Relative))
+		return "Scripts/" + FromPath(Relative.generic_wstring());
+	if (RelativeInside(Full, FPaths::EngineResourcesDir(), Relative))
+		return "Engine/" + FromPath(Relative.generic_wstring());
+	return FromPath(Full.generic_wstring());
+}
+
+FString FLuaScriptManager::NormalizeScriptPath(const FString& Path)
+{
+	if (Path.empty())
+		return {};
+
+	std::error_code Ec;
+	fs::path File = ToPath(Path);
+	if (File.is_absolute() && !fs::exists(File, Ec))
+	{
+		const fs::path Local = FPaths::ProjectScriptsDir() / File.filename();
+		if (fs::exists(Local, Ec))
+			File = Local;
+	}
+	return MakeScriptKey(File);
 }
 
 FString FLuaScriptManager::GetTemplatePath()

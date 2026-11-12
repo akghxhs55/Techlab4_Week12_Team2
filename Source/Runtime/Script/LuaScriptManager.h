@@ -16,8 +16,12 @@ public:
 
 	sol::state& GetState();
 
-	// 씬이름_액터이름.lua 규칙과 템플릿 경로
-	static FString MakeScriptPath(const FString& SceneName, const FString& ActorName);
+	// 씬·액터에 저장하는 경로 형식. 프로젝트 콘텐츠 안이면 "Content/Game/Scripts/Foo.lua",
+	// 엔진 리소스면 "Engine/...", 그 밖이면 절대 경로를 돌려준다. 다른 PC와 패키지에서도 같은 문자열로 찾는다.
+	static FString MakeScriptKey(const fs::path& File);
+	// 저장돼 있던 경로(옛 절대 경로 포함)를 위 형식으로 바꾼다.
+	// 다른 PC의 절대 경로라 파일이 없으면 프로젝트 Scripts 폴더에서 같은 이름을 찾는다.
+	static FString NormalizeScriptPath(const FString& Path);
 	static FString GetTemplatePath();
 
 	// template.lua를 Path로 복제한다. 이미 있으면 덮어쓰지 않고 true

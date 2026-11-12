@@ -8,8 +8,9 @@
 #include "Core/EngineLog.h"
 #include "UObject/Object.h"
 
-#include "Script/LuaScriptInstance.h"
+#include "Components/ScriptComponent.h"
 #include "Script/LuaBindings.h"
+#include "Script/LuaScriptManager.h"
 
 #include "Camera/CameraComponent.h"
 #include "Camera/PlayerCameraManager.h"
@@ -39,39 +40,44 @@ void AActor::BeginPlay()
 	if (bHasBegunPlay || !World || !World->HasBegunPlay()) return;
 	RegisterAllComponents();
 	bHasBegunPlay = true;
-	for (UActorComponent* Component : Components)
-		if (Component) Component->BeginPlayComponent();
-
-	if (!ScriptPath.empty())
-	{
-		Script = new FLuaScriptInstance();
-		Script->Load(this, ScriptPath);
-		PrimaryActorTick.bCanEverTick = true;
-	}
+	// 스크립트의 BeginPlay는 다른 컴포넌트가 모두 준비된 뒤, 붙인 순서대로 실행한다.
+	// BeginPlay 도중 컴포넌트가 추가될 수 있어 복사본을 돈다.
+	const TArray<UActorComponent*> Begun = Components;
+	for (UActorComponent* Component : Begun)
+		if (Component && !Cast<UScriptComponent>(Component)) Component->BeginPlayComponent();
 
 	RegisterAllActorTickFunctions(true);
 
-	if (Script)
-		Script->Call("BeginPlay");
+	for (UActorComponent* Component : Begun)
+		if (Component && Cast<UScriptComponent>(Component)) Component->BeginPlayComponent();
 }
 
 void AActor::TickActor(float DeltaTime)
 {
 	Tick(DeltaTime);
-	if (Script)
-		Script->Tick(DeltaTime);
 }
 
 void AActor::EndPlay()
 {
-	if (!Script)
-		return;
+	const TArray<UActorComponent*> Ending = Components;
+	for (UActorComponent* Component : Ending)
+		if (Component) Component->EndPlayComponent();
 
-	Script->Call("EndPlay");
+	// 코루틴과 Lua 콜백은 액터 단위로 묶여 있다. 스크립트가 모두 끝난 뒤 한 번에 정리한다.
 	if (World) World->GetCoroutineScheduler().StopAll(this);
-	FLuaBindings::ReleaseCallbacks(this);       // 델리게이트에 걸린 Lua 함수 해제 (단계 8 안전장치 참고)
-	delete Script;
-	Script = nullptr;
+	FLuaBindings::ReleaseCallbacks(this);
+}
+
+void AActor::CallScripts(const char* Name, AActor* Other)
+{
+	// 스크립트가 컴포넌트를 추가하거나 지워도 안전하도록 복사본을 돈다.
+	const TArray<UActorComponent*> Current = Components;
+	for (UActorComponent* Component : Current)
+	{
+		if (Components.Find(Component) == INDEX_NONE) continue;
+		if (UScriptComponent* Script = Cast<UScriptComponent>(Component))
+			Script->CallScript(Name, Other);
+	}
 }
 
 void AActor::RegisterAllActorTickFunctions(bool bRegister)
@@ -217,6 +223,17 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 			Attachment.Child->SetupAttachment(ParentComponent);
 		}
 	}
+
+	// 옛 씬: 액터에 직접 저장된 스크립트 경로를 컴포넌트로 옮긴다.
+	if (Ar.IsLoading() && !ScriptPath.empty())
+	{
+		if (UScriptComponent* Script = Cast<UScriptComponent>(AddComponent(UScriptComponent::StaticClass(), FName("None"))))
+		{
+			Script->SetScriptPath(ScriptPath);
+			HTR_LOG(Info, "[Lua] {} : moved legacy script path to {} ({})", GetName(), Script->GetName(), Script->GetScriptPath());
+		}
+		ScriptPath.clear();
+	}
 }
 
 
@@ -347,6 +364,7 @@ void AActor::DestroyComponent(UActorComponent* Component)
 		}
 	}
 
+	Component->EndPlayComponent();
 	Component->UnregisterComponent();
 	RemoveOwnedComponent(Component);
 	delete Component;
@@ -417,31 +435,22 @@ bool AActor::TryGetActorBounds(FBox& OutBounds) const
 
 void AActor::NotifyActorBeginOverlap(AActor* OtherActor)
 {
-	// TODO(A): if (Script) Script->Call("OnBeginOverlap", OtherActor);
-	//          sol.hpp는 LuaScriptInstance.cpp 안에서만 include하도록 비템플릿 진입점을 거친다
-	if (Script)
-		Script->Call("OnBeginOverlap", OtherActor);
+	CallScripts("OnBeginOverlap", OtherActor);
 }
 
 void AActor::NotifyActorEndOverlap(AActor* OtherActor)
 {
-	// TODO(A): if (Script) Script->Call("OnEndOverlap", OtherActor);
-	if (Script)
-		Script->Call("OnEndOverlap", OtherActor);
+	CallScripts("OnEndOverlap", OtherActor);
 }
 
 void AActor::NotifyHit(AActor* OtherActor)
 {
-	// TODO(A): if (Script) Script->Call("OnHit", OtherActor);
-	if (Script)
-		Script->Call("OnHit", OtherActor);
-
+	CallScripts("OnHit", OtherActor);
 }
 
 void AActor::NotifyDeath(AActor* OtherActor)
 {
-	if (Script)
-		Script->Call("OnDeath", OtherActor);
+	CallScripts("OnDeath", OtherActor);
 }
 
 bool AActor::IsOverlappingActor(const AActor* Other) const

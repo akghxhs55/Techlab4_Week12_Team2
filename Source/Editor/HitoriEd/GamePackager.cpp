@@ -123,6 +123,7 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
                     if (!It->is_regular_file(Ec)) continue;
                     FString Name = It->path().filename().string();
                     std::transform(Name.begin(), Name.end(), Name.begin(), [](unsigned char C) { return static_cast<char>(std::tolower(C)); });
+                    if (FString(Folder) == "Config" && (Name == "editor.ini" || Name == "imgui.ini")) continue;
                     if (Name.ends_with(".obj.bin")) continue;
                     const fs::path Target = Out / Folder / It->path().lexically_relative(Base);
                     fs::create_directories(Target.parent_path(), Ec);

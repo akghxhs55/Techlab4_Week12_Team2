@@ -2,7 +2,11 @@
 #include "Editor/LevelEditor/LevelEditorTab.h"
 #include "Editor/HitoriEd/EditorFileUtils.h"
 #include "Asset/FbxImporter/FbxMeshBake.h"
+#include "Editor/EditorUI/EditorPanel.h"
 #include <filesystem>
+
+// 레벨 에디터 패널끼리만 도킹되게 하는 윈도우 클래스 ID. 레벨 에디터 탭은 하나뿐이라 고정 이름을 쓴다.
+static const ImGuiID PanelClassId = ImHashStr("LevelEditorPanelClass");
 
 FLevelEditorTab::FLevelEditorTab()
 {
@@ -47,19 +51,7 @@ void FLevelEditorTab::DrawMenuBar()
 	// Window 탭
 	////////////////////////////////////////////////////////////
 
-	if (ImGui::BeginMenu("Window"))
-	{
-		for (auto& Panel : Panels)
-		{
-			bool bOpen = Panel->IsOpen();
-
-			if (ImGui::MenuItem(Panel->GetPanelName(), nullptr, bOpen))
-			{
-				Panel->SetOpen(!bOpen);
-			}
-		}
-		ImGui::EndMenu();
-	}
+	EditorDock::DrawWindowMenu(Panels);
 
 
 
@@ -95,15 +87,23 @@ void FLevelEditorTab::OnRender(bool bActive)
 		if (!bActive)
 			Flags |= ImGuiDockNodeFlags_KeepAliveOnly;
 
-		ImGui::DockSpace(DockSpaceId, ImVec2(0.0f, 0.0f), Flags);
+		const ImGuiWindowClass DockSpaceClass = EditorDock::MakeDockSpaceClass(PanelClassId);
+		ImGui::DockSpace(DockSpaceId, ImVec2(0.0f, 0.0f), Flags, &DockSpaceClass);
 	}
 
 	if (bActive)
 	{
+		// 레벨 에디터 패널은 창을 각자 Begin하므로, 여기서 다음 창의 클래스를 미리 지정한다.
+		const ImGuiWindowClass PanelClass = EditorDock::MakePanelClass(PanelClassId);
 		for (auto& Panel : Panels)
 		{
-			if (Panel->IsOpen())
-				Panel->OnRender();
+			if (!Panel->IsOpen())
+				continue;
+
+			ImGui::SetNextWindowClass(&PanelClass);
+			Panel->OnRender();
+			// 패널이 창을 열지 않고 돌아오면 지정한 클래스가 엉뚱한 창에 붙지 않게 지운다.
+			GImGui->NextWindowData.Flags &= ~ImGuiNextWindowDataFlags_HasWindowClass;
 		}
 	}
 }

@@ -5,17 +5,6 @@
 #include "Render/RenderingInfo.h"
 #include "Render/PipelineState.h"
 
-struct FPSGridData
-{
-	// 원근 Grid Shader가 월드 평면을 복원하고 거리별 간격을 계산할 상수를 담는다.
-	FMatrix invViewProj;
-	FVector CameraPos;
-	int32 CellSize;
-	float SubCellSize;
-	int32 GridPlaneType;
-	float Padding[2];
-};
-
 enum class EGridPlane : int32
 {
 	// 직교 View가 표시할 월드 평면을 축 조합으로 구분한다.
@@ -57,9 +46,7 @@ public:
 	// 기존 렌더 진입점 선언이며 현재 호출은 원근·직교 전용 함수를 사용한다.
 	void OnRender(const FMatrix& ViewProj, const FVector& CameraPos);
 
-	// 원근 Grid 앞뒤로 Z축을 나눠 합성하고 음수 Z는 낮은 불투명도로 그린다.
-	void OnRenderPSGrid(const FMatrix& ViewProj, const FVector& CameraPos, const FEditorSettings& InEditorSettings, const FViewportSettings& Viewport);
-	// 직교 Grid와 축에 픽셀 두께·보간을 적용하고 평면 관통 축은 앞뒤로 나눠 합성한다.
+	// 원근·직교 Grid와 축에 픽셀 두께·보간을 적용하고 평면 관통 축은 앞뒤로 나눠 합성한다.
 	void OnRenderBatchGrid(const FMatrix& ViewProj, const FVector& CameraPos, const FVector& CameraForward, EGridPlane Plane, float GridSpacing, bool bDrawAllWorldAxes, const FViewportSettings& Viewport);
 
 private:
@@ -78,10 +65,4 @@ private:
 	TUniquePtr<FConstantBuffer>	BatchGridConstantBuffer;
 	FGridLineVertex* BatchGridVertices = nullptr;
 	uint32						MaxVertices = 0;
-
-	// PS Grid
-	FShaderProgram*			PSGridShader;
-	FPipelineState									PSGridPipelineState;
-	TUniquePtr<FConstantBuffer>						PSGridConstantBuffer;
-	ComPtr<ID3D11RasterizerState>	RasterizerState;
 };

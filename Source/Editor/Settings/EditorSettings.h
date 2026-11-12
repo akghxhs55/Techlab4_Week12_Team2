@@ -1,7 +1,7 @@
 #pragma once
 
 #include <format>
-#include "Editor/EditorUI/EditorPanel.h"
+#include "Core/Types.h"
 #include "Math/Quat.h"
 #include "Math/Vector.h"
 #include "Render/RenderEnums.h"
@@ -16,7 +16,6 @@ struct FEditorSettings
 
 	// 에디터 렌더 옵션과 Multiple Viewports 레이아웃의 영구 설정을 한곳에 담는다.
 	// Toggles
-	bool bWireframe = false;
 	bool bDrawPrimitives = true;
 	bool bCacheShadows = true; // r.Shadow.CacheWholeSceneShadows
 	EPcfMode PcfMode = EPcfMode::Sample8;
@@ -27,7 +26,6 @@ struct FEditorSettings
 	bool bShowRootDebug = false;  // root 본 구체 + 액터→root 선
 	bool bDrawBatchLine = true;
 	bool bDrawCascadeBounds = false;
-	bool bDrawPSGrid = false;
 	bool bEnableFXAA = false;
 	bool bDrawDecals = true;
 	bool bDecalCulling = true;
@@ -51,7 +49,6 @@ struct FEditorSettings
     float ViewFov[4]{};
     float ViewOrthoWidth[4]{};
     int32 ViewPreset[4]{-1,-1,-1,-1};
-    int32 ViewWireframe[4]{-1,-1,-1,-1};
     int32 ViewMode[4]{-1,-1,-1,-1};
 
     // View별 카메라 Transform은 Quaternion 그대로 저장해 재실행 후 같은 시점을 복원한다.
@@ -78,18 +75,14 @@ struct FEditorSettings
 
 class FViewportsPanel;
 
-class FSettingsPanel : public IEditorPanel
+class FEditorSettingsManager
 {
 public:
-	FSettingsPanel() = default;
-	~FSettingsPanel();
+	FEditorSettingsManager() = default;
+	~FEditorSettingsManager();
 
-	bool Init() override;
-	void Tick(float DeltaTime)override;
-	void OnRender() override;
-	const char* GetPanelName() const override { return "Settings"; }
+	bool Init();
 
-	void SetWorld(UWorld* InWorld) { World = InWorld; }
 	void SetViewportsPanel(FViewportsPanel* InPanel) { ViewportsPanel = InPanel; }
 
 	const FEditorSettings& GetSettings() const { return Settings; }
@@ -102,18 +95,13 @@ public:
     // 종료 저장은 마지막 프레임의 복사본을 사용해 저장 설정을 유지한다.
     void CaptureViewportSettings();
     void ApplyViewportSettings();
+	void ApplySceneDepthRange();
 
 private:
-	static constexpr float SectionGap = 10.0f;
-	static constexpr float SubsectionGap = 4.0f;
 
     // View별 Transform·투영·표시 설정을 읽어 저장용 스냅샷에 반영한다.
     void ReadViewportSettings(FEditorSettings& Out) const;
-	void ApplySceneDepthRange();
-	void DrawDefaultPawnSettings();
-	void DrawShadowMapSettings();
 
-	UWorld* World = nullptr;
 	FViewportsPanel* ViewportsPanel = nullptr;
 	FEditorSettings Settings;
 };

@@ -85,6 +85,9 @@ public:
 
 	float GetOrthoWidth() const { return OrthoWidth; }
 	void SetOrthoWidth(float InWidth) { OrthoWidth = InWidth; }
+	float GetNearClip() const { return NearClip; }
+	float GetFarClip() const { return FarClip; }
+	void SetClipPlanes(float Near, float Far) { NearClip = Near; FarClip = Far; }
 
 	float GetAspectRatio() const { return AspectRatio; }
 	void SetAspectRatio(float InAspectRatio) { AspectRatio = InAspectRatio; }
