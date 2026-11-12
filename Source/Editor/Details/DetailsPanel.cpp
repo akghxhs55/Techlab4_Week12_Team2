@@ -1362,7 +1362,9 @@ bool FDetailsPanel::Init()
 {
 	ImGuiIO& io = ImGui::GetIO();
 
-	io.Fonts->AddFontDefault();
+	// 1.92.6+의 AddFontDefault()는 DPI 배율로 비트맵/벡터를 고르는데, DPI 적용 전에 호출되면
+	// 고배율 모니터에서 2프레임째 재판정 결과가 달라져 assert가 난다. 기존 동작(비트맵)을 명시한다.
+	io.Fonts->AddFontDefaultBitmap();
 
 	// 폰트 파일은 엔진 폴더 루트에 있다. 작업 디렉터리는 프로젝트 폴더이므로 절대 경로로 연다.
 	const FString fontPath = FPaths::EngineFileUtf8("NanumSquareR.TTF");
