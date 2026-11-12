@@ -24,7 +24,7 @@ public:
 	static FString NormalizeScriptPath(const FString& Path);
 	static FString GetTemplatePath();
 
-	// template.lua를 Path로 복제한다. 이미 있으면 덮어쓰지 않고 true
+	// Template.lua를 Path로 복제한다. 이미 있으면 덮어쓰지 않고 true
 	bool CreateScriptFromTemplate(const FString& Path);
 	// 기본 연결 프로그램으로 연다. ShellExecute 반환값 ≤ 32이면 false
 	bool OpenScriptInEditor(const FString& Path);

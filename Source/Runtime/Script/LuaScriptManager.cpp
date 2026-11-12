@@ -110,7 +110,7 @@ FString FLuaScriptManager::GetTemplatePath()
 	std::error_code Ec;
 	if (fs::exists(ToPath(ProjectTemplate), Ec))
 		return ProjectTemplate;
-	return FPaths::ResolveContentPath("Engine/Scripts/template.lua");
+	return FPaths::ResolveContentPath("Engine/Scripts/Template.lua");
 }
 
 bool FLuaScriptManager::CreateScriptFromTemplate(const FString& Path)
