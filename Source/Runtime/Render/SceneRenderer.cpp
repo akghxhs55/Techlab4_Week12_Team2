@@ -16,6 +16,7 @@
 #include "Render/PostProcess/FXAARenderer.h"
 #include "Render/PostProcess/ToneMapData.h"
 #include "Render/DecalData.h"
+#include "Render/SkyboxRenderer.h"
 #include "Text/TextRenderer.h"
 #include "UObject/UObjectIterator.h"
 #include "Render/GPUStats.h"
@@ -318,6 +319,23 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 	
 	PrepareDrawData(Renderer, RenderData);
 
+	// 스카이 배경을 물체보다 먼저 HDR 타깃에 깐다. 이 패스가 LightingHDR을 Clear하고, 포워드 패스는 Load로 그 위에 그린다.
+	FSkyboxRenderer* Skybox = Renderer->GetSkybox();
+	const bool bDrawSkybox = Skybox && Skybox->IsValid();
+	if (bDrawSkybox)
+	{
+		FRenderGraphRasterPassDesc Sky{};
+		Sky.Name = "Skybox";
+		Sky.ColorAttachments = {
+			{ LightingHDR, ERenderGraphLoadAction::Clear, { 0.0f, 0.0f, 0.0f, 1.0f } }
+		};
+		if (!Graph.AddRasterPass(std::move(Sky), [this, Skybox]
+			{
+				if (bCorePassSucceeded)
+					Skybox->OnRender(View.ViewProjectionMatrix, View.ViewLocation);
+			})) return false;
+	}
+
 	// 언리얼 RenderShadowDepthMaps: 할당된 그림자 맵마다 Caster 깊이를 아틀라스에 그린다.
 	FTexture2D* ShadowDepthAtlas = RenderData.ViewLightResources.GetShadowDepthAtlas();
 	const bool bAnyShadowAllocated = std::any_of(RenderData.ProjectedShadows.begin(), RenderData.ProjectedShadows.end(),
@@ -437,7 +455,7 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 		FRenderGraphRasterPassDesc Forward{};
 		Forward.Name = "ForwardOpaque";
 		Forward.ColorAttachments = {
-			{ LightingHDR, ERenderGraphLoadAction::Clear, { 0.0f, 0.0f, 0.0f, 1.0f } }
+			{ LightingHDR, bDrawSkybox ? ERenderGraphLoadAction::Load : ERenderGraphLoadAction::Clear, { 0.0f, 0.0f, 0.0f, 1.0f } }
 		};
 		Forward.DepthAttachment = { Depth, bUseDepthPrepass ? ERenderGraphLoadAction::Load : ERenderGraphLoadAction::Clear, 1.0f, 0 };
 		if (!Graph.AddRasterPass(std::move(Forward), [this, Renderer, &Graph, LightingOptions = Options, bUseDepthPrepass, ForwardShadowMask]

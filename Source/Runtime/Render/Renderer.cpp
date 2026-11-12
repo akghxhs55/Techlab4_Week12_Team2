@@ -12,6 +12,8 @@
 
 #include "Render/PostProcess/CameraOverlayRenderer.h"
 #include "Text/TextRenderer.h"
+#include "Render/SkyboxRenderer.h"
+#include "Core/Misc/Paths.h"
 
 namespace
 {
@@ -131,6 +133,13 @@ void FRenderer::EndObjectConstants()
 
 void FRenderer::InitScenePasses()
 {
+	// 스카이 배경 파노라마(엔진 콘텐츠). 로드에 실패하면 배경은 검정으로 남는다.
+	Skybox = MakeUnique<FSkyboxRenderer>();
+	if (!Skybox->Init(FPaths::EngineFileUtf8("EngineResources/SkySphere/Sky.hdr")))
+	{
+		HTR_LOG(Warning, "Skybox panorama not loaded");
+		Skybox.reset();
+	}
 	HeightFog = MakeUnique<FHeightFogRenderer>();
 	HeightFog->Init(this);
 	FXAA = MakeUnique<FFXAARenderer>();

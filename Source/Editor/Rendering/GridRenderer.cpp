@@ -254,7 +254,7 @@ void FGridRenderer::OnRenderBatchGrid(const FMatrix &ViewProj,
   const FVector FadeOrigin(CameraPos.X, CameraPos.Y, 0);
   const float FadeRadius =
       Orthographic ? 0.0f
-                   : std::clamp(std::fabs(CameraPos.Z) * 25.0f, 5.0f, 50.0f);
+                   : std::clamp(std::fabs(CameraPos.Z) * 50.0f, 20.0f, 500.0f);
   const float CameraSide =
       Orthographic ? -CameraForward.Dot(Normal) : CameraPos.Dot(Normal);
   // Grid는 월드 원점에 고정하고 생성 범위만 절두체와 평면의 교차 영역을 따른다.

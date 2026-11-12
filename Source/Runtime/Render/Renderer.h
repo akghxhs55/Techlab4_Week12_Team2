@@ -15,6 +15,7 @@ class FFXAARenderer;
 class FCameraOverlayRenderer;
 
 class FTextRenderer;
+class FSkyboxRenderer;
 
 class FRenderer
 {
@@ -41,6 +42,7 @@ public:
 	FFXAARenderer* GetFXAA() const { return FXAA.get(); }
 	FCameraOverlayRenderer* GetCameraOverlay() const { return CameraOverlay.get(); }
 	FTextRenderer* GetSceneText() const { return SceneText.get(); }
+	FSkyboxRenderer* GetSkybox() const { return Skybox.get(); }
 
 	FConstantBuffer* GetToneMapConstants() const { return ToneMapConstants.get(); }
 	FConstantBuffer* GetDecalConstants() const { return DecalConstants.get(); }
@@ -62,4 +64,5 @@ private:
 	TUniquePtr<FFXAARenderer> FXAA;
 	TUniquePtr<FCameraOverlayRenderer> CameraOverlay;
 	TUniquePtr<FTextRenderer> SceneText;
+	TUniquePtr<FSkyboxRenderer> Skybox;
 };
