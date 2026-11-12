@@ -96,56 +96,10 @@ function CommonSettings()
 end
 
 
--- 외부 라이브러리. 별도 프로젝트로 두면 에디터의 소스 루트가 Source/Editor 하나로 좁혀져
--- Solution Explorer의 "모든 파일 표시"에서 폴더 구조가 그대로 보인다.
-project "ImGui"
-	location (ProjectRoot .. "/Build/Projects")
-	kind     "StaticLib"
-	CommonSettings()
-
-	files
-	{
-		"%{IncludeDir.ImGui}/*.h",
-		"%{IncludeDir.ImGui}/*.cpp",
-		"%{IncludeDir.ImGuiNodeEditor}/*.h",
-        "%{IncludeDir.ImGuiNodeEditor}/*.cpp",
-        "%{IncludeDir.ImGuiNodeEditor}/*.inl",
-		"%{IncludeDir.ImGui}/backends/imgui_impl_win32.*",
-		"%{IncludeDir.ImGui}/backends/imgui_impl_dx11.*",
-	}
-
-	includedirs
-	{
-		"%{IncludeDir.ImGui}",
-		"%{IncludeDir.ImGuiNodeEditor}",
-		"%{IncludeDir.ImGui}/backends",
-	}
-
-	links
-	{
-		"d3d11.lib",
-		"dxgi.lib",
-		"dxguid.lib",
-		"d3dcompiler.lib",
-	}
-
-
--- Lua 5.4. C로 컴파일한다. lua.c·luac.c는 main이 있는 단독 실행 파일용이라 뺀다.
-project "Lua"
-	location (ProjectRoot .. "/Build/Projects")
-	kind     "StaticLib"
-	CommonSettings()
-	language "C"   -- CommonSettings의 C++를 덮어쓴다
-
-	files { "%{IncludeDir.lua}/*.h", "%{IncludeDir.lua}/*.c" }
-	removefiles { "%{IncludeDir.lua}/lua.c", "%{IncludeDir.lua}/luac.c" }
-	includedirs { "%{IncludeDir.lua}" }
-
-
 -- 헤더 툴 (UE의 UnrealHeaderTool 역할). 엔진 코드에 의존하지 않고 std만 쓴다.
 -- HitoriEngine / HitoriEditor가 빌드 전에 이 exe로 *.generated.h를 만든다.
-HeaderTool = '"%{wks.location}/Build/Bin/' .. outputdir .. '/HitoriHeaderTool.exe"'
-GeneratedDir = "%{wks.location}/Build/Generated"
+HeaderTool = '"' .. ProjectRoot .. '/Build/Bin/' .. outputdir .. '/HitoriHeaderTool.exe"'
+GeneratedDir = ProjectRoot .. "/Build/Generated"
 
 project "HitoriHeaderTool"
 	location (ProjectRoot .. "/Build/Projects")
@@ -188,10 +142,17 @@ project "HitoriEngine"
 		"%{IncludeDir.sol2}",
 	}
 
-	links { "Lua" }
+	-- Lua는 엔진에 포함한다. 인터프리터/컴파일러 실행 파일의 main은 제외한다.
+	files { "%{IncludeDir.lua}/*.h", "%{IncludeDir.lua}/*.c" }
+	removefiles { "%{IncludeDir.lua}/lua.c", "%{IncludeDir.lua}/luac.c" }
+	vpaths { ["ThirdParty/Lua/*"] = "%{IncludeDir.lua}/*" }
+	filter "files:**/lua/src/**.c"
+		compileas "C"
+		enablepch "Off"
+	filter {}
 
 	dependson { "HitoriHeaderTool" }
-	prebuildcommands { HeaderTool .. ' Runtime "' .. GeneratedDir .. '/Runtime" "%{wks.location}/Source/Runtime"' }
+	prebuildcommands { HeaderTool .. ' Runtime "' .. GeneratedDir .. '/Runtime" "' .. ProjectRoot .. '/Source/Runtime"' }
 
 	-- sol2 템플릿이 섹션 수 제한을 넘긴다
 	filter "files:**/Script/**.cpp"
@@ -233,7 +194,27 @@ project "HitoriEditor"
 	pchheader "EnginePCH.h"
 	pchsource (ProjectRoot .. "/Source/Editor/EditorPCH.cpp")
 
-	links { "HitoriEngine", "ImGui", "Lua" }
+	links { "HitoriEngine" }
+
+	-- ImGui와 NodeEditor는 에디터에서만 컴파일하고 엔진 PCH를 사용하지 않는다.
+	files
+	{
+		"%{IncludeDir.ImGui}/*.h",
+		"%{IncludeDir.ImGui}/*.cpp",
+		"%{IncludeDir.ImGui}/backends/imgui_impl_win32.*",
+		"%{IncludeDir.ImGui}/backends/imgui_impl_dx11.*",
+		"%{IncludeDir.ImGuiNodeEditor}/*.h",
+		"%{IncludeDir.ImGuiNodeEditor}/*.cpp",
+		"%{IncludeDir.ImGuiNodeEditor}/*.inl",
+	}
+	vpaths
+	{
+		["ThirdParty/ImGui/*"] = "%{IncludeDir.ImGui}/**",
+		["ThirdParty/ImGuiNodeEditor/*"] = "%{IncludeDir.ImGuiNodeEditor}/**",
+	}
+	filter "files:**/ThirdParty/**.cpp"
+		enablepch "Off"
+	filter {}
 
 	-- UClass는 헤더의 정적 객체가 등록하므로, exe가 직접 참조하지 않는 클래스의 .obj를 링커가 버리면
 	-- 그 클래스가 등록되지 않아 씬 로드 때 액터가 사라진다. 엔진 .obj를 전부 링크해 막는다.
@@ -250,7 +231,7 @@ project "HitoriEditor"
 
 
 	dependson { "HitoriHeaderTool" }
-	prebuildcommands { HeaderTool .. ' Editor "' .. GeneratedDir .. '/Editor" "%{wks.location}/Source/Editor"' }
+	prebuildcommands { HeaderTool .. ' Editor "' .. GeneratedDir .. '/Editor" "' .. ProjectRoot .. '/Source/Editor"' }
 
 	includedirs
 	{
@@ -291,7 +272,7 @@ project "HitoriGame"
 	pchheader "EnginePCH.h"
 	pchsource (ProjectRoot .. "/Source/Game/GamePCH.cpp")
 
-	links { "HitoriEngine", "Lua" }
+	links { "HitoriEngine" }
 
 	-- 에디터와 같은 이유. 게임 코드는 라이트 액터 등을 직접 참조하지 않아 특히 빠지기 쉽다.
 	linkoptions { "/WHOLEARCHIVE:HitoriEngine" }
@@ -333,7 +314,43 @@ project "Shaders"
 
 	files { ProjectRoot .. "/EngineResources/Shaders/**.hlsl" }
 	files { ProjectRoot .. "/EngineResources/Shaders/**.hlsli" }
-	vpaths { ["*"] = ProjectRoot .. "/EngineResources/Shaders/**" }
+	-- VS의 논리 필터만 분류한다. 런타임에서 사용하는 실제 파일 경로는 유지한다.
+	local ShaderRoot = ProjectRoot .. "/EngineResources/Shaders/"
+	local ShaderGroups =
+	{
+		Common = { "*.hlsli" },
+		Surface = { "DefaultShader.hlsl", "UberLit.hlsl", "StaticMeshTranslucentShader.hlsl", "DecalShader.hlsl", "SkyboxShader.hlsl" },
+		Depth = { "DepthPrepass.hlsl", "SceneDepthShader.hlsl" },
+		Shadows = { "Shadow*.hlsl", "CascadeFloorShader.hlsl" },
+		Lighting = { "TileBasedLightCulling.hlsl", "LightCullingDebug.hlsl" },
+		PostProcess = { "CameraOverlay.hlsl", "FxaaShader.hlsl", "HeightFogShader.hlsl", "OutlineShader.hlsl", "ToneMapShader.hlsl" },
+		Effects = { "BillboardShader.hlsl", "ParticleSubUVShader.hlsl" },
+		Editor = { "BoundingBoxShader.hlsl", "GizmoShader.hlsl", "GridShader*.hlsl" },
+		UI = { "TextShader.hlsl", "UIShader.hlsl" },
+	}
+	local ShaderFilters = {}
+	local ClassifiedShaders = {}
+	for Group, Patterns in pairs(ShaderGroups) do
+		local Paths = {}
+		for _, Pattern in ipairs(Patterns) do
+			for _, File in ipairs(os.matchfiles(ShaderRoot .. Pattern)) do
+				table.insert(Paths, File)
+				ClassifiedShaders[File] = true
+			end
+		end
+		ShaderFilters[Group .. "/*"] = Paths
+	end
+	-- 겹치는 와일드카드 대신 미분류 파일만 따로 매핑해 필터 우선순위에 의존하지 않는다.
+	local Uncategorized = {}
+	for _, Pattern in ipairs({ "**.hlsl", "**.hlsli" }) do
+		for _, File in ipairs(os.matchfiles(ShaderRoot .. Pattern)) do
+			if not ClassifiedShaders[File] then
+				table.insert(Uncategorized, File)
+			end
+		end
+	end
+	ShaderFilters["Uncategorized/*"] = Uncategorized
+	vpaths (ShaderFilters)
 
 	filter "files:**.hlsl"
 		excludefrombuild "On"
