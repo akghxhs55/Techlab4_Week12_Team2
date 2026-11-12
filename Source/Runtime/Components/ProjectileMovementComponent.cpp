@@ -207,8 +207,7 @@ FVector UProjectileMovementComponent::ComputeBounceResult(const FHitResult& Hit,
 		const float ScaledFriction = (bIsSliding && TempVelocity.Size() > KINDA_SMALL_NUMBER) ? FMath::Clamp(-VDotNormal / TempVelocity.Size(), 0.0f, 1.0f) * Friction : Friction;
 		TempVelocity *= FMath::Clamp(1.0f - ScaledFriction, 0.0f, 1.0f);
 
-		// TODO : Change std::max to FMath::Max
-		TempVelocity += (ProjectedNormal * std::max(Bounciness, 0.0f));
+		TempVelocity += (ProjectedNormal * FMath::Max(Bounciness, 0.0f));
 
 		TempVelocity = LimitVelocity(TempVelocity);
 	}
@@ -291,7 +290,7 @@ bool UProjectileMovementComponent::HandleSliding(FHitResult& Hit, float& SubTick
 			const FVector ProjectedForce = FVector::VectorPlaneProject(Force, OldHitNormal);
 			const FVector NewVelocity = Velocity + ProjectedForce;
 
-			const FVector FrictionForce = -NewVelocity.GetSafeNormal() * (-ForceDotN * Friction < NewVelocity.Size() ? -ForceDotN * Friction : NewVelocity.Size()); // TODO : Change to FMath::Min
+			const FVector FrictionForce = -NewVelocity.GetSafeNormal() * FMath::Min(-ForceDotN * Friction, NewVelocity.Size());
 			Velocity = ConstrainDirectionToPlane(NewVelocity + FrictionForce);
 		}
 		else
