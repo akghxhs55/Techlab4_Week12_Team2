@@ -29,17 +29,24 @@ enum class ELevelViewportType
 	Top,
 	Front,
 	Right,
+	// 저장 파일 호환을 위해 뒤에 붙인다. UE의 직교 뷰 6방향을 모두 갖춘다.
+	Bottom,
+	Left,
+	Back,
+	Count
 };
 
 // 뷰포트 렌더 모드
 enum class EViewportMode
 {
-	Solid,
+	Solid,      // UE의 Lit
 	Wireframe,
 	SceneDepth,
 	WorldNormal,
 	LightCulling,
 	Cascade,
+	Unlit,      // 이 뷰포트만 라이팅 없이 베이스 컬러로 그린다.
+	Count
 };
 
 // 에디터 뷰포트 클라이언트
@@ -93,8 +100,10 @@ public:
 	void SetAspectRatio(float InAspectRatio) { AspectRatio = InAspectRatio; }
 
 	// 카메라 입력 처리
+	// MouseX/Y는 캡처 중 이동량(픽셀)이다. bLeftDrag는 UE의 좌클릭 드래그 조작(앞뒤 이동 + 좌우 회전)이다.
 	void TickInput(float DeltaTime, bool bCaptured, bool bHovered,
-		int32 WheelDelta, float MoveSpeed, float MouseSensitivity);
+		int32 WheelDelta, float MoveSpeed, float MouseSensitivity,
+		float MouseX = 0.0f, float MouseY = 0.0f, bool bLeftDrag = false);
 
 	// 기즈모 조작과 피킹 처리
 	void

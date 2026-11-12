@@ -72,7 +72,7 @@ bool FEditorSettingsManager::SaveSettings() const
 	File << "[MultipleViewports]\n";
 	File << "Horizontal=" << Snapshot.MultipleViewportsHorizontal << "\n";
 	File << "Vertical=" << Snapshot.MultipleViewportsVertical << "\n";
-	File << "Layout=" << (Snapshot.bMultipleViewportsSingle ? "Single" : "Quad") << "\n";
+	File << "Layout=" << GetLayoutModeName(static_cast<ELayoutMode>(Snapshot.ViewportLayout)) << "\n";
 	File << "SingleViewIndex=" << Snapshot.MultipleViewportsSingleViewIndex << "\n";
 
 	for (int32 Index = 0; Index < 4; ++Index)
@@ -146,7 +146,7 @@ bool FEditorSettingsManager::LoadSettings()
                     else if (Key == Prefix + "Preset" && Value >= 0 && Value <= 7 && Value == static_cast<int32>(Value))
                         Settings.ViewPreset[Index] = static_cast<int32>(Value);
 					else if (Key == Prefix + "Mode" && Value >= 0 &&
-						Value <= static_cast<int32>(EViewportMode::Cascade) && Value == static_cast<int32>(Value))
+						Value < static_cast<int32>(EViewportMode::Count) && Value == static_cast<int32>(Value))
 						Settings.ViewMode[Index] = static_cast<int32>(Value);
                     else if (Key == Prefix + "LocationX")
                     {
@@ -234,7 +234,12 @@ bool FEditorSettingsManager::LoadSettings()
 				else if (Key == "GridSpacing") Settings.GridSpacing = std::stoi(ValueStr);
 				else if (Key == "Horizontal") Settings.MultipleViewportsHorizontal = std::stof(ValueStr);
 				else if (Key == "Vertical") Settings.MultipleViewportsVertical = std::stof(ValueStr);
-				else if (Key == "Layout") Settings.bMultipleViewportsSingle = ValueStr == "Single";
+				else if (Key == "Layout")
+				{
+					ELayoutMode Mode = ELayoutMode::QuadSplit;
+					if (ParseLayoutModeName(ValueStr.c_str(), Mode))
+						Settings.ViewportLayout = static_cast<int32>(Mode);
+				}
 				else if (Key == "SingleViewIndex")
 				{
 					const int32 ViewIndex = std::stoi(ValueStr);
@@ -319,7 +324,7 @@ void FEditorSettingsManager::ApplyViewportSettings()
 		if (!Client)
 			continue;
 
-		if (Settings.ViewPreset[Index] >= 0 && Settings.ViewPreset[Index] < 4)
+		if (Settings.ViewPreset[Index] >= 0 && Settings.ViewPreset[Index] < static_cast<int32>(ELevelViewportType::Count))
 			Client->SetViewportType(static_cast<ELevelViewportType>(Settings.ViewPreset[Index]));
 		if (Settings.ViewFov[Index] > 0.0f)
 			Client->SetViewFOV(Settings.ViewFov[Index]);
@@ -327,7 +332,7 @@ void FEditorSettingsManager::ApplyViewportSettings()
 			Client->SetOrthoWidth(Settings.ViewOrthoWidth[Index]);
 		if (Settings.bViewLocationSaved[Index]) Client->SetViewLocation(Settings.ViewLocation[Index]);
 		if (Settings.bViewRotationSaved[Index]) Client->SetViewRotation(Settings.ViewRotation[Index].ToFRotator());
-		if (Settings.ViewMode[Index] >= 0 && Settings.ViewMode[Index] < 6)
+		if (Settings.ViewMode[Index] >= 0 && Settings.ViewMode[Index] < static_cast<int32>(EViewportMode::Count))
 			Client->SetViewportMode(static_cast<EViewportMode>(Settings.ViewMode[Index]));
 	}
 }

@@ -56,13 +56,16 @@ void FEditorViewportClient::FocusOnBounds(const FBoxSphereBounds& Bounds, bool b
 
 void FEditorViewportClient::TickInput(float DeltaTime, bool bCaptured,
                                       bool bHovered, int32 WheelDelta,
-                                      float MoveSpeed, float MouseSensitivity) {
+                                      float MoveSpeed, float MouseSensitivity,
+                                      float MouseX, float MouseY, bool bLeftDrag) {
 
   FViewportCameraInput Input;
   Input.bCaptured = bCaptured;
+  Input.bLeftDrag = bLeftDrag;
   Input.bAllowWheel = bCaptured || bHovered;
-  Input.MouseX = static_cast<float>(FInputSystem::GetMouseDeltaX());
-  Input.MouseY = static_cast<float>(FInputSystem::GetMouseDeltaY());
+  // 캡처 중에는 엔진이 기준점에서 잰 이동량을 넘긴다 (커서를 숨기고 매 프레임 되돌리므로 WM_MOUSEMOVE 델타는 쓸 수 없다).
+  Input.MouseX = MouseX;
+  Input.MouseY = MouseY;
   Input.Wheel = static_cast<float>(WheelDelta);
   Input.bForward = FInputSystem::IsKeyDown(EKeyCode::W);
   Input.bBackward = FInputSystem::IsKeyDown(EKeyCode::S);
@@ -70,7 +73,7 @@ void FEditorViewportClient::TickInput(float DeltaTime, bool bCaptured,
   Input.bLeft = FInputSystem::IsKeyDown(EKeyCode::A);
   Input.bUp = FInputSystem::IsKeyDown(EKeyCode::E);
   Input.bDown = FInputSystem::IsKeyDown(EKeyCode::Q);
-  if (bCaptured || (bHovered && WheelDelta != 0)) bFocusTransition = false;
+  if (bCaptured || bLeftDrag || (bHovered && WheelDelta != 0)) bFocusTransition = false;
   if (bFocusTransition)
   {
     FocusElapsed += DeltaTime;
@@ -107,7 +110,12 @@ void FEditorViewportClient::UpdateGizmoAndPicking(
                   static_cast<int>(Rect.Width), static_cast<int>(Rect.Height),
                   bMouseDown, GetViewLocation(), !IsPerspective(), ImGui::IsMouseClicked(ImGuiMouseButton_Left));
 
-  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !InGizmo->IsUsing() &&
+  // UE처럼 뗄 때 선택한다. 끌었다면(좌클릭 드래그 카메라 조작) 선택하지 않는다.
+  // 문턱은 UEditorEngine의 LeftDragNavThreshold(3px)와 같다.
+  constexpr float ClickSelectThreshold = 3.0f;
+  const bool bClickReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left) &&
+      ImGui::GetIO().MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <= ClickSelectThreshold * ClickSelectThreshold;
+  if (bClickReleased && !InGizmo->IsUsing() &&
       InGizmo->GetHoveredAxis() < 0) {
     FHitResult Hit;
     UWorld* PickingWorld = GetWorld();
@@ -305,6 +313,24 @@ void FEditorViewportClient::SetViewportType(const ELevelViewportType InType) {
     bIsPerspective = false;
     ViewLocation = FVector(0.0f, 20.0f, 0.0f);
     ViewRotation = FRotator(0.0f, -90.0f, 0.0f);
+    break;
+  // 아래 세 방향은 각각 Top, Right, Front의 반대편에서 본다.
+  case ELevelViewportType::Bottom:
+    bIsPerspective = false;
+    ViewLocation = FVector(0.0f, 0.0f, -20.0f);
+    ViewRotation = FRotator(-90.0f, 0.0f, 0.0f);
+    break;
+  case ELevelViewportType::Left:
+    bIsPerspective = false;
+    ViewLocation = FVector(0.0f, -20.0f, 0.0f);
+    ViewRotation = FRotator(0.0f, 90.0f, 0.0f);
+    break;
+  case ELevelViewportType::Back:
+    bIsPerspective = false;
+    ViewLocation = FVector(-20.0f, 0.0f, 0.0f);
+    ViewRotation = FRotator(0.0f, 0.0f, 0.0f);
+    break;
+  default:
     break;
   }
 }

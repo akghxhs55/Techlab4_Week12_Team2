@@ -71,7 +71,10 @@ void FLevelEditorViewportClient::Draw(FRenderer* Renderer)
 		EngineShowFlags.bDecalOBBTree = S.bDecalOBBTree;
 
 		// 이 뷰포트의 뷰 모드에서 나오는 설정
-		EngineShowFlags.bEnableFog = ViewportMode == EViewportMode::Solid;
+		EngineShowFlags.bEnableFog = ViewportMode == EViewportMode::Solid || ViewportMode == EViewportMode::Unlit;
+		// Unlit은 Solid와 같은 경로로 그리되 이 뷰포트만 라이팅 모델을 Unlit으로 바꾼다.
+		if (ViewportMode == EViewportMode::Unlit)
+			EngineShowFlags.LightingModel = ELightingModel::Unlit;
 		EngineShowFlags.bShowSceneDepth = IsSceneDepth();
 		EngineShowFlags.bShowCascade = IsCascade();
 		EngineShowFlags.bShowWorldNormal = IsWorldNormal();
@@ -180,8 +183,10 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 				EGridPlane GridPlane = EGridPlane::XY;
 				switch (ViewportType)
 				{
-				case ELevelViewportType::Front: GridPlane = EGridPlane::YZ; break;
-				case ELevelViewportType::Right: GridPlane = EGridPlane::XZ; break;
+				case ELevelViewportType::Front:
+				case ELevelViewportType::Back: GridPlane = EGridPlane::YZ; break;
+				case ELevelViewportType::Right:
+				case ELevelViewportType::Left: GridPlane = EGridPlane::XZ; break;
 				default: break;
 				}
 				DrawHelper.OnRenderBatchGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,

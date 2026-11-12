@@ -42,7 +42,7 @@ struct FEditorSettings
 	int32 GridSpacing = 1;
 	float MultipleViewportsHorizontal = 0.5f;
 	float MultipleViewportsVertical = 0.5f;
-	bool bMultipleViewportsSingle = false;
+	int32 ViewportLayout = 1; // ELayoutMode. 기본은 2x2(QuadSplit)
 	int32 MultipleViewportsSingleViewIndex = 0;
 
     // 미저장 표식은 초기 카메라 값을 유지한다. 위치·회전은 저장하지 않는다.

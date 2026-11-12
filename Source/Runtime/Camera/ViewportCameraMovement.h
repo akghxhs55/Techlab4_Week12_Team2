@@ -8,6 +8,7 @@
 struct FViewportCameraInput
 {
     bool bCaptured = false;
+    bool bLeftDrag = false;   // UE 좌클릭 드래그: 원근은 앞뒤 이동 + 좌우 회전, 직교는 화면 이동
     bool bAllowWheel = false;
     bool bForward = false;
     bool bBackward = false;
@@ -37,6 +38,26 @@ inline void ApplyViewportCameraMovement(FViewportCameraState& Camera,
 		Camera.Rotation.Yaw += Input.MouseX * MouseSensitivity;
 		Camera.Rotation.Pitch += Input.MouseY * MouseSensitivity;
 	}
+
+    if (Input.bLeftDrag && !Input.bCaptured)
+    {
+        if (Camera.bPerspective)
+        {
+            // 좌우로 끌면 회전, 위아래로 끌면 수평면 위에서 앞뒤로 이동한다 (UE와 같다).
+            Camera.Rotation.Yaw += Input.MouseX * MouseSensitivity;
+            const FVector Forward = Camera.Rotation.Quaternion().GetForwardVector();
+            FVector Flat(Forward.X, Forward.Y, 0.0f);
+            if (Flat.Size() > 0.0001f)
+                Camera.Location += Flat.Normalized() * (-Input.MouseY * 0.02f * MoveSpeed);
+        }
+        else
+        {
+            const FQuat DragOrientation = Camera.Rotation.Quaternion();
+            const float UnitsPerPixel = Camera.OrthoWidth / Camera.ViewWidth;
+            Camera.Location += DragOrientation.GetRightVector() * (-Input.MouseX * UnitsPerPixel) +
+                DragOrientation.GetUpVector() * (Input.MouseY * UnitsPerPixel);
+        }
+    }
 
     const FQuat Orientation = Camera.Rotation.Quaternion();
     const FVector Forward = Orientation.GetForwardVector();

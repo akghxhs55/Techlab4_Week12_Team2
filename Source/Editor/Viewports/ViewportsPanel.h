@@ -42,7 +42,10 @@ public:
 	void SetLayoutMode(ELayoutMode InMode, int32 InSingleIndex = 0) {
 		CurrentLayoutMode = InMode;
 		CurrentSingleViewIndex = InSingleIndex;
+		if (InMode != ELayoutMode::Single) LastMultiPaneLayout = InMode;
 	}
+	// 분할선을 그릴 위치. Core가 레이아웃 사각형을 계산할 때 쓴 비율을 그대로 받는다.
+	void SetSplitRatio(const FSplitRatio& InRatio) { SplitRatio = InRatio; }
 
 	// 뷰포트 클라이언트 조회
 	FLevelEditorViewportClient* GetViewportClient(const int32 ViewIndex) const
@@ -74,10 +77,15 @@ public:
 private:
 	void DrawViewportToolbar(int32 ViewIndex);
 	void DrawSpawnMenu(FEditorViewportClient& Client);
-	void DrawCameraMenu(FEditorViewportClient& Client);
 	void DrawGridMenu();
 	void DrawShowMenu();
 	void DrawRenderMenu();
+	// UE 뷰포트 툴바 방식의 드롭다운 (아이콘 + 라벨 + 화살표)
+	void DrawProjectionMenu(FEditorViewportClient& Client);
+	void DrawCameraSpeedMenu();
+	void DrawViewModeMenu(FEditorViewportClient& Client);
+	void DrawLayoutMenu(int32 ViewIndex);
+	FSplitRatio SplitRatio{};
 	UWorld* World = nullptr;
 	FGizmo* Gizmo = nullptr;
 	FEditorSettingsManager* EditorSettings = nullptr;
@@ -109,6 +117,8 @@ private:
 	int32 CurrentSingleViewIndex = 0;
 	bool bHasLayoutRequest = false;
 	ELayoutMode RequestedLayoutMode = ELayoutMode::QuadSplit;
+	// "뷰포트 최대화"를 끌 때 돌아갈 다중 패널 레이아웃
+	ELayoutMode LastMultiPaneLayout = ELayoutMode::QuadSplit;
 	int32 RequestedSingleViewIndex = 0;
 
 };

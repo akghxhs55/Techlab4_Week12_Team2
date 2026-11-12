@@ -2,28 +2,84 @@
 #include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/Viewports/ViewportsPanel.h"
 #include "Editor/Settings/EditorSettings.h"
+#include "Editor/Viewports/ViewportToolbarWidgets.h"
 #include "Components/SkinnedMeshComponent.h"
+#include "Core/StatOverlay.h"
 
-// 보이기/숨기기 토글만 둔다. 품질·성능 옵션은 Render 메뉴가 맡는다.
+// UE의 표시(Show) 메뉴: 기본값 복원, 뷰포트 통계, 표시 플래그 체크 목록.
+// 보이기/숨기기만 둔다. 품질·성능 옵션은 Render 메뉴가 맡는다. 모든 에디터 뷰에 함께 적용된다.
 void FViewportsPanel::DrawShowMenu()
 {
     if (!EditorSettings) return;
+    using namespace ViewportToolbarWidgets;
     auto& Settings = EditorSettings->GetMutableSettings();
+
+    if (IconMenuItem(nullptr, "Use Defaults", false, EIndicator::None))
+    {
+        const FEditorSettings Defaults{};
+        Settings.bDrawPrimitives = Defaults.bDrawPrimitives;
+        Settings.bShowSkeletalMesh = Defaults.bShowSkeletalMesh;
+        Settings.bDrawDecals = Defaults.bDrawDecals;
+        Settings.bDrawBatchLine = Defaults.bDrawBatchLine;
+        Settings.bDrawBoundingBox = Defaults.bDrawBoundingBox;
+        Settings.bShowUUID = Defaults.bShowUUID;
+        Settings.bDrawCascadeBounds = Defaults.bDrawCascadeBounds;
+        Settings.bShowCollision = Defaults.bShowCollision;
+        Settings.bShowRootDebug = Defaults.bShowRootDebug;
+        Settings.bShowVignette = Defaults.bShowVignette;
+        Settings.bShowCameraOverlay = Defaults.bShowCameraOverlay;
+    }
+
+    // 뷰포트 통계: 콘솔의 stat 명령과 같은 상태를 켜고 끈다.
+    if (ImGui::BeginMenu("      Viewport Stats"))
+    {
+        struct FStatItem { const char* Label; const char* Command; EStatFlags Flag; };
+        const FStatItem Stats[] = {
+            { "FPS", "stat fps", EStatFlags::FPS },
+            { "Memory", "stat memory", EStatFlags::Memory },
+            { "Profile", "stat profile", EStatFlags::Profile },
+            { "Light", "stat light", EStatFlags::Light },
+            { "Decal", "stat decal", EStatFlags::Decal },
+            { "Skinning", "stat skinning", EStatFlags::Skinning },
+        };
+        FString Message;
+        if (IconMenuItem(nullptr, "Hide All", false, EIndicator::None))
+            FStatOverlay::ExecCommand("stat none", Message);
+        SectionHeader("Common Stats");
+        for (const FStatItem& Stat : Stats)
+            if (IconMenuItem(nullptr, Stat.Label, FStatOverlay::IsEnabled(Stat.Flag), EIndicator::Check))
+                FStatOverlay::ExecCommand(Stat.Command, Message);
+        ImGui::EndMenu();
+    }
+    // BeginMenu 줄 앞에 통계 아이콘을 덧그린다.
+    {
+        const ImVec2 Min = ImGui::GetItemRectMin(), Max = ImGui::GetItemRectMax();
+        const float CenterY = (Min.y + Max.y) * 0.5f, X = Min.x + EditorStyle::Scale(22.0f);
+        if (const ImTextureID Icon = GetIcon("Stats"); Icon != ImTextureID_Invalid)
+            ImGui::GetWindowDrawList()->AddImage(Icon, { X - EditorStyle::Scale(20.0f), CenterY - IconSize() * 0.5f },
+                { X - EditorStyle::Scale(4.0f), CenterY + IconSize() * 0.5f }, { 0, 0 }, { 1, 1 }, IM_COL32(200, 200, 200, 255));
+    }
+
+    auto Flag = [](const char* Icon, const char* Label, bool& bValue)
+    {
+        if (IconMenuItem(Icon, Label, bValue, EIndicator::Check)) bValue = !bValue;
+    };
+    SectionHeader("Common Show Flags");
+    Flag("Bounds", "Bounding Boxes", Settings.bDrawBoundingBox);
+    Flag("Decals", "Decals", Settings.bDrawDecals);
+    Flag("Grid", "Grid", Settings.bDrawBatchLine);
+    Flag("SkeletalMesh", "Skeletal Meshes", Settings.bShowSkeletalMesh);
+    Flag("StaticMesh", "Static Meshes", Settings.bDrawPrimitives);
+    SectionHeader("Developer");
+    Flag("Cascade", "Cascade Bounds", Settings.bDrawCascadeBounds);
+    Flag("Pivot", "Object UUID", Settings.bShowUUID);
+    SectionHeader("PIE");
+    Flag("Collision", "Collision", Settings.bShowCollision);
+    Flag("SkeletalMesh", "Root Bone", Settings.bShowRootDebug);
+    Flag("Lighting", "Vignette", Settings.bShowVignette);
+    Flag("Camera", "Camera Fade / Letterbox", Settings.bShowCameraOverlay);
+    ImGui::Spacing();
     ImGui::TextDisabled("Applies to all editor views");
-    ImGui::SeparatorText("Scene");
-    ImGui::Checkbox("Primitives", &Settings.bDrawPrimitives);
-    ImGui::Checkbox("Skeletal Meshes", &Settings.bShowSkeletalMesh);
-    ImGui::Checkbox("Decals", &Settings.bDrawDecals);
-    ImGui::SeparatorText("Helpers");
-    ImGui::Checkbox("Grid / Lines", &Settings.bDrawBatchLine);
-    ImGui::Checkbox("Bounding Boxes", &Settings.bDrawBoundingBox);
-    ImGui::Checkbox("Object UUID", &Settings.bShowUUID);
-    ImGui::Checkbox("Cascade Bounds", &Settings.bDrawCascadeBounds);
-    ImGui::SeparatorText("PIE");
-    ImGui::Checkbox("Collision", &Settings.bShowCollision);
-    ImGui::Checkbox("Root Bone", &Settings.bShowRootDebug);
-    ImGui::Checkbox("Vignette", &Settings.bShowVignette);
-    ImGui::Checkbox("Camera Fade / Letterbox", &Settings.bShowCameraOverlay);
 }
 
 // 모든 뷰에 공통인 렌더 품질·성능 옵션

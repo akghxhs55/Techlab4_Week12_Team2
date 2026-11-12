@@ -215,36 +215,35 @@ void FViewportsPanel::OnRender() {
 	}
 	DrawList->PopClipRect();
 
-	if (CurrentLayoutMode == ELayoutMode::QuadSplit && ViewportClients[0] && ViewportClients[1] && ViewportClients[2]) {
-		const FRect &Rect0 = ViewportClients[0]->GetRect();
-		const FRect &Rect1 = ViewportClients[1]->GetRect();
-		const FRect &Rect2 = ViewportClients[2]->GetRect();
-		// 분할선 배치 계산
-		const float SplitX =
-				(Rect0.X + Rect0.Width + Rect1.X) * 0.5f;
-		const float SplitY =
-				(Rect0.Y + Rect0.Height + Rect2.Y) * 0.5f;
-
-		const ImVec2 VerticalMin{
-				ContentOrigin.x + SplitX - SplitterThickness * 0.5f, ContentOrigin.y};
-		const ImVec2 VerticalMax{VerticalMin.x + SplitterThickness,
-			ContentOrigin.y + ContentSize.y};
-		const ImVec2 HorizontalMin{ContentOrigin.x, ContentOrigin.y + SplitY -
-			SplitterThickness * 0.5f};
-		const ImVec2 HorizontalMax{ContentOrigin.x + ContentSize.x,
-			HorizontalMin.y + SplitterThickness};
-
-		ImGui::SetCursorScreenPos(VerticalMin);
-		ImGui::InvisibleButton("##MultipleViewportsHorizontalSplitter",
-													 {SplitterThickness, ContentSize.y});
-		ImGui::SetCursorScreenPos(HorizontalMin);
-		ImGui::InvisibleButton("##MultipleViewportsVerticalSplitter",
-													 {ContentSize.x, SplitterThickness});
-
-		const bool bVerticalHovered =
-				bHovered && ImGui::IsMouseHoveringRect(VerticalMin, VerticalMax);
-		const bool bHorizontalHovered =
-				bHovered && ImGui::IsMouseHoveringRect(HorizontalMin, HorizontalMax);
+	// 레이아웃마다 분할선 구성이 다르다. 끌 수 있는 선은 세로선(Horizontal 비율)과 가로선(Vertical 비율) 두 종류뿐이다.
+	FLayoutSplitter Splitters[4]{};
+	const int32 SplitterCount = CurrentLayoutMode == ELayoutMode::Single ? 0
+		: ComputeLayoutSplitters(CurrentLayoutMode, SplitRatio, { ContentSize.x, ContentSize.y }, Splitters);
+	if (SplitterCount > 0) {
+		ImVec2 Mins[4], Maxs[4];
+		bool bVerticalHovered = false;    // 세로선 위
+		bool bHorizontalHovered = false;  // 가로선 위
+		for (int32 Index = 0; Index < SplitterCount; ++Index)
+		{
+			const FLayoutSplitter& Splitter = Splitters[Index];
+			const bool bVerticalLine = Splitter.Axis == EDragAxis::Horizontal;
+			// 끌 수 없는 경계선은 얇게 그린다.
+			const float Thickness = Splitter.bDraggable ? SplitterThickness : 2.0f;
+			Mins[Index] = bVerticalLine
+				? ImVec2{ ContentOrigin.x + Splitter.Position - Thickness * 0.5f, ContentOrigin.y + Splitter.Start }
+				: ImVec2{ ContentOrigin.x + Splitter.Start, ContentOrigin.y + Splitter.Position - Thickness * 0.5f };
+			Maxs[Index] = bVerticalLine
+				? ImVec2{ Mins[Index].x + Thickness, ContentOrigin.y + Splitter.End }
+				: ImVec2{ ContentOrigin.x + Splitter.End, Mins[Index].y + Thickness };
+			if (!Splitter.bDraggable) continue;
+			ImGui::SetCursorScreenPos(Mins[Index]);
+			ImGui::PushID(Index);
+			ImGui::InvisibleButton("##ViewportSplitter",
+				{ std::max(1.0f, Maxs[Index].x - Mins[Index].x), std::max(1.0f, Maxs[Index].y - Mins[Index].y) });
+			ImGui::PopID();
+			if (bHovered && ImGui::IsMouseHoveringRect(Mins[Index], Maxs[Index]))
+				(bVerticalLine ? bVerticalHovered : bHorizontalHovered) = true;
+		}
 		if (ImGui::IsMouseClicked(ImGuiMouseButton_Left)) {
 			bDraggingVerticalSplitter = bVerticalHovered;
 			bDraggingHorizontalSplitter = bHorizontalHovered;
@@ -254,16 +253,15 @@ void FViewportsPanel::OnRender() {
 			bDraggingHorizontalSplitter = false;
 		}
 
-		const bool bVerticalHighlighted =
-				bDraggingVerticalSplitter || bVerticalHovered;
-		const bool bHorizontalHighlighted =
-				bDraggingHorizontalSplitter || bHorizontalHovered;
-		DrawList->AddRectFilled(VerticalMin, VerticalMax,
-			bVerticalHighlighted ? SplitterHoverColor
-			: SplitterColor);
-		DrawList->AddRectFilled(HorizontalMin, HorizontalMax,
-			bHorizontalHighlighted ? SplitterHoverColor
-			: SplitterColor);
+		const bool bVerticalHighlighted = bDraggingVerticalSplitter || bVerticalHovered;
+		const bool bHorizontalHighlighted = bDraggingHorizontalSplitter || bHorizontalHovered;
+		for (int32 Index = 0; Index < SplitterCount; ++Index)
+		{
+			const bool bVerticalLine = Splitters[Index].Axis == EDragAxis::Horizontal;
+			const bool bHighlighted = Splitters[Index].bDraggable &&
+				(bVerticalLine ? bVerticalHighlighted : bHorizontalHighlighted);
+			DrawList->AddRectFilled(Mins[Index], Maxs[Index], bHighlighted ? SplitterHoverColor : SplitterColor);
+		}
 
 		if (bDraggingVerticalSplitter)
 			PendingHorizontalDrag += ImGui::GetIO().MouseDelta.x;

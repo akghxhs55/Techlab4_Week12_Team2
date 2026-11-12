@@ -60,6 +60,53 @@ namespace
 	DECLARE_CYCLE_STAT("Capture World", STAT_CaptureWorld);
 	DECLARE_CYCLE_STAT("Build Render Queue", STAT_BuildRenderQueue);
 	DECLARE_CYCLE_STAT("ImGui", STAT_ImGui);
+
+	// 좌클릭을 이만큼(픽셀) 끌면 선택이 아니라 카메라 조작으로 본다.
+	// FEditorViewportClient의 클릭 선택 문턱과 같은 값이어야 한다.
+	constexpr int32 LeftDragNavThreshold = 3;
+}
+
+// 뷰포트 하나의 화면 사각형에 커서를 가둔다.
+bool UEditorEngine::ClipCursorToView(int32 ViewIndex) const
+{
+	const FEditorViewportClient* Client = ViewportsPanel ? ViewportsPanel->GetViewportClient(ViewIndex) : nullptr;
+	if (!Client) return false;
+	const FRect& Rect = Client->GetRect();
+	const FVector2 Origin = ViewportsPanel->GetContentOrigin();
+	const RECT Clip{ static_cast<LONG>(Origin.X + Rect.X), static_cast<LONG>(Origin.Y + Rect.Y),
+		static_cast<LONG>(Origin.X + Rect.X + Rect.Width), static_cast<LONG>(Origin.Y + Rect.Y + Rect.Height) };
+	if (Clip.right - Clip.left < 2 || Clip.bottom - Clip.top < 2) return false;
+	return ::ClipCursor(&Clip) != FALSE;
+}
+
+void UEditorEngine::BeginViewportNavCapture(int32 ViewIndex, EViewportNavButton Button, int32 AnchorX, int32 AnchorY)
+{
+	if (NavCaptureViewIndex != -1 || !ClipCursorToView(ViewIndex)) return;
+	NavCaptureViewIndex = ViewIndex;
+	NavCaptureButton = Button;
+	NavAnchorX = AnchorX;
+	NavAnchorY = AnchorY;
+	::SetCursorPos(NavAnchorX, NavAnchorY);
+	::ShowCursor(FALSE);
+	// 숨은 커서가 툴바나 다른 패널을 hover하거나 누르지 않게 한다.
+	ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouse;
+	ImGui::SetWindowFocus("Viewports");
+}
+
+void UEditorEngine::EndViewportNavCapture()
+{
+	if (NavCaptureViewIndex == -1) return;
+	NavCaptureViewIndex = -1;
+	NavCaptureButton = EViewportNavButton::None;
+	::ClipCursor(nullptr);
+	// UE처럼 조작을 시작한 자리에서 커서가 다시 나타난다.
+	::SetCursorPos(NavAnchorX, NavAnchorY);
+	::ShowCursor(TRUE);
+	ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouse;
+	// 되돌린 위치 기준으로 델타를 맞춰 캡처를 푼 직후 튀지 않게 한다.
+	POINT Cursor{ NavAnchorX, NavAnchorY };
+	if (MainWindow && ::ScreenToClient(MainWindow->GetHandle(), &Cursor))
+		FInputSystem::SyncMousePosition(Cursor.x, Cursor.y);
 }
 
 #include "Core/SplashScreen.h"
@@ -246,9 +293,12 @@ void UEditorEngine::InitPanels()
 	// SingleView에 사용할 인덱스 설정
 	SingleViewportIndex = EditorSettings->GetSettings().MultipleViewportsSingleViewIndex;
 	// 뷰포트 레이아웃 설정
-	ViewportLayoutMode = EditorSettings->GetSettings().bMultipleViewportsSingle
-		? ELayoutMode::Single
-		: ELayoutMode::QuadSplit;
+	{
+		const int32 SavedLayout = EditorSettings->GetSettings().ViewportLayout;
+		ViewportLayoutMode = SavedLayout >= 0 && SavedLayout < static_cast<int32>(ELayoutMode::Count)
+			? static_cast<ELayoutMode>(SavedLayout)
+			: ELayoutMode::QuadSplit;
+	}
 	EditorWorld->GetMainCamera()->GetCameraComponent()->SetExternalInputManaged(true);
 
 	OutlinerPanel = LevelEditorTab->AddPanel<FOutlinerPanel>();
@@ -431,7 +481,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 			ViewportLayoutMode = RequestedLayout;
 
 			FEditorSettings& Settings = EditorSettings->GetMutableSettings();
-			Settings.bMultipleViewportsSingle = RequestedLayout == ELayoutMode::Single;
+			Settings.ViewportLayout = static_cast<int32>(RequestedLayout);
 			Settings.MultipleViewportsSingleViewIndex = RequestedSingleViewIndex;
 		}
 
@@ -459,14 +509,15 @@ void UEditorEngine::Tick(const float DeltaTime)
 		}
 		else
 		{
-			ComputeViewRects(ViewportSplitRatio, ViewportSize, ViewRects);
+			ComputeLayoutRects(ViewportLayoutMode, ViewportSplitRatio, ViewportSize, ViewRects);
 		}
+		ViewportsPanel->SetSplitRatio(ViewportSplitRatio);
 
 		for (int32 i = 0; i < 4; ++i)
 		{
 			const bool bSlotActive = (ViewportLayoutMode == ELayoutMode::Single)
 				? (i == SingleViewportIndex)
-				: true;
+				: i < GetLayoutPaneCount(ViewportLayoutMode);
 			ViewportsPanel->SetView(i, ViewRects[i], bSlotActive);
 		}
 
@@ -488,20 +539,66 @@ void UEditorEngine::Tick(const float DeltaTime)
 			}
 		}
 
-		// 마우스 캡처 및 활성 뷰 결정
-		static int32 CapturedViewportIndex = -1;
-		if (FInputSystem::IsMouseReleased(EMouseButton::Right))
+		// PIE 게임 화면을 보여 주는 뷰의 카메라는 게임이 소유한다.
+		// 여기서 에디터 카메라까지 움직이면 같은 마우스 입력이 두 번 적용된다.
+		// SIE에서는 그 뷰도 에디터 뷰포트로 돌아와 있으므로 다른 뷰처럼 에디터 카메라를 움직인다.
+		const bool bSimulating = IsSimulatingInEditor();
+		const int32 GameOwnedViewIndex = (PlayWorld && !bSimulating) ? PIEViewIndex : InvalidViewIndex;
+
+		// 카메라 조작 캡처. UE처럼 버튼을 누르고 있는 동안 커서를 숨기고 뷰포트에 가둔다.
+		// 이동량은 "지난 프레임에 되돌려 놓은 기준점에서 얼마나 움직였나"로 읽어서
+		// 커서가 화면이나 뷰포트 가장자리에 닿아도 회전이 멈추지 않는다.
+		if (NavCaptureViewIndex != -1)
 		{
-			CapturedViewportIndex = -1;
+			const EMouseButton Held = NavCaptureButton == EViewportNavButton::Right ? EMouseButton::Right : EMouseButton::Left;
+			if (!FInputSystem::IsMouseDown(Held) || bGameMouseCaptured || !ViewportsPanel->GetViewportClient(NavCaptureViewIndex) ||
+				!ViewportsPanel->GetViewportClient(NavCaptureViewIndex)->IsActive())
+				EndViewportNavCapture();
 		}
-		if (FInputSystem::IsMousePressed(EMouseButton::Right) && HoveredViewIndex != -1)
+		const bool bCanStartNav = NavCaptureViewIndex == -1 && !bGameMouseCaptured &&
+			HoveredViewIndex != -1 && HoveredViewIndex != GameOwnedViewIndex;
+		POINT CursorNow{};
+		const bool bHasCursor = ::GetCursorPos(&CursorNow) != FALSE;
+		if (bCanStartNav && bHasCursor && FInputSystem::IsMousePressed(EMouseButton::Right))
 		{
-			CapturedViewportIndex = HoveredViewIndex;
-			ImGui::SetWindowFocus("Viewports");
+			BeginViewportNavCapture(HoveredViewIndex, EViewportNavButton::Right, CursorNow.x, CursorNow.y);
 		}
-		if (CapturedViewportIndex != -1)
+		// 좌클릭은 바로 캡처하지 않는다. 클릭(선택)과 구분하려고 조금 끌었을 때만 카메라 조작으로 바꾼다.
+		// 기즈모 축 위에서 누른 경우는 기즈모 드래그이므로 제외한다.
+		if (bCanStartNav && bHasCursor && FInputSystem::IsMousePressed(EMouseButton::Left) &&
+			Gizmo && Gizmo->GetHoveredAxis() < 0 && !Gizmo->IsUsing() && !ImGui::GetIO().KeyAlt && !ImGui::GetIO().KeyCtrl)
 		{
-			ViewportsPanel->SetActiveViewIndex(CapturedViewportIndex);
+			LeftPressViewIndex = HoveredViewIndex;
+			LeftPressX = CursorNow.x;
+			LeftPressY = CursorNow.y;
+		}
+		if (!FInputSystem::IsMouseDown(EMouseButton::Left) || (Gizmo && Gizmo->IsUsing()))
+			LeftPressViewIndex = -1;
+		if (LeftPressViewIndex != -1 && NavCaptureViewIndex == -1 && bHasCursor)
+		{
+			const int32 DX = CursorNow.x - LeftPressX, DY = CursorNow.y - LeftPressY;
+			if (DX * DX + DY * DY > LeftDragNavThreshold * LeftDragNavThreshold)
+			{
+				BeginViewportNavCapture(LeftPressViewIndex, EViewportNavButton::Left, LeftPressX, LeftPressY);
+				LeftPressViewIndex = -1;
+			}
+		}
+
+		float NavMouseX = 0.0f, NavMouseY = 0.0f;
+		if (NavCaptureViewIndex != -1 && ::GetCursorPos(&CursorNow))
+		{
+			NavMouseX = static_cast<float>(CursorNow.x - NavAnchorX);
+			NavMouseY = static_cast<float>(CursorNow.y - NavAnchorY);
+			// 패널 이동·크기 변경을 따라가도록 매 프레임 다시 가두고 기준점으로 되돌린다.
+			ClipCursorToView(NavCaptureViewIndex);
+			::SetCursorPos(NavAnchorX, NavAnchorY);
+		}
+
+		const int32 CapturedViewportIndex = NavCaptureButton == EViewportNavButton::Right ? NavCaptureViewIndex : -1;
+		const int32 LeftDragViewportIndex = NavCaptureButton == EViewportNavButton::Left ? NavCaptureViewIndex : -1;
+		if (NavCaptureViewIndex != -1)
+		{
+			ViewportsPanel->SetActiveViewIndex(NavCaptureViewIndex);
 		}
 		else if (FInputSystem::IsMousePressed(EMouseButton::Left) && HoveredViewIndex != -1)
 		{
@@ -518,12 +615,6 @@ void UEditorEngine::Tick(const float DeltaTime)
 		const float MoveSpeed = 10.0f * EditorSettings->GetSettings().CameraSpeed;
 		const float MouseSens = 0.2f * EditorSettings->GetSettings().MouseSensitivity;
 
-		// PIE 게임 화면을 보여 주는 뷰의 카메라는 게임이 소유한다.
-		// 여기서 에디터 카메라까지 움직이면 같은 마우스 입력이 두 번 적용된다.
-		// SIE에서는 그 뷰도 에디터 뷰포트로 돌아와 있으므로 다른 뷰처럼 에디터 카메라를 움직인다.
-		const bool bSimulating = IsSimulatingInEditor();
-		const int32 GameOwnedViewIndex = (PlayWorld && !bSimulating) ? PIEViewIndex : InvalidViewIndex;
-
 		for (int32 i = 0; i < 4; ++i)
 		{
 			FEditorViewportClient* Client = ViewportsPanel->GetViewportClient(i);
@@ -531,7 +622,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 				continue;
 
 			Client->TickInput(DeltaTime, i == CapturedViewportIndex,
-				i == HoveredViewIndex, WheelDelta, MoveSpeed, MouseSens);
+				i == HoveredViewIndex, WheelDelta, MoveSpeed, MouseSens,
+				NavMouseX, NavMouseY, i == LeftDragViewportIndex);
 		}
 
 		if (!PlayWorld && EditorManager->GetFocusedTab() == LevelEditorTab && !ImGui::GetIO().WantTextInput &&

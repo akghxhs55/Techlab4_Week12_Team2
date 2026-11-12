@@ -234,4 +234,18 @@ private:
 	// 캡처 중 커서를 되돌려 놓는 화면 좌표
 	int32 PIECaptureCenterX = 0;
 	int32 PIECaptureCenterY = 0;
+
+	// 에디터 뷰포트 카메라 조작 중 커서 캡처 (UE처럼 커서를 숨기고 뷰포트에 가둔 채 무한히 돌릴 수 있다).
+	// 우클릭: 비행 시점, 좌클릭 드래그(빈 곳): 앞뒤 이동 + 좌우 회전
+	enum class EViewportNavButton : uint8 { None, Left, Right };
+	void BeginViewportNavCapture(int32 ViewIndex, EViewportNavButton Button, int32 AnchorX, int32 AnchorY);
+	void EndViewportNavCapture();
+	bool ClipCursorToView(int32 ViewIndex) const;
+	int32 NavCaptureViewIndex = -1;
+	EViewportNavButton NavCaptureButton = EViewportNavButton::None;
+	int32 NavAnchorX = 0;   // 캡처 동안 커서를 매 프레임 되돌려 놓는 화면 좌표
+	int32 NavAnchorY = 0;
+	int32 LeftPressViewIndex = -1;  // 좌클릭이 눌린 뷰. 드래그가 문턱을 넘으면 캡처로 바뀐다.
+	int32 LeftPressX = 0;
+	int32 LeftPressY = 0;
 };

@@ -11,6 +11,64 @@
 #include "Animation/BlendSpaceFile.h"
 #include "Animation/AnimBlueprintFile.h"
 
+namespace
+{
+	// UTF-8 한 글자의 바이트 수 (한글 파일 이름도 글자 중간에서 자르지 않도록)
+	int Utf8CharLength(unsigned char Lead)
+	{
+		if (Lead < 0x80) return 1;
+		if ((Lead >> 5) == 0x6) return 2;
+		if ((Lead >> 4) == 0xE) return 3;
+		return 4;
+	}
+
+	// [Begin, End) 중 Width 안에 들어가는 가장 긴 앞부분의 끝을 찾는다. 최소 한 글자는 넣는다.
+	const char* FitPrefix(const char* Begin, const char* End, float Width)
+	{
+		const char* Fit = Begin;
+		const char* Cursor = Begin;
+		while (Cursor < End)
+		{
+			const char* Next = std::min(End, Cursor + Utf8CharLength(static_cast<unsigned char>(*Cursor)));
+			if (ImGui::CalcTextSize(Begin, Next).x > Width && Fit != Begin) break;
+			Fit = Cursor = Next;
+		}
+		return Fit;
+	}
+
+	// UE 콘텐츠 브라우저처럼 이름을 칸 폭에 맞춰 최대 두 줄로 보여 주고, 넘치면 "..."으로 줄인다.
+	// 이름 대부분이 밑줄로 이어져 공백이 없으므로 단어가 아니라 글자 단위로 줄을 바꾼다.
+	void DrawTruncatedName(const std::string& Name, float Width)
+	{
+		const char* Begin = Name.c_str();
+		const char* End = Begin + Name.size();
+		if (Width <= 1.0f || ImGui::CalcTextSize(Begin, End).x <= Width)
+		{
+			ImGui::TextUnformatted(Begin, End);
+			return;
+		}
+		const char* LineBreak = FitPrefix(Begin, End, Width);
+		ImGui::TextUnformatted(Begin, LineBreak);
+
+		bool bTruncated = false;
+		if (ImGui::CalcTextSize(LineBreak, End).x <= Width)
+		{
+			ImGui::TextUnformatted(LineBreak, End);
+		}
+		else
+		{
+			const float EllipsisWidth = ImGui::CalcTextSize("...").x;
+			const char* SecondEnd = FitPrefix(LineBreak, End, std::max(1.0f, Width - EllipsisWidth));
+			const std::string SecondLine = std::string(LineBreak, SecondEnd) + "...";
+			ImGui::TextUnformatted(SecondLine.c_str());
+			bTruncated = true;
+		}
+		// 잘린 이름은 마우스를 올리면 전체를 보여 준다.
+		if (bTruncated && ImGui::IsItemHovered())
+			ImGui::SetTooltip("%s", Name.c_str());
+	}
+}
+
 bool FContentDrawerPanel::Init()
 {
 	return false;
@@ -257,8 +315,8 @@ void FContentDrawerPanel::OnRender()
 					}
 
 				}
-				// 파일 이름 표시
-				ImGui::TextWrapped("%s", FilenameString.c_str());
+				// 파일 이름 표시 (최대 두 줄, 넘치면 "...")
+				DrawTruncatedName(FilenameString, thumbnailSize);
 
 				ImGui::PopID();
 			}
