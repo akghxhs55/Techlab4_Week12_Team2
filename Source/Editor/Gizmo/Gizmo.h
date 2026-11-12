@@ -35,22 +35,23 @@ public:
 	// Gizmo 대상 설정
 	void SetTarget(USceneComponent* InTarget, bool InbUseActorBounds = false)
 	{ 
-		Target = InTarget; 
+		if (Target != InTarget) EndDrag();
+		Target = InTarget;
 		bUseActorBounds = InbUseActorBounds; 
 	}
 	USceneComponent* GetTarget() const { return Target; }
 
 	// Gizmo 모드(이동, 회전, 크기)
-	void SetMode(EGizmoMode InMode) { Mode = InMode; }
+	void SetMode(EGizmoMode InMode) { if (Mode != InMode) EndDrag(); Mode = InMode; }
 	EGizmoMode GetMode() const { return Mode; }
 
-	void SetSpace(EGizmoSpace InSpace) { Space = InSpace; }
+	void SetSpace(EGizmoSpace InSpace) { if (Space != InSpace) EndDrag(); Space = InSpace; }
 	EGizmoSpace GetSpace() const { return Space; }
 
 	// Active View의 Ray와 행렬만 사용해 Hover·Drag 상태를 갱신한다.
 	void Update(const FRay& MouseRay, const FVector2& MousePos,
 		const FMatrix& ViewProj, int ScreenW, int ScreenH,
-		bool bMouseDown, const FVector& CameraLocation, bool bCameraOrthographic);
+		bool bMouseDown, const FVector& CameraLocation, bool bCameraOrthographic, bool bMousePressed = true);
 
 	bool IsUsing() const { return DraggingAxis >= 0; }
 	int GetHoveredAxis() const { return HoveredAxis; }

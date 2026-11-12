@@ -44,6 +44,7 @@ struct FEditorCommand
 
 namespace EditorCommandUI
 {
+	ImVec2 GetToolbarButtonSize(float IconSize = 20.0f);
 	// 툴바용 버튼. 보이지 않으면 아무것도 그리지 않고 false.
 	bool ToolbarButton(const char* Id, const FEditorCommand& Command, float IconSize = 20.0f);
 	// 메뉴용 항목 (MainMenuBar 등에서 재사용)

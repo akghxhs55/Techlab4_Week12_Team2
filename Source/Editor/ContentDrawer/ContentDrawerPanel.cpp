@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/ContentDrawer/ContentDrawerPanel.h"
 
 #include "Render/SkeletalMesh.h"
@@ -41,7 +42,7 @@ void FContentDrawerPanel::OnRender()
 	RenderNavigationBar();
 	ImGui::Separator();
 
-	float treeViewWidth = 200.0f;
+	float treeViewWidth = ImMin(EditorStyle::Scale(200.0f), ImGui::GetContentRegionAvail().x * 0.35f);
 	ImGui::BeginChild("FolderTreeView", ImVec2(treeViewWidth, 0));
 	{
 		// 루트 노드
@@ -94,8 +95,8 @@ void FContentDrawerPanel::OnRender()
 		}
 
 		// 그리드 레이아웃 계산
-		float padding = 16.0f;
-		float thumbnailSize = 80.0f;
+		float padding = EditorStyle::Scale(16.0f);
+		float thumbnailSize = EditorStyle::Scale(80.0f);
 		float cellSize = thumbnailSize + padding;
 		float panelWidth = ImGui::GetContentRegionAvail().x;
 		int ColumnCount = static_cast<int>(panelWidth / cellSize);

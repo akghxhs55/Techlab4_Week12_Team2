@@ -20,6 +20,10 @@ public:
 	bool DrawShadowMap(ID3D11ShaderResourceView* AtlasSRV, unsigned int AtlasIndex,
 		ImVec2 Size, ImVec2 UV0, ImVec2 UV1, float Contrast);
 private:
+	void UpdateDpiScale();
+	HWND MainWindowHandle = nullptr;
+	ImGuiStyle UnscaledStyle;
+	float AppliedDpiScale = 0.0f;
 	static void BindShadowPreview(const ImDrawList*, const ImDrawCmd* Command);
 	static void SetShadowPreviewSlice(const ImDrawList*, const ImDrawCmd* Command);
 	static void RestoreShadowPreview(const ImDrawList*, const ImDrawCmd* Command);

@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "LevelEditorToolbar.h"
 
 #include "Asset/AssetManager.h"
@@ -21,41 +22,26 @@ namespace
 
 		ImDrawList* DL = ImGui::GetWindowDrawList();
 		DL->ChannelsSetCurrent(0);
-		DL->AddRectFilled({ Min.x - 4, Min.y - 2 }, { Max.x + 4, Max.y + 2 }, IM_COL32(45, 45, 45, 255), 4.0f);
+		DL->AddRectFilled({ Min.x - EditorStyle::Scale(4.0f), Min.y - EditorStyle::Scale(2.0f) }, { Max.x + EditorStyle::Scale(4.0f), Max.y + EditorStyle::Scale(2.0f) }, IM_COL32(45, 45, 45, 255), 4.0f);
 		DL->ChannelsMerge();
 	}
 
-	void ToolbarSeparator()
-	{
-		ImGui::SameLine(0, 12);
-		const ImVec2 P = ImGui::GetCursorScreenPos();
-		const float H = ImGui::GetFrameHeight();
-		ImGui::GetWindowDrawList()->AddLine({ P.x, P.y }, { P.x, P.y + H }, IM_COL32(70, 70, 70, 255));
-		ImGui::Dummy({ 1, H });
-		ImGui::SameLine(0, 12);
-	}
 }
 
 void FLevelEditorToolbar::Draw()
 {
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { 8, 6 });
-	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { 4, 4 });
-	const bool bOpen = ImGui::BeginChild("##LevelEditorToolbar", ImVec2(0.0f, Height),
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f) });
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { EditorStyle::Scale(4.0f), EditorStyle::Scale(4.0f) });
+	const float ToolbarHeight = EditorCommandUI::GetToolbarButtonSize().y + ImGui::GetStyle().WindowPadding.y * 2.0f;
+	const bool bOpen = ImGui::BeginChild("##LevelEditorToolbar", ImVec2(0.0f, ToolbarHeight),
 		ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
 
 	if (bOpen)
 	{
-		DrawFileGroup();
-		ToolbarSeparator();
 		DrawPlayGroup();
 	}
 	ImGui::EndChild();                  // Begin 결과와 관계없이 항상 EndChild
 	ImGui::PopStyleVar(2);
-}
-
-void FLevelEditorToolbar::DrawFileGroup()
-{
-	//EditorCommandUI::ToolbarButton("##Save", Save);
 }
 
 void FLevelEditorToolbar::DrawPlayGroup()
@@ -97,14 +83,15 @@ void FLevelEditorToolbar::DrawPlayModeMenu()
 	// 실행 중에는 모드를 바꿔도 현재 세션에 반영되지 않으므로 막는다.
 	const bool bCanChange = !CanChangePlayMode || CanChangePlayMode();
 	ImGui::BeginDisabled(!bCanChange);
-	if (ImGui::ArrowButton("##PlayModeMenu", ImGuiDir_Down))
+	if (ImGui::ArrowButtonEx("##PlayModeMenu", ImGuiDir_Down, EditorCommandUI::GetToolbarButtonSize()))
 		ImGui::OpenPopup("PlayModePopup");
+	const auto PopupAnchor = EditorStyle::LastItemAnchor();
 	ImGui::EndDisabled();
 	if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
 		ImGui::SetTooltip("Play Mode: %s",
 			GetPlayMode() == EPlayModeType::InViewport ? "Selected Viewport" : "New Editor Window (PIE)");
 
-	if (ImGui::BeginPopup("PlayModePopup"))
+	if (EditorStyle::BeginButtonPopup("PlayModePopup", PopupAnchor))
 	{
 		const EPlayModeType Current = GetPlayMode();
 		if (ImGui::MenuItem("Selected Viewport", nullptr, Current == EPlayModeType::InViewport))

@@ -579,7 +579,6 @@ void UEditorEngine::Tick(const float DeltaTime)
 		SCOPE_CYCLE_COUNTER(STAT_EditorTick);
 		EditorManager->Tick(DeltaTime);
 	}
-	UpdateGizmoAndPicking();
 	EditorWorld->GetScene().UpdateAllTransforms();
 	if (PlayWorld && bIsPaused)
 		PlayWorld->GetScene().UpdateAllTransforms();
@@ -690,6 +689,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 		ImGuiRenderer->Begin();
 
 		EditorManager->DrawEditorUI();
+		// NewFrame과 패널 배치 이후의 입력/좌표를 사용해야 클릭과 기즈모 피킹이 일치한다.
+		UpdateGizmoAndPicking();
 
 		ImGuiRenderer->End();
 	}
@@ -807,7 +808,14 @@ FWorldContext* UEditorEngine::GetPIEWorldContext(int32 WorldPIEInstance)
 void UEditorEngine::UpdateGizmoAndPicking()
 {
 	const int32 ViewIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : -1;
-	if (ViewIndex < 0 || ViewIndex >= 4 || !ViewportsPanel || !ViewportsPanel->IsHovered())
+	if (ViewIndex < 0 || ViewIndex >= 4 || !ViewportsPanel)
+		return;
+	if (!ViewportsPanel->WasRenderedThisFrame())
+	{
+		Gizmo->EndDrag();
+		return;
+	}
+	if (!ViewportsPanel->IsHovered() && !Gizmo->IsUsing())
 		return;
 	if (IsPlayingView(ViewIndex))
 		return;

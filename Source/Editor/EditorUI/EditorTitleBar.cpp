@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/EditorUI/EditorTitleBar.h"
 
 #include "Core/Window.h"
@@ -24,7 +25,7 @@ namespace
 
 	constexpr const char* TitleBarWindowName = "##WindowTitleBar";
 	// 메뉴 항목의 세로 여백. 에디터 메뉴(FEditorTabContainer::DrawTabMenu)와 같은 값이라 띠 높이와 메뉴 높이가 맞는다.
-	constexpr float MenuFramePaddingY = 10.0f;
+	constexpr float MenuFramePaddingY = 4.0f;
 	constexpr ImGuiWindowFlags TitleBarFlags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar |
 		ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus;
 
@@ -45,7 +46,7 @@ namespace
 
 	float RowHeight()
 	{
-		return ImFloor(ImGui::GetFontSize() + MenuFramePaddingY * 2.0f);
+		return ImFloor(ImGui::GetFontSize() + EditorStyle::Scale(MenuFramePaddingY) * 2.0f);
 	}
 
 	FString ReadWindowTitle(HWND Hwnd)
@@ -167,7 +168,7 @@ void EditorTitleBar::Draw()
 	const float Height = RowHeight();
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
-	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, MenuFramePaddingY));
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(ImGui::GetStyle().FramePadding.x, EditorStyle::Scale(MenuFramePaddingY)));
 	ImGui::PushStyleColor(ImGuiCol_WindowBg, ImGui::GetColorU32(ImGuiCol_TitleBg));
 	ImGui::PushStyleColor(ImGuiCol_MenuBarBg, ImGui::GetColorU32(ImGuiCol_TitleBg));
 	const bool bVisible = ImGui::BeginViewportSideBar(TitleBarWindowName, MainViewport, ImGuiDir_Up, Height, TitleBarFlags);

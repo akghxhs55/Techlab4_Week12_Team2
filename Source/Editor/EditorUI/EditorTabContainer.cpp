@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/EditorUI/EditorTabContainer.h"
 #include "Editor/EditorUI/EditorTitleBar.h"
 
@@ -198,7 +199,7 @@ void FEditorTabContainer::DrawTabs()
 
 		
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
-		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 10.0f));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
 		const bool bActivate = PendingActivation == Tab;
 		if (bActivate)
 		{
@@ -266,9 +267,26 @@ void FEditorTabContainer::DrawTabMenu(IEditorTab& Tab)
 	{
 		ImGui::PushID(&Tab);
 		{
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 10.0f));
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(8.0f, 10.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
 			Tab.DrawMenuBar();
+			// 패널 목록에 이어 모든 에디터 탭에서 같은 열린 에디터 목록을 제공한다.
+			if (ImGui::BeginMenu("Window"))
+			{
+				ImGui::SeparatorText("Open Editors");
+				for (IEditorTab* OpenTab : Tabs)
+				{
+					bool bClosing = false;
+					for (IEditorTab* ClosingTab : PendingCloseTabs)
+						bClosing |= ClosingTab == OpenTab;
+					if (bClosing) continue;
+					ImGui::PushID(OpenTab);
+					if (ImGui::MenuItem(OpenTab->GetTabName(), nullptr, OpenTab == &Tab))
+						ActivateTab(OpenTab);
+					ImGui::PopID();
+				}
+				ImGui::EndMenu();
+			}
 			ImGui::PopStyleVar(2);
 		}
 		ImGui::PopID();
@@ -302,7 +320,7 @@ void FEditorTabContainer::OnRender(bool bPassthruCentralNode)
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0.0f);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 	// 메뉴 높이를 먼저 확보하고 탭 선택이 확정된 후 내용을 그린다.
-	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(8.0f, 10.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
 	ImGui::Begin("DockingSpace", nullptr, Flags);
 	ImGui::PopStyleVar(4);
 

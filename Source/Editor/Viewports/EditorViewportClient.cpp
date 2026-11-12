@@ -12,6 +12,7 @@
 #include "Math/BoxSphereBounds.h"
 #include "Render/Renderer.h"
 #include "Render/SceneRenderer.h"
+#include <imgui.h>
 
 FEditorViewportClient::FEditorViewportClient() {}
 
@@ -83,13 +84,14 @@ void FEditorViewportClient::UpdateGizmoAndPicking(
                                 LocalMousePosition.Y - Rect.Y);
   FRay Ray = DeprojectScreenToWorld(ViewLocalMouse);
   const FMatrix ViewProjection = GetViewProjectionMatrix();
-  const bool bMouseDown = FInputSystem::IsMouseDown(EMouseButton::Left);
+  // 플랫폼 창으로 분리해도 동일한 ImGui 입력 경로를 사용한다.
+  const bool bMouseDown = ImGui::IsMouseDown(ImGuiMouseButton_Left);
 
   InGizmo->Update(Ray, ViewLocalMouse, ViewProjection,
                   static_cast<int>(Rect.Width), static_cast<int>(Rect.Height),
-                  bMouseDown, GetViewLocation(), !IsPerspective());
+                  bMouseDown, GetViewLocation(), !IsPerspective(), ImGui::IsMouseClicked(ImGuiMouseButton_Left));
 
-  if (FInputSystem::IsMousePressed(EMouseButton::Left) && !InGizmo->IsUsing() &&
+  if (ImGui::IsMouseClicked(ImGuiMouseButton_Left) && !InGizmo->IsUsing() &&
       InGizmo->GetHoveredAxis() < 0) {
     FHitResult Hit;
     UWorld* PickingWorld = GetWorld();

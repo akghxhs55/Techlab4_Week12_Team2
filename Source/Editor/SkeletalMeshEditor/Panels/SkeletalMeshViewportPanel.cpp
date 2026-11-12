@@ -11,7 +11,7 @@ void FSkeletalMeshViewportPanel::DrawContent()
 {
 
 	int32 Mode = static_cast<int32>(Editor.GetGizmoMode());
-	ImGui::SetNextItemWidth(300.0f);
+	ImGui::SetNextItemWidth(-1.0f);
 	
 	constexpr const char* GizmoModeNames[] = { "Location", "Rotation", "Scale" };
 	if (ImGui::Combo("##GizmoMode", &Mode, GizmoModeNames, IM_ARRAYSIZE(GizmoModeNames)))

@@ -36,7 +36,7 @@ void FGizmo::Render(const FSceneView* View) const
 }
 
 // 입력 View의 카메라 조건으로 축 선택과 드래그를 갱신한다.
-void FGizmo::Update(const FRay& MouseRay, const FVector2& MousePos, const FMatrix& ViewProj, int ScreenW, int ScreenH, bool bMouseDown, const FVector& CameraLocation, const bool bCameraOrthographic)
+void FGizmo::Update(const FRay& MouseRay, const FVector2& MousePos, const FMatrix& ViewProj, int ScreenW, int ScreenH, bool bMouseDown, const FVector& CameraLocation, const bool bCameraOrthographic, bool bMousePressed)
 {
 	ViewCameraLocation = CameraLocation;
 	bViewCameraOrthographic = bCameraOrthographic;
@@ -53,13 +53,16 @@ void FGizmo::Update(const FRay& MouseRay, const FVector2& MousePos, const FMatri
 		if (bMouseDown)
 			UpdateDrag(MouseRay, MousePos);
 		else
+		{
+			UpdateDrag(MouseRay, MousePos);
 			EndDrag();
+		}
 		return;
 	}
 
 	HoveredAxis = PickAxis(MousePos, ViewProj, ScreenW, ScreenH); // 현재 마우스가 올라간 기즈모 축이 있으면
 
-	if (bMouseDown && HoveredAxis >= 0) // 마우스가 올라간 축이 있고 마우스가 눌렸으면
+	if (bMousePressed && bMouseDown && HoveredAxis >= 0)
 		BeginDrag(HoveredAxis, MouseRay, MousePos);
 
 
@@ -218,7 +221,7 @@ void FGizmo::BeginDrag(int Axis, const FRay& MouseRay, const FVector2& MousePos)
 		DragStartRenderLocation = Target->GetWorldLocation();
 	}
 
-	DragStartRotation = GetRotation();
+	DragStartRotation = Target->GetWorldRotation();
 	DragStartScale = GetScale();
 
 	// Local LightComponent면 Radius 가져와서 저장해놓기
@@ -303,7 +306,7 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 
 		FQuat result = delta * start;
 
-		Target->SetRelativeRotation(result.ToFRotator());
+		Target->SetWorldRotation(result.ToFRotator(), false);
 		return;
 	}
 
@@ -365,8 +368,8 @@ float FGizmo::ComputeAngleOnPlane(const FVector& Point, int Axis) const
 
 FRotator FGizmo::GetAxisRotation() const
 {
-	// 이동 Ray와 평면은 월드 공간이므로 부모 회전까지 포함한 축을 사용합니다.
-	return Mode == EGizmoMode::Location && Target ? Target->GetWorldRotation() : GetRotation();
+	// 피킹, 렌더링, 드래그 평면은 모두 월드 공간에서 같은 축을 사용한다.
+	return Target ? Target->GetWorldRotation() : FRotator();
 }
 
 // 월드 축 또는 로컬 회전으로 변환한 정규화 축을 반환한다.

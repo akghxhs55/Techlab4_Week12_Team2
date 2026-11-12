@@ -177,6 +177,15 @@ LRESULT FWindow::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
 {
 	switch (msg)
 	{
+	case WM_DPICHANGED:
+    {
+        const RECT* Suggested = reinterpret_cast<const RECT*>(lParam);
+        SetWindowPos(hWnd, nullptr, Suggested->left, Suggested->top,
+            Suggested->right - Suggested->left, Suggested->bottom - Suggested->top,
+            SWP_NOZORDER | SWP_NOACTIVATE);
+        return 0;
+    }
+
 	case WM_NCCALCSIZE:
 		if (!bCustomTitleBar || !wParam)
 			return DefWindowProc(hWnd, msg, wParam, lParam);

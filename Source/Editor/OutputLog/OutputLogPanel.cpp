@@ -122,7 +122,7 @@ void FOutputLogPanel::OnRender()
 			ImGui::EndPopup();
 		}
 
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, ImGui::GetStyle().ItemSpacing.y * 0.5f));
 		if (CopyToClipboard)
 			ImGui::LogToClipboard();
 		for (const FLogData& item : Items)

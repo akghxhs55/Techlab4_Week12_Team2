@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/Viewports/ViewportsPanel.h"
 #include "Editor/Settings/EditorSettings.h"
 #include "Components/SkinnedMeshComponent.h"
@@ -31,7 +32,7 @@ void FViewportsPanel::DrawRenderMenu()
     if (!EditorSettings) return;
     auto& Settings = EditorSettings->GetMutableSettings();
     ImGui::TextDisabled("Applies to all editor views");
-    ImGui::PushItemWidth(160.0f);
+    ImGui::PushItemWidth(EditorStyle::Scale(160.0f));
 
     ImGui::SeparatorText("Lighting");
     const char* Models[] = { "Gouraud", "Lambert", "Phong", "Unlit" };

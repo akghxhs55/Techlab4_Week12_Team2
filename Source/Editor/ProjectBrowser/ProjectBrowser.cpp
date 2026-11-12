@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/ProjectBrowser/ProjectBrowser.h"
 
 #include <cctype>
@@ -513,23 +514,11 @@ namespace
 
 	void ApplyStyle(float Scale)
 	{
-		ImGui::StyleColorsDark();
-		ImGuiStyle& Style = ImGui::GetStyle();
-		Style.WindowRounding = 0.0f;
-		Style.ChildRounding = 4.0f;
-		Style.FrameRounding = 4.0f;
-		Style.FramePadding = ImVec2(8.0f, 5.0f);
-		Style.ItemSpacing = ImVec2(8.0f, 6.0f);
-		// 에디터와 같은 강조 색
-		ImVec4* Colors = Style.Colors;
-		Colors[ImGuiCol_Button] = ImVec4(0.65f, 0.30f, 0.45f, 1.00f);
-		Colors[ImGuiCol_ButtonHovered] = ImVec4(0.75f, 0.40f, 0.55f, 1.00f);
-		Colors[ImGuiCol_ButtonActive] = ImVec4(0.55f, 0.20f, 0.35f, 1.00f);
-		Colors[ImGuiCol_Header] = ImVec4(0.65f, 0.30f, 0.45f, 0.55f);
-		Colors[ImGuiCol_HeaderHovered] = ImVec4(0.75f, 0.40f, 0.55f, 0.70f);
-		Colors[ImGuiCol_HeaderActive] = ImVec4(0.55f, 0.20f, 0.35f, 1.00f);
-		Style.ScaleAllSizes(Scale);
+		EditorStyle::Apply();
+		ImGui::GetStyle().ScaleAllSizes(Scale);
+		ImGui::GetStyle().FontScaleDpi = Scale;
 	}
+
 }
 
 fs::path ProjectBrowser::Run(HINSTANCE hInstance)
@@ -568,14 +557,15 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 		IO.IniFilename = nullptr;
 		IO.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 
-		ApplyStyle(Scale);
+		float AppliedScale = ImGui_ImplWin32_GetDpiScaleForHwnd(Window.Hwnd);
+		ApplyStyle(AppliedScale);
 		const FString FontPath = FPaths::EngineFileUtf8(L"EngineResources/Fonts/NanumSquareR.ttf");
 		std::error_code Ec;
 		if (!fs::exists(FPaths::EngineFile(L"EngineResources/Fonts/NanumSquareR.ttf"), Ec) ||
-			!IO.Fonts->AddFontFromFileTTF(FontPath.c_str(), 17.0f * Scale, nullptr, IO.Fonts->GetGlyphRangesKorean()))
+			!IO.Fonts->AddFontFromFileTTF(FontPath.c_str(), 17.0f, nullptr, IO.Fonts->GetGlyphRangesKorean()))
 		{
 			ImFontConfig Config;
-			Config.SizePixels = 15.0f * Scale;
+			Config.SizePixels = 15.0f;
 			// Keep the fallback font stable when the window DPI changes.
 			IO.Fonts->AddFontDefaultVector(&Config);
 		}
@@ -607,6 +597,12 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 				CreateRenderTarget(Window);
 			}
 
+			const float CurrentScale = ImGui_ImplWin32_GetDpiScaleForHwnd(Window.Hwnd);
+			if (CurrentScale != AppliedScale)
+			{
+				ApplyStyle(CurrentScale);
+				AppliedScale = CurrentScale;
+			}
 			ImGui_ImplDX11_NewFrame();
 			ImGui_ImplWin32_NewFrame();
 			ImGui::NewFrame();

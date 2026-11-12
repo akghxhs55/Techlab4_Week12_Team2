@@ -25,7 +25,6 @@ public:
 	static constexpr float Height = 40.0f;
 
 private:
-	void DrawFileGroup();
 	void DrawPlayGroup();
 	void DrawPlayModeMenu();
 

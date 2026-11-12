@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "EditorCommand.h"
 
 #include "Input/InputSystem.h"
@@ -46,6 +47,13 @@ FString FInputChord::ToString() const
 
 namespace EditorCommandUI
 {
+	ImVec2 GetToolbarButtonSize(float IconSize)
+	{
+		const ImVec2 Padding = ImGui::GetStyle().FramePadding;
+		const float Side = EditorStyle::Scale(IconSize);
+		return { Side + Padding.x * 2.0f, Side + Padding.y * 2.0f };
+	}
+
 	bool ToolbarButton(const char* Id, const FEditorCommand& Command, float IconSize)
 	{
 		if (!Command.IsVisibleNow())
@@ -59,7 +67,7 @@ namespace EditorCommandUI
 		{
 			// 비활성일 때는 BeginDisabled가 알파를 낮춰 준다.
 			bClicked = ImGui::ImageButton(Id, (ImTextureID)Command.Icon->GetResource()->GetSRV(),
-				{ IconSize, IconSize }, { 0, 0 }, { 1, 1 }, { 0, 0, 0, 0 }, Command.IconTint);
+				{ EditorStyle::Scale(IconSize), EditorStyle::Scale(IconSize) }, { 0, 0 }, { 1, 1 }, { 0, 0, 0, 0 }, Command.IconTint);
 		}
 		else
 		{

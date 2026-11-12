@@ -31,6 +31,7 @@ public:
 	FVector2 GetContentOrigin() const { return {ContentOrigin.x, ContentOrigin.y}; }
 	FVector2 GetLocalMousePosition() const;
 	bool IsHovered() const;
+	bool WasRenderedThisFrame() const { return LastRenderedFrame == ImGui::GetFrameCount(); }
 	bool IsFocused() const { return bFocused; }
 
 	float ConsumeHorizontalDrag();
@@ -96,6 +97,7 @@ private:
 	int32 GameViewportIndex = -1;
 	ImVec2 ContentOrigin{};
 	ImVec2 ContentSize{1.0f, 1.0f};
+	int LastRenderedFrame = -1;
 	bool bHovered = false;
 	bool bFocused = false;
 	float PendingHorizontalDrag = 0.0f;

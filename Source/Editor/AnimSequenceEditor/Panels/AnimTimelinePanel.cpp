@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "AnimTimelinePanel.h"
 #include "Editor/AnimSequenceEditor/AnimSequenceEditor.h"
 #include "Animation/AnimNotify.h"
@@ -154,38 +155,38 @@ void FAnimTimelinePanel::DrawTransport()
     const float Rate = Editor.GetFrameRate();
 
     if (ImGui::Button("|<")) Editor.SetPlaybackTime(0.0f);
-    ImGui::SameLine();
+    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize("<").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     if (ImGui::Button("<")) Editor.StepFrame(-1);
-    ImGui::SameLine();
+    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize(Editor.IsPlaying() ? "Pause" : "Play").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     if (ImGui::Button(Editor.IsPlaying() ? "Pause" : "Play"))
     {
         if (Editor.IsPlaying()) Editor.Pause();
         else Editor.Play();
     }
-    ImGui::SameLine();
+    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize(">").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     if (ImGui::Button(">")) Editor.StepFrame(+1);
-    ImGui::SameLine();
+    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize(">|").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     if (ImGui::Button(">|")) Editor.SetPlaybackTime(Length);
 
-    ImGui::SameLine();
+    EditorStyle::SameLineOrWrap(ImGui::GetFrameHeight() + ImGui::CalcTextSize("Loop").x + ImGui::GetStyle().ItemInnerSpacing.x);
     ImGui::Checkbox("Loop", &Editor.bLooping);
-    ImGui::SameLine();
+    EditorStyle::SameLineOrWrap(ImGui::GetFrameHeight() + ImGui::CalcTextSize("Notifies").x + ImGui::GetStyle().ItemInnerSpacing.x);
     ImGui::Checkbox("Notifies", &Editor.bPreviewNotifies);
     if (ImGui::IsItemHovered())
     {
         ImGui::SetTooltip("Fire notifies while playing (sounds etc.). Name-based notifies are logged.");
     }
-    ImGui::SameLine();
-    ImGui::SetNextItemWidth(90.0f);
+    EditorStyle::SameLineOrWrap(EditorStyle::Scale(90.0f) + ImGui::CalcTextSize("Rate").x + ImGui::GetStyle().ItemInnerSpacing.x);
+    ImGui::SetNextItemWidth(EditorStyle::Scale(90.0f));
     ImGui::DragFloat("Rate", &Editor.PlayRate, 0.01f, -2.0f, 2.0f, "%.2fx");
 
     const float Time = Editor.GetPlaybackTime();
-    ImGui::SameLine();
+    EditorStyle::SameLineOrWrap(EditorStyle::Scale(250.0f));
     ImGui::Text("%.2f / %.2f s   Frame %d / %d", Time, Length,
         static_cast<int>(std::lround(Time * Rate)), Editor.GetNumFrames());
 
     // 저장: 변경이 있을 때만 누를 수 있다 (Ctrl+S와 같음)
-    ImGui::SameLine(0.0f, 24.0f);
+    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize("Save").x + ImGui::GetStyle().FramePadding.x * 2.0f);
     const bool bDirty = Editor.IsDirty();
     ImGui::BeginDisabled(!bDirty);
     if (ImGui::Button("Save"))
@@ -198,7 +199,7 @@ void FAnimTimelinePanel::DrawTransport()
         ImGui::SetTooltip("Save notifies and root motion settings to the .anim.bin (Ctrl+S)");
     }
 
-    ImGui::SameLine();
+    EditorStyle::SameLineOrWrap(EditorStyle::Scale(180.0f));
     if (bDirty)
     {
         ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "Unsaved changes");

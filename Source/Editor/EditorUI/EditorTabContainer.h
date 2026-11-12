@@ -26,7 +26,7 @@ private:
 
 	static bool IsInDockSpace(const ImGuiWindow* Window, ImGuiID DockSpaceId);
 
-	static void DrawTabMenu(IEditorTab& Tab);
+	void DrawTabMenu(IEditorTab& Tab);
 
 	TArray<IEditorTab*> Tabs;
 	TArray<IEditorTab*> PendingCloseTabs;

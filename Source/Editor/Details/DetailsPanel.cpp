@@ -1,4 +1,5 @@
 #include "EnginePCH.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/Details/DetailsPanel.h"
 #include "Editor/Details/PropertyEditor.h"
 #include "Core/Misc/Paths.h"
@@ -200,9 +201,9 @@ namespace
 	{
 		bool isValueChanged = false;
 
-		float lineHeight = GImGui->Font->LegacySize + GImGui->Style.FramePadding.y * 2.0f;
+		float lineHeight = ImGui::GetFrameHeight();
 		ImVec4 color(_color.X, _color.Y, _color.Z, _color.W);
-		ImVec2 buttonSize = { lineHeight + 2.0f , lineHeight };
+		ImVec2 buttonSize = { lineHeight + EditorStyle::Scale(2.0f) , lineHeight };
 
 		// 각 버튼의 색상 설정
 		ImGui::PushStyleColor(ImGuiCol_Button, color);
@@ -229,7 +230,7 @@ namespace
 	bool DrawVector3Controller(const FString& _label, float* _values, float _resetValue, float _columnWidth)
 	{
 		ImGuiIO& io = ImGui::GetIO();
-		auto boldFont = io.Fonts->Fonts[0];
+		auto boldFont = io.FontDefault ? io.FontDefault : io.Fonts->Fonts[0];
 
 		ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
 
@@ -240,29 +241,37 @@ namespace
 		{
 			// ImGuiTableColumnFlags_WidthFixed: 초기 너비 고정
 			// ImGuiTableColumnFlags_WidthStretch: 창 크기에 따라 너비 조절 (기본값)
-			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, _columnWidth);
+			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, EditorStyle::Scale(_columnWidth));
 			ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthStretch);
 
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::Text(_label.c_str()); // 왼쪽 열: 레이블
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted(_label.c_str());
 
 			ImGui::TableSetColumnIndex(1);
 			// [컨트롤러 UI 코드] // 오른쪽 열: 컨트롤러
-			ImGui::PushMultiItemsWidths(3, ImGui::CalcItemWidth());
-			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ 2,0 });
+			const float Gap = EditorStyle::Scale(2.0f);
+            const float ButtonWidth = ImGui::GetFrameHeight() + EditorStyle::Scale(2.0f);
+            const float Available = ImGui::GetContentRegionAvail().x;
+            const bool bStackAxes = Available < EditorStyle::Scale(210.0f);
+            const float ValueWidth = bStackAxes
+                ? ImMax(1.0f, Available - ButtonWidth - Gap)
+                : ImMax(3.0f, Available - 3.0f * ButtonWidth - 5.0f * Gap);
+            ImGui::PushMultiItemsWidths(bStackAxes ? 1 : 3, ValueWidth);
+            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ Gap, ImGui::GetStyle().ItemSpacing.y });
 			ImGui::PushFont(boldFont);
 
 			isVectorChanged |= DrawAxisControl("X", _values[0], 0.1f, 0.0f, 0.0f, _resetValue, { 0.8f, 0.1f, 0.1f, 1.0f });
 
 			ImGui::PopItemWidth();
 
-			ImGui::SameLine();
+			if (bStackAxes) ImGui::PushItemWidth(ValueWidth); else ImGui::SameLine();
 			isVectorChanged |= DrawAxisControl("Y", _values[1], 0.1f, 0.0f, 0.0f, _resetValue, { 0.1f, 0.8f, 0.1f, 1.0f });
 
 			ImGui::PopItemWidth();
 
-			ImGui::SameLine();
+			if (bStackAxes) ImGui::PushItemWidth(ValueWidth); else ImGui::SameLine();
 			isVectorChanged |= DrawAxisControl("Z", _values[2], 0.1f, 0.0f, 0.0f, _resetValue, { 0.1f, 0.1f, 0.8f, 1.0f });
 
 			ImGui::PopItemWidth();
@@ -272,7 +281,6 @@ namespace
 			ImGui::EndTable();
 		}
 
-		ImGui::Columns(1);
 
 		ImGui::PopID();
 
@@ -296,7 +304,7 @@ namespace
 
 	void DrawTextureSlot(UMaterial** MaterialPtr, int32 SlotIndex)
 	{
-		const float ThumbnailSize = 64.0f;
+		const float ThumbnailSize = EditorStyle::Scale(64.0f);
 
 		UMaterial* Material = *MaterialPtr;
 		UTexture2D* Texture = nullptr;
@@ -746,8 +754,8 @@ namespace
 	bool DrawTexturePicker(UTexture2D* Current, const char* Label,
 		const std::function<void(UTexture2D*)>& OnPick)
 	{
-		const float ThumbnailSize{ 64.0f };
-		const float ItemThumbnailSize{ 24.0f };
+		const float ThumbnailSize{ EditorStyle::Scale(64.0f) };
+		const float ItemThumbnailSize{ EditorStyle::Scale(24.0f) };
 
 		bool bChanged{ false };
 
@@ -856,8 +864,8 @@ namespace
 	}
 
 	void DrawMaterialTextureSlot(UMeshComponent* MeshComponent, int32 MaterialSlot, int32 TextureSlot, const char* Label, UMaterial*& Effective, UMaterial*& Override) {
-		const float ThumbnailSize{ 64.0f };
-		const float ItemThumbnailSize{ 24.0f };
+		const float ThumbnailSize{ EditorStyle::Scale(64.0f) };
+		const float ItemThumbnailSize{ EditorStyle::Scale(24.0f) };
 		UTexture2D* Texture{ Effective && Effective->Textures.IsValidIndex(TextureSlot) ? Effective->Textures[TextureSlot] : nullptr };
 
 		ImGui::TableNextRow();
@@ -924,7 +932,7 @@ namespace
 			{
 				if (ImGui::BeginTable("MaterialProperties", 2))
 				{
-					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, 110.0f);
+					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, EditorStyle::Scale(110.0f));
 					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
 					DrawMaterialTextureSlot(MeshComponent, Slot, 0, "Texture", Effective, Override);
@@ -1122,6 +1130,7 @@ namespace
 				Value.Roll = Euler[0];
 				Value.Pitch = Euler[1];
 				Value.Yaw = Euler[2];
+				return true;
 			}
 			return false;
 		}
@@ -1195,18 +1204,16 @@ namespace
 			char Buffer[256] = {};
 			strncpy_s(Buffer, Value.c_str(), sizeof(Buffer) - 1);
 			if (CustomFont) ImGui::PushFont(CustomFont);
-			if (ImGui::InputText(Label, Buffer, sizeof(Buffer)))
-			{
-				Value = Buffer;
-			}
+			const bool bChanged = ImGui::InputText(Label, Buffer, sizeof(Buffer));
+			if (bChanged) Value = Buffer;
 			if (CustomFont) ImGui::PopFont();
-			return false;
+			return bChanged;
 		}
 		if (const FTransformProperty* TransformProperty = CastField<FTransformProperty>(&Property))
 		{
 			FTransform& Value = TransformProperty->GetPropertyValue(ValuePtr);
+			ImGui::PushID(ValuePtr);
 
-			ImGui::NewLine();
 
 			bool bChanged = false;
 			bChanged |= DrawVector3Controller("Location", Value.Location.V, 0.0f, 55.0f);
@@ -1220,6 +1227,7 @@ namespace
 				bChanged = true;
 			}
 			bChanged |= DrawVector3Controller("Scale", Value.Scale.V, 1.0f, 55.0f);
+			ImGui::PopID();
 			return bChanged;
 		}
 		if (const FObjectProperty* ObjectProperty = CastField<FObjectProperty>(&Property))
@@ -1251,7 +1259,6 @@ namespace
 		if (const FStructProperty* StructProperty = CastField<FStructProperty>(&Property))
 		{
 			// USTRUCT: 구조체의 프로퍼티를 한 단계 들여 그린다. 컨테이너가 객체가 아니라 이 멤버의 주소다.
-			ImGui::NewLine();
 			ImGui::Indent();
 			ImGui::PushID(Label);
 
@@ -1300,7 +1307,7 @@ namespace
 		const float AvailableWidth = ImGui::GetContentRegionAvail().x;
 		const float LabelWidth = AvailableWidth * 0.45f;
 
-		const bool bInline = !Property.IsA<FTransformProperty>() && !Property.IsA<FStructProperty>() && AvailableWidth >= 260.0f && ImGui::CalcTextSize(DisplayName).x < LabelWidth;
+		const bool bInline = !Property.IsA<FTransformProperty>() && !Property.IsA<FStructProperty>() && AvailableWidth >= EditorStyle::Scale(260.0f) && ImGui::CalcTextSize(DisplayName).x < LabelWidth;
 
 		ImGui::AlignTextToFramePadding();
 		ImGui::TextWrapped("%s", DisplayName);
@@ -1396,14 +1403,16 @@ namespace
 			ImGui::OpenPopup("AddComponentPopup");
 		}
 
-		if (ImGui::BeginPopup("AddComponentPopup"))
+		const auto AddComponentAnchor = EditorStyle::LastItemAnchor();
+
+		if (EditorStyle::BeginButtonPopup("AddComponentPopup", AddComponentAnchor, EditorStyle::Scale(320.0f)))
 		{
 			ImGui::Text("Component Name:");
 			ImGui::SameLine();
 			ImGui::InputText("##Component Name", ComponentNameInputBuf, sizeof(ComponentNameInputBuf));
 			TArray<UClass*> Classes;
 			GetDerivedClasses(UActorComponent::StaticClass(), Classes);
-			// 이름순 정렬하면 메뉴가 안정적
+			std::sort(Classes.begin(), Classes.end(), [](const UClass* A, const UClass* B) { return A->Name < B->Name; });
 			for (UClass* Class : Classes)
 			{
 				//if (!IsSpawnableComponent(Class)) continue;
@@ -1438,9 +1447,8 @@ bool FDetailsPanel::Init()
 {
 	ImGuiIO& io = ImGui::GetIO();
 
-	// 1.92.6+의 AddFontDefault()는 DPI 배율로 비트맵/벡터를 고르는데, DPI 적용 전에 호출되면
-	// 고배율 모니터에서 2프레임째 재판정 결과가 달라져 assert가 난다. 기존 동작(비트맵)을 명시한다.
-	io.Fonts->AddFontDefaultBitmap();
+	// 기본 폰트도 배율에 맞춰 다시 래스터화할 수 있도록 벡터 폰트를 명시한다.
+	io.Fonts->AddFontDefaultVector();
 
 	// 폰트 파일은 엔진 폴더 루트에 있다. 작업 디렉터리는 프로젝트 폴더이므로 절대 경로로 연다.
 	const FString fontPath = FPaths::EngineFileUtf8("EngineResources/Fonts/NanumSquareR.ttf");
@@ -1448,6 +1456,7 @@ bool FDetailsPanel::Init()
 	const ImWchar* koreanRanges = io.Fonts->GetGlyphRangesKorean();
 
 	CustomFont = io.Fonts->AddFontFromFileTTF(fontPath.c_str(), fontSize, nullptr, koreanRanges);
+	if (CustomFont) io.FontDefault = CustomFont;
 	assert(CustomFont != nullptr);
 
 	return true;
