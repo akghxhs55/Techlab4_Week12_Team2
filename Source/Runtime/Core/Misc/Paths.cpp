@@ -69,8 +69,8 @@ fs::path FPaths::ProjectContentDir()
     const fs::path Root = ProjectRoot();
     std::error_code Ec;
     // Older external projects can still be opened without moving their files automatically.
-    if (!fs::exists(Root / L"Content/Game", Ec) && fs::is_directory(Root / L"Assets", Ec)) return Root / L"Assets";
-    return Root / L"Content/Game";
+    if (!fs::exists(Root / L"Content", Ec) && fs::is_directory(Root / L"Assets", Ec)) return Root / L"Assets";
+    return Root / L"Content";
 }
 fs::path FPaths::ProjectScenesDir()
 {
@@ -99,7 +99,9 @@ FString FPaths::ResolveContentPath(const FString& Path)
     if (StartsWithFolder(Normal, "EngineResources")) return EngineFileUtf8(FromUtf8(Normal));
     // Previously saved engine file paths still resolve after the folder rename.
     if (StartsWithFolder(Normal, "Content/Engine")) return ToUtf8(EngineResourcesDir() / FromUtf8(Normal.substr(15)));
+    // Content/Game was merged into Content; scenes saved with the old prefix still resolve.
     if (StartsWithFolder(Normal, "Content/Game")) return ToUtf8(ProjectContentDir() / FromUtf8(Normal.substr(13)));
+    if (StartsWithFolder(Normal, "Content")) return ToUtf8(ProjectContentDir() / FromUtf8(Normal.substr(8)));
     if (StartsWithFolder(Normal, "Assets")) return ToUtf8(ProjectContentDir() / FromUtf8(Normal.substr(7)));
     if (StartsWithFolder(Normal, "Scenes")) return ToUtf8(ProjectScenesDir() / FromUtf8(Normal.substr(7)));
     if (StartsWithFolder(Normal, "Scripts")) return ToUtf8(ProjectScriptsDir() / FromUtf8(Normal.substr(8)));
@@ -116,7 +118,7 @@ fs::path FPaths::MeshCacheFile(const FString& SourcePath)
     fs::path CacheRoot = ProjectBuildDir() / L"Cache/Meshes";
     fs::path Relative = Source.lexically_relative(ProjectContentDir());
     fs::path Result;
-    if (IsInside(Relative)) Result = CacheRoot / L"Game" / Relative;
+    if (IsInside(Relative)) Result = CacheRoot / L"Content" / Relative;
     else
     {
         Relative = Source.lexically_relative(EngineResourcesDir());

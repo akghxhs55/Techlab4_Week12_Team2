@@ -121,7 +121,7 @@ namespace
 			"\n"
 			"[Game]\n"
 			"; 시작할 씬. 프로젝트 폴더 기준 상대 경로. 에디터에서 이 경로로 씬을 저장한다.\n"
-			"GameDefaultMap=Content/Game/Scenes/Main.scene\n"
+			"GameDefaultMap=Content/Scenes/Main.scene\n"
 			"\n"
 			"[Window]\n"
 			"Title=" + Name + "\n"
@@ -165,7 +165,7 @@ bool ProjectCreator::Create(const FString& Name, const fs::path& ParentDir, fs::
 		return false;
 	}
 
-	for (const wchar_t* Folder : { L"Content/Game/Scenes", L"Content/Game/Scripts", L"Config" })
+	for (const wchar_t* Folder : { L"Content/Scenes", L"Content/Scripts", L"Config" })
 	{
 		fs::create_directories(ProjectDir / Folder, Ec);
 		if (Ec)
@@ -183,7 +183,7 @@ bool ProjectCreator::Create(const FString& Name, const fs::path& ParentDir, fs::
 	}
 
 	{
-		std::ofstream Scene(ProjectDir / L"Content/Game/Scenes/Main.scene");
+		std::ofstream Scene(ProjectDir / L"Content/Scenes/Main.scene");
 		Scene << R"({"Version":4,"World":{"PersistentLevel":{"Actors":[],"Properties":{}},"Properties":{}}})";
 	}
 
@@ -462,7 +462,7 @@ namespace
 			}
 
 			ImGui::Spacing();
-			ImGui::TextDisabled("Creates Content/Game and Config folders.\nEngine icons and fonts are shared from the engine folder.");
+			ImGui::TextDisabled("Creates Content and Config folders.\nEngine icons and fonts are shared from the engine folder.");
 
 			ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetFrameHeightWithSpacing() - ImGui::GetStyle().WindowPadding.y);
 			ImGui::BeginDisabled(!NameError.empty() || Location.empty());

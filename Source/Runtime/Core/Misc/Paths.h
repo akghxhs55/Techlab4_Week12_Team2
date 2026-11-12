@@ -6,9 +6,9 @@
 #include "Core/Types.h"
 
 // UE의 FPaths처럼 엔진 폴더와 프로젝트 폴더를 나눠서 다룬다.
-// 엔진 자원은 EngineResources, 프로젝트 콘텐츠는 Content/Game, 생성 데이터는 Build 아래에 둔다.
+// 엔진 자원은 EngineResources, 프로젝트 콘텐츠는 Content, 생성 데이터는 Build 아래에 둔다.
 // 프로젝트 폴더는 .hproject 파일이 있는 곳이며 실행 중 작업 디렉터리로 사용한다.
-// 프로젝트를 정하면 작업 디렉터리를 프로젝트 폴더로 바꾸므로 "Content/Game/..." 같은 기존 상대 경로는 그대로 쓴다.
+// 프로젝트를 정하면 작업 디렉터리를 프로젝트 폴더로 바꾸므로 "Content/..." 같은 기존 상대 경로는 그대로 쓴다.
 // 엔진 파일은 EngineFile()로 절대 경로를 만들어 연다.
 class FPaths
 {
@@ -40,7 +40,7 @@ public:
 	static constexpr const char* EngineContentPrefix = "Engine/";
 	static std::filesystem::path EngineResourcesDir();
 	static bool IsEngineContentPath(const FString& Path);
-	// Content/Game 및 Engine/... 경로를 해석한다. 옛 Assets/Scenes/Scripts 접두 경로도 읽는다.
+	// Content 및 Engine/... 경로를 해석한다. 옛 Content/Game, Assets/Scenes/Scripts 접두 경로도 읽는다.
 	static FString ResolveContentPath(const FString& Path);
 
 	// 엔진 쪽 사용자 데이터(최근 프로젝트 목록 등)를 두는 폴더.

@@ -156,7 +156,7 @@ namespace
 		}
 
 		if (CustomFont) ImGui::PushFont(CustomFont);
-		ImGui::InputTextWithHint("Script Path", "Content/Game/Scripts/MyScript.lua", Buffer, sizeof(Buffer));
+		ImGui::InputTextWithHint("Script Path", "Content/Scripts/MyScript.lua", Buffer, sizeof(Buffer));
 		const bool bCommitted = ImGui::IsItemDeactivatedAfterEdit();
 		if (CustomFont) ImGui::PopFont();
 		if (bCommitted)

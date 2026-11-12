@@ -58,13 +58,13 @@ try {
         }
     }
     Copy-Content (Join-Path $engineRoot 'EngineResources') 'EngineResources'
-    $gameContent = Join-Path $projectRoot 'Content\Game'
+    $gameContent = Join-Path $projectRoot 'Content'
     if (Test-Path -LiteralPath $gameContent) {
-        Copy-Content $gameContent 'Content\Game'
+        Copy-Content $gameContent 'Content'
     } else {
-        Copy-Content (Join-Path $projectRoot 'Assets') 'Content\Game'
-        Copy-Content (Join-Path $projectRoot 'Scenes') 'Content\Game\Scenes'
-        Copy-Content (Join-Path $projectRoot 'Scripts') 'Content\Game\Scripts'
+        Copy-Content (Join-Path $projectRoot 'Assets') 'Content'
+        Copy-Content (Join-Path $projectRoot 'Scenes') 'Content\Scenes'
+        Copy-Content (Join-Path $projectRoot 'Scripts') 'Content\Scripts'
     }
     Copy-Content (Join-Path $projectRoot 'Config') 'Config'
     Write-Host "[Package] Done: $out"

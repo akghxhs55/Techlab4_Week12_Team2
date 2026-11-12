@@ -16,7 +16,7 @@ FGamePackager::~FGamePackager()
 bool FGamePackager::Start(const FString& Config)
 {
 	if (IsRunning()) return false;
-	// 엔진(Setup/Packaging/Package.bat, EngineResources)과 프로젝트(Content/Game)는 서로 다른 폴더일 수 있다.
+	// 엔진(Setup/Packaging/Package.bat, EngineResources)과 프로젝트(Content)는 서로 다른 폴더일 수 있다.
 	const std::filesystem::path Root = FPaths::EngineDir();
 	std::error_code Ec;
 	if (std::filesystem::exists(Root / "Setup/Packaging/Package.bat", Ec) && std::filesystem::exists(Root / "Setup/Build/premake5.lua", Ec))
@@ -103,14 +103,14 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 				CopyResult = "HitoriGame.exe";
 				bCopyFailed = true;
 			}
-			// 엔진 콘텐츠(EngineResources)는 엔진 폴더에서, 프로젝트 콘텐츠(Content/Game)는 프로젝트 폴더에서 가져온다.
+			// 엔진 콘텐츠(EngineResources)는 엔진 폴더에서, 프로젝트 콘텐츠(Content)는 프로젝트 폴더에서 가져온다.
 			// 게임 exe는 옆에 있는 .hproject를 찾아 그 폴더를 프로젝트 폴더로 쓴다.
 			const std::pair<std::filesystem::path, const char*> Folders[] =
 			{
 				{ Root / "EngineResources", "EngineResources" },
-				{ FPaths::ProjectContentDir(), "Content/Game" },
-				{ FPaths::ProjectScenesDir(), "Content/Game/Scenes" },
-				{ FPaths::ProjectScriptsDir(), "Content/Game/Scripts" },
+				{ FPaths::ProjectContentDir(), "Content" },
+				{ FPaths::ProjectScenesDir(), "Content/Scenes" },
+				{ FPaths::ProjectScriptsDir(), "Content/Scripts" },
 				{ ProjectDir / "Config", "Config" },
 			};
 			for (const auto& [Base, Folder] : Folders)

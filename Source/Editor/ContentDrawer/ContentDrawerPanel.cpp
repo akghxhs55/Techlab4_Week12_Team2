@@ -84,7 +84,7 @@ void FContentDrawerPanel::OnRender()
 			ImGui::BeginDisabled(bExists || NewAssetName[0] == '\0');
 			if (ImGui::Button("Create") && OnCreateWidget)
 			{
-				OnCreateWidget(Target.generic_string());   // "Content/Game/UI/GameOver.widget" 형식
+				OnCreateWidget(Target.generic_string());   // "Content/UI/GameOver.widget" 형식
 				ImGui::CloseCurrentPopup();
 			}
 			ImGui::EndDisabled();
@@ -278,41 +278,18 @@ void FContentDrawerPanel::OnRender()
 
 void FContentDrawerPanel::RenderNavigationBar()
 {
-	// 경로 표시: 각 조각을 누르면 그 폴더로 이동한다.
-	fs::path Accumulated = AssetRootPath;
-	fs::path NavigateTarget;
-
-	const std::string RootLabel = AssetRootPath.filename().string();
-	if (ImGui::Button((RootLabel + "##Crumb_Root").c_str()))
-	{
-		NavigateTarget = AssetRootPath;
-	}
+	// 현재 경로를 평범한 텍스트로 표시한다. (예: Asset/Textures/UI)
+	fs::path DisplayPath = AssetRootPath.filename();
 
 	const fs::path Relative = CurrentPath.lexically_relative(AssetRootPath);
-	int CrumbIndex = 0;
 	for (const fs::path& Part : Relative)
 	{
 		if (Part.empty() || Part == ".")
 			continue;
-
-		Accumulated /= Part;
-
-		ImGui::SameLine(0.0f, 4.0f);
-		ImGui::TextUnformatted(">");
-		ImGui::SameLine(0.0f, 4.0f);
-
-		ImGui::PushID(CrumbIndex++);
-		if (ImGui::Button(Part.string().c_str()))
-		{
-			NavigateTarget = Accumulated;
-		}
-		ImGui::PopID();
+		DisplayPath /= Part;
 	}
 
-	if (!NavigateTarget.empty())
-	{
-		CurrentPath = NavigateTarget;
-	}
+	ImGui::TextUnformatted(DisplayPath.generic_string().c_str());
 }
 
 void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& SelectedPath)

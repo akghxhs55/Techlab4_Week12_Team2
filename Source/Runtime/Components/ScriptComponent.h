@@ -31,7 +31,7 @@ private:
 	void StartScript();
 	void StopScript();
 
-	// "Content/Game/Scripts/Foo.lua" 같은 프로젝트 상대 경로. 저장만 하고 프로퍼티 목록에는 내지 않는다.
+	// "Content/Scripts/Foo.lua" 같은 프로젝트 상대 경로. 저장만 하고 프로퍼티 목록에는 내지 않는다.
 	// 디테일 패널이 전용 입력란으로 SetScriptPath를 거쳐 바꾼다.
 	UPROPERTY()
 	FString ScriptPath;

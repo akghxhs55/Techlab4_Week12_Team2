@@ -53,7 +53,7 @@ public:
 	void CreateParticleMaterial();
 	void CreateEditorArrowMaterial();
 
-	// 경로는 "Content/Game/Models/a.obj"와 "Models/a.obj"를 같은 에셋으로 본다.
+	// 경로는 "Content/Models/a.obj"와 "Models/a.obj"를 같은 에셋으로 본다.
 	// 아직 로드되지 않았으면 여기서 로드하므로 GPU 자원을 만들 수 있는 메인 스레드에서만 부른다.
 	template <typename T>
 	static T* GetAssetByPath(const FString& Path)

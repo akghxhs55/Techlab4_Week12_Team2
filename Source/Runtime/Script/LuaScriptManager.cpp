@@ -78,7 +78,7 @@ FString FLuaScriptManager::MakeScriptKey(const fs::path& File)
 
 	fs::path Relative;
 	if (RelativeInside(Full, FPaths::ProjectContentDir(), Relative))
-		return "Content/Game/" + FromPath(Relative.generic_wstring());
+		return "Content/" + FromPath(Relative.generic_wstring());
 	// 옛 프로젝트 배치(루트/Scripts)는 콘텐츠 폴더 밖에 스크립트가 있다.
 	if (RelativeInside(Full, FPaths::ProjectScriptsDir(), Relative))
 		return "Scripts/" + FromPath(Relative.generic_wstring());
@@ -105,8 +105,8 @@ FString FLuaScriptManager::NormalizeScriptPath(const FString& Path)
 
 FString FLuaScriptManager::GetTemplatePath()
 {
-	// 프로젝트에 Content/Game/Scripts/template.lua가 있으면 그것을 쓰고, 없으면 엔진 콘텐츠의 기본 템플릿을 쓴다.
-	const FString ProjectTemplate = "Content/Game/Scripts/template.lua";
+	// 프로젝트에 Content/Scripts/template.lua가 있으면 그것을 쓰고, 없으면 엔진 콘텐츠의 기본 템플릿을 쓴다.
+	const FString ProjectTemplate = "Content/Scripts/template.lua";
 	std::error_code Ec;
 	if (fs::exists(ToPath(ProjectTemplate), Ec))
 		return ProjectTemplate;

@@ -103,7 +103,7 @@ void FLevelEditorTab::OnRender(bool bActive)
 			ImGui::SetNextWindowClass(&PanelClass);
 			Panel->OnRender();
 			// 패널이 창을 열지 않고 돌아오면 지정한 클래스가 엉뚱한 창에 붙지 않게 지운다.
-			GImGui->NextWindowData.Flags &= ~ImGuiNextWindowDataFlags_HasWindowClass;
+			GImGui->NextWindowData.HasFlags &= ~ImGuiNextWindowDataFlags_HasWindowClass;
 		}
 	}
 }

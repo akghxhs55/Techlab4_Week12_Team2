@@ -31,7 +31,7 @@ namespace
 FUIEditor::FUIEditor(UEditorEngine& InEditorEngine, FEditorManager& InEditorManager, const FString& InAssetPath)
 	: FAssetEditor(InEditorEngine, InEditorManager, InAssetPath)
 {
-	// 에디터 키는 Assets 상대 경로다. 파일 입출력과 런타임 캐시는 "Content/Game/UI/Foo.widget" 형식을 쓰므로 프로젝트 상대 경로로 되돌린다.
+	// 에디터 키는 Assets 상대 경로다. 파일 입출력과 런타임 캐시는 "Content/UI/Foo.widget" 형식을 쓰므로 프로젝트 상대 경로로 되돌린다.
 	const FString Absolute = FAssetUtils::ResolveAssetFilePath(InAssetPath);
 	if (!Absolute.empty())
 	{
