@@ -92,7 +92,7 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
     Items[Speed] = { SpeedLabel, "CameraSpeed", true, "Camera speed\nHold the right mouse button and scroll to change it." };
     Items[ViewMode] = { ViewModeLabels[ModeIndex], ViewModeIcons[ModeIndex], true, "View mode" };
     Items[Show] = { nullptr, "Show", true, "Show flags and viewport stats" };
-    Items[Render] = { "Render" };
+    Items[Render] = { nullptr, "Settings", true, "Render settings" };   // UE 뷰포트처럼 톱니 아이콘
     Items[Layout] = { nullptr, nullptr, false, "Viewport layouts", EGlyph::Kebab };
     // 누르면 바뀔 모양을 보여 준다: 싱글이면 田(쿼드로), 여러 패널이면 □(이 뷰만 크게).
     const bool bSingleLayout = CurrentLayoutMode == ELayoutMode::Single;
