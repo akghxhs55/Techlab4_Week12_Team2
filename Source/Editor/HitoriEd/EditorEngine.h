@@ -69,13 +69,15 @@ public:
 	void DeleteComponent(UActorComponent* Component);
 
 	//Play 버튼을 눌렀을때 Play Session 실행을 요청한다.
-	inline void RequestPlaySession() { bPlaySessionRequested = true; }
+	inline void RequestPlaySession() { bPlaySessionRequested = true; bSimulateRequested = false; }
+	// UE의 Simulate 버튼: PIE 월드를 띄우되 게임 화면 대신 SIE로 바로 시작한다.
+	inline void RequestSimulateSession() { bPlaySessionRequested = true; bSimulateRequested = true; }
 	inline void RequestEndPlayMap() { bRequestEndPlayMapQueued = true; bIsPaused = false; }
 
 	// 대기 중인 Play 요청이 있으면 PIE를 시작한다. Tick이 프레임 시작에 부른다.
 	void StartQueuedPlaySessionRequest();
 	//실제 PIE 를 실행
-	void StartPlayInEditorSession();
+	void StartPlayInEditorSession(bool bSimulate = false);
 	UWorld* CreatePIEWorldByDuplication(FWorldContext& PIEContext, UWorld* InEditorWorld);
 
 	void OnActiveWorldChanged();
@@ -205,12 +207,17 @@ private:
 	FEditorCommand OpenSceneCommand;  // OpenScene()과 이름이 겹치지 않게 Command를 붙인다
 
 	FEditorCommand Play;
+	FEditorCommand Simulate;
+	FEditorCommand Eject;
+	FEditorCommand Possess;
 	FEditorCommand Pause;
 	FEditorCommand Resume;
 	FEditorCommand StepFrame;
 	FEditorCommand Stop;
 
 	bool bPlaySessionRequested = false;
+	bool bSimulateRequested = false;
+	bool bTogglePIESIERequested = false;
 	bool bRequestEndPlayMapQueued = false;
 	bool bStepRequested = false;
 	bool bIsPaused = false;

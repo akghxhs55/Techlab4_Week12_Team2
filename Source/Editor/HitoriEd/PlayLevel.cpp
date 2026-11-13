@@ -304,17 +304,20 @@ void UEditorEngine::StartQueuedPlaySessionRequest()
 	if (!bPlaySessionRequested) return;
 	bPlaySessionRequested = false;
 
+	const bool bSimulate = bSimulateRequested;
+	bSimulateRequested = false;
 	if (!PlayWorld)
 	{
-		StartPlayInEditorSession();
+		StartPlayInEditorSession(bSimulate);
 	}
 }
 
-void UEditorEngine::StartPlayInEditorSession()
+void UEditorEngine::StartPlayInEditorSession(bool bSimulate)
 {
 	// 별도 창 모드면 패널 View는 모두 에디터 월드로 두고 창 하나에만 PIE 월드를 그린다.
 	// 창을 만들지 못하면 선택한 View에서 실행한다.
-	const bool bNewWindow = (PlayMode == EPlayModeType::InEditorFloating);
+	// Simulate는 UE처럼 항상 레벨 에디터 뷰포트 안에서 돈다. (F8로 게임 화면과 오가려면 바꿔 끼울 View가 필요하다)
+	const bool bNewWindow = !bSimulate && (PlayMode == EPlayModeType::InEditorFloating);
 
 	PIEStartEditorViewIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : 0;
 	if (bNewWindow && CreatePIEWindow())
@@ -357,8 +360,19 @@ void UEditorEngine::StartPlayInEditorSession()
 	{
 		ViewportsPanel->SetGameViewportClient(PIEStartEditorViewIndex, PIEContext.GameViewport.get());
 	}
-	// UE 기본값처럼 시작하자마자 마우스를 잡는다 (Shift+F1로 해제)
-	bPendingPIEMouseCapture = true;
+	if (bSimulate && !bNewWindow && ViewportsPanel)
+	{
+		// 게임 화면을 거치지 않고 에디터 뷰포트로 PIE 월드를 보여 준다. 카메라는 지금 보던 에디터 카메라 그대로다.
+		ViewportsPanel->ClearGameViewportClient();
+		bIsSimulatingInEditor = true;
+		bPendingPIEMouseCapture = false;
+	}
+	else
+	{
+		// 시작할 때는 커서를 그대로 두고, 게임 화면을 한 번 클릭하면 잡는다 (Shift+F1로 해제).
+		// 그 클릭은 게임에 넘기지 않는다 (TickPIEInput의 bCaptureStartedThisFrame).
+		bPendingPIEMouseCapture = false;
+	}
 
 	OnActiveWorldChanged();
 }

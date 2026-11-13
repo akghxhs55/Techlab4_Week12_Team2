@@ -20,11 +20,20 @@ public:
 		SetPlayMode = std::move(InSetPlayMode);
 		CanChangePlayMode = std::move(InCanChangePlayMode);
 	}
+	// UE 메인 툴바의 Add(액터 배치)와 그리드 스냅 드롭다운. 메뉴 내용은 뷰포트 패널이 그린다.
+	void SetPlacementMenus(std::function<void()> InDrawAddMenu, std::function<void()> InDrawGridMenu,
+		std::function<int32()> InGetGridSpacing)
+	{
+		DrawAddMenu = std::move(InDrawAddMenu);
+		DrawGridMenu = std::move(InDrawGridMenu);
+		GetGridSpacing = std::move(InGetGridSpacing);
+	}
 	void Draw();
 
 	static constexpr float Height = 40.0f;
 
 private:
+	void DrawPlacementGroup();
 	void DrawPlayGroup();
 	void DrawPlayModeMenu();
 
@@ -33,6 +42,9 @@ private:
 	std::function<EPlayModeType()> GetPlayMode;
 	std::function<void(EPlayModeType)> SetPlayMode;
 	std::function<bool()> CanChangePlayMode;
+	std::function<void()> DrawAddMenu;
+	std::function<void()> DrawGridMenu;
+	std::function<int32()> GetGridSpacing;
 
 
 };

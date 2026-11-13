@@ -16,10 +16,12 @@ namespace EditorDock
 		return WindowClass;
 	}
 
-	// 패널 창의 Begin 앞에서 SetNextWindowClass로 넘긴다. 패널은 Window 메뉴로만 여닫는다.
+	// 패널 창의 Begin 앞에서 SetNextWindowClass로 넘긴다.
+	// 패널은 탭의 X 버튼(Begin에 GetOpenFlag()를 넘긴다)으로 닫고 Window 메뉴로 다시 연다.
 	inline ImGuiWindowClass MakePanelClass(ImGuiID ClassId)
 	{
 		ImGuiWindowClass WindowClass = MakeDockSpaceClass(ClassId);
+		// 도킹 노드 오른쪽 끝의 X는 끈다. 그게 있으면 탭의 X와 함께 닫기 버튼이 두 개가 된다.
 		WindowClass.DockNodeFlagsOverrideSet = ImGuiDockNodeFlags_NoCloseButton;
 		return WindowClass;
 	}
@@ -51,6 +53,8 @@ public:
 
 	bool IsOpen() const { return bIsOpen; }
 	void SetOpen(bool bOpen) { bIsOpen = bOpen; }
+	// ImGui::Begin의 p_open으로 넘기면 창/탭에 닫기 버튼이 생기고, 누르면 패널이 닫힌다.
+	bool* GetOpenFlag() { return &bIsOpen; }
 	virtual const char* GetPanelName() const = 0;
 
 private:

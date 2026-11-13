@@ -321,7 +321,8 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 
 	// 스카이 배경을 물체보다 먼저 HDR 타깃에 깐다. 이 패스가 LightingHDR을 Clear하고, 포워드 패스는 Load로 그 위에 그린다.
 	FSkyboxRenderer* Skybox = Renderer->GetSkybox();
-	const bool bDrawSkybox = Skybox && Skybox->IsValid();
+	// UE처럼 직교 뷰(Top/Front/Side 등)에서는 스카이를 그리지 않는다.
+	const bool bDrawSkybox = Skybox && Skybox->IsValid() && View.bIsPerspective;
 	if (bDrawSkybox)
 	{
 		FRenderGraphRasterPassDesc Sky{};

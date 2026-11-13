@@ -80,7 +80,7 @@ void FContentDrawerPanel::Tick(float DeltaTime)
 
 void FContentDrawerPanel::OnRender()
 {
-	ImGui::Begin("Content Drawer");
+	ImGui::Begin("Content Drawer", GetOpenFlag());
 	std::error_code Error;
 
 	if (!fs::is_directory(CurrentPath, Error))
@@ -103,8 +103,9 @@ void FContentDrawerPanel::OnRender()
 	float treeViewWidth = ImMin(EditorStyle::Scale(200.0f), ImGui::GetContentRegionAvail().x * 0.35f);
 	ImGui::BeginChild("FolderTreeView", ImVec2(treeViewWidth, 0));
 	{
-		// 루트 노드
-		if (ImGui::TreeNodeEx(AssetRootPath.string().c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth |
+		// 루트 노드: 상단 경로 표시와 같도록 폴더 이름만 보여 준다. (예: Content)
+		const FString RootLabel = AssetRootPath.filename().string() + "##AssetRoot";
+		if (ImGui::TreeNodeEx(RootLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth |
 			(AssetRootPath == CurrentPath ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_DrawLinesToNodes))
 		{
 			if (ImGui::IsItemClicked())

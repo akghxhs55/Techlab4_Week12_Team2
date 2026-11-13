@@ -58,12 +58,13 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
 
     // 왼쪽은 기즈모와 스폰, 오른쪽은 UE처럼 투영·카메라 속도·뷰 모드·표시·레이아웃 드롭다운을 둔다.
     // Layout: ⋮ 버튼(레이아웃 프리셋 메뉴), LayoutToggle: UE의 쿼드/싱글 전환 버튼
-    enum EItem { Add, Move, Rotate, Scale, Space, Grid, Projection, Speed, ViewMode, Show, Render, Layout, LayoutToggle, ItemCount };
+    // Add와 그리드 스냅은 UE처럼 레벨 에디터 메인 툴바에 있다.
+    enum EItem { Move, Rotate, Scale, Space, Projection, Speed, ViewMode, Show, Render, Layout, LayoutToggle, ItemCount };
     // 왼쪽 묶음은 왼쪽 정렬, 오른쪽 묶음은 UE처럼 오른쪽 정렬한다.
-    const EItem LeftItems[] = { Add, Move, Rotate, Scale, Space, Grid };
+    const EItem LeftItems[] = { Move, Rotate, Scale, Space };
     const EItem RightItems[] = { Projection, Speed, ViewMode, Show, Render, Layout, LayoutToggle };
     const char* PopupIds[ItemCount]{};
-    PopupIds[Add] = "Add"; PopupIds[Grid] = "Grid"; PopupIds[Projection] = "Projection"; PopupIds[Speed] = "CameraSpeed";
+    PopupIds[Projection] = "Projection"; PopupIds[Speed] = "CameraSpeed";
     PopupIds[ViewMode] = "ViewMode"; PopupIds[Show] = "Show"; PopupIds[Render] = "Render"; PopupIds[Layout] = "Layout";
     EditorStyle::FPopupAnchor PopupAnchors[ItemCount]{};
 
@@ -71,8 +72,6 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
     const int ProjectionIndex = std::clamp(static_cast<int>(Client->GetViewportType()), 0, static_cast<int>(ELevelViewportType::Count) - 1);
     const int ModeIndex = std::clamp(static_cast<int>(Client->GetViewportMode()), 0, static_cast<int>(EViewportMode::Count) - 1);
 
-    char GridLabel[32];
-    std::snprintf(GridLabel, sizeof(GridLabel), "Grid %d", EditorSettings ? EditorSettings->GetSettings().GridSpacing : 1);
     char SpeedLabel[32];
     std::snprintf(SpeedLabel, sizeof(SpeedLabel), "%.2f", EditorSettings ? EditorSettings->GetSettings().CameraSpeed : 1.0f);
 
@@ -81,12 +80,14 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
     enum class EGlyph : uint8 { None, Kebab, Quad, Single };
     struct FItemDesc { const char* Label = nullptr; const char* Icon = nullptr; bool bChevron = false; const char* Tooltip = nullptr; EGlyph Glyph = EGlyph::None; };
     FItemDesc Items[ItemCount];
-    Items[Add] = { "+ Add" };
-    Items[Move] = { "Move", nullptr, false, "Space: cycle Move / Rotate / Scale" };
-    Items[Rotate] = { "Rotate", nullptr, false, "Space: cycle Move / Rotate / Scale" };
-    Items[Scale] = { "Scale", nullptr, false, "Space: cycle Move / Rotate / Scale" };
-    Items[Space] = { Gizmo && Gizmo->GetSpace() == EGizmoSpace::World ? "World" : "Local" };
-    Items[Grid] = { GridLabel };
+    Items[Move] = { nullptr, "TransformMove", false, "Select and translate objects\nSpace: cycle Move / Rotate / Scale" };
+    Items[Rotate] = { nullptr, "TransformRotate", false, "Select and rotate objects\nSpace: cycle Move / Rotate / Scale" };
+    Items[Scale] = { nullptr, "TransformScale", false, "Select and scale objects\nSpace: cycle Move / Rotate / Scale" };
+    // UE처럼 스케일은 항상 로컬 축이라 그동안은 Local로 고정해 보여 주고 버튼을 막는다. 고른 공간은 그대로 기억한다.
+    const bool bScaleMode = Gizmo && Gizmo->GetMode() == EGizmoMode::Scale;
+    const bool bWorldSpace = Gizmo && Gizmo->GetSpace() == EGizmoSpace::World && !bScaleMode;
+    Items[Space] = { nullptr, bWorldSpace ? "SpaceWorld" : "SpaceLocal", false,
+        bScaleMode ? "Scaling always uses local space" : (bWorldSpace ? "World space (click for local)" : "Local space (click for world)") };
     Items[Projection] = { ProjectionLabels[ProjectionIndex], ProjectionIcons[ProjectionIndex], true, "Viewport type and camera" };
     Items[Speed] = { SpeedLabel, "CameraSpeed", true, "Camera speed\nHold the right mouse button and scroll to change it." };
     Items[ViewMode] = { ViewModeLabels[ModeIndex], ViewModeIcons[ModeIndex], true, "View mode" };
@@ -191,8 +192,8 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
 
             const bool bGizmoItem = Item >= Move && Item <= Space;
             // PIE 게임 화면에서는 에디터 카메라·기즈모·스폰을 쓸 수 없다.
-            const bool bDisabled = (bGizmoItem && !Gizmo) ||
-                (bGameView && (bGizmoItem || Item == Projection || Item == ViewMode || Item == Add || Item == Speed));
+            const bool bDisabled = (bGizmoItem && !Gizmo) || (Item == Space && bScaleMode) ||
+                (bGameView && (bGizmoItem || Item == Projection || Item == ViewMode || Item == Speed));
             // 지금 선택된 기즈모 모드는 눌린 색으로 표시한다.
             const bool bSelected = Gizmo && Item >= Move && Item <= Scale &&
                 static_cast<int>(Gizmo->GetMode()) == Item - Move;
@@ -256,9 +257,7 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
                 ImGui::SetTooltip("%s", Desc.Tooltip);
         }
 
-        if (EditorStyle::BeginButtonPopup("Add", PopupAnchors[Add])) { DrawSpawnMenu(*Client); ImGui::EndPopup(); }
-        if (EditorStyle::BeginButtonPopup("Grid", PopupAnchors[Grid])) { DrawGridMenu(); ImGui::EndPopup(); }
-        if (EditorStyle::BeginButtonPopup("Projection", PopupAnchors[Projection], EditorStyle::Scale(260.0f))) { DrawProjectionMenu(*Client); ImGui::EndPopup(); }
+        if (EditorStyle::BeginButtonPopup("Projection", PopupAnchors[Projection], EditorStyle::Scale(360.0f))) { DrawProjectionMenu(*Client); ImGui::EndPopup(); }
         if (EditorStyle::BeginButtonPopup("CameraSpeed", PopupAnchors[Speed], EditorStyle::Scale(300.0f))) { DrawCameraSpeedMenu(); ImGui::EndPopup(); }
         if (EditorStyle::BeginButtonPopup("ViewMode", PopupAnchors[ViewMode], EditorStyle::Scale(220.0f))) { DrawViewModeMenu(*Client); ImGui::EndPopup(); }
         if (EditorStyle::BeginButtonPopup("Show", PopupAnchors[Show], EditorStyle::Scale(240.0f))) { DrawShowMenu(); ImGui::EndPopup(); }
@@ -290,7 +289,8 @@ void FViewportsPanel::DrawProjectionMenu(FEditorViewportClient& Client)
     }
 
     SectionHeader("View");
-    ImGui::PushItemWidth(EditorStyle::Scale(140.0f));
+    // Location/Rotation의 세 칸이 좁아 보이지 않도록 넉넉히 준다.
+    ImGui::PushItemWidth(EditorStyle::Scale(220.0f));
     if (Client.IsPerspective())
     {
         float Fov = Client.GetViewFOV();
@@ -337,11 +337,6 @@ void FViewportsPanel::DrawCameraSpeedMenu()
     SectionHeader("Settings");
     ImGui::SetNextItemWidth(EditorStyle::Scale(160.0f));
     ImGui::SliderFloat("Mouse Sensitivity", &Settings.MouseSensitivity, 0.01f, 1.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
-    if (IconMenuItem(nullptr, "Reset to Defaults", false, EIndicator::None))
-    {
-        Settings.CameraSpeed = 1.0f;
-        Settings.MouseSensitivity = 1.0f;
-    }
 }
 
 // UE의 뷰 모드 메뉴: 라이팅 포함 / 라이팅 제외 / 와이어프레임 / 버퍼 시각화 / 디버그
@@ -451,6 +446,17 @@ void FViewportsPanel::DrawSpawnMenu(FEditorViewportClient& Client)
 }
 
 // 언리얼의 그리드 크기 버튼처럼 자주 쓰는 간격을 고르거나 직접 입력한다.
+void FViewportsPanel::DrawSpawnMenuForActiveView()
+{
+    if (FEditorViewportClient* Client = GetViewportClient(ActiveViewIndex))
+        DrawSpawnMenu(*Client);
+}
+
+int32 FViewportsPanel::GetGridSpacing() const
+{
+    return EditorSettings ? EditorSettings->GetSettings().GridSpacing : 1;
+}
+
 void FViewportsPanel::DrawGridMenu()
 {
     if (!EditorSettings) return;

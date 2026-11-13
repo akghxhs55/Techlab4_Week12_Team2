@@ -72,7 +72,7 @@ void FOutlinerPanel::OnRender()
         return;
 
     // Level의 Actor 목록 Tree 출력
-    ImGui::Begin("Outliner");
+    ImGui::Begin("Outliner", GetOpenFlag());
     bFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     if (bFocused && !ImGui::GetIO().WantTextInput && ImGui::IsKeyPressed(ImGuiKey_F2, false))
         if (AActor* Actor = GetSelectedActor())

@@ -5,6 +5,7 @@
 #include "Render/SceneRenderer.h"
 
 #include "Editor/Settings/EditorSettings.h"
+#include "Editor/Viewports/ViewportToolbarWidgets.h"
 
 #include "Components/SkinnedMeshComponent.h"
 
@@ -70,90 +71,143 @@ bool FOutputLogPanel::Init()
 	return true;
 }
 
+void FOutputLogPanel::LoadLogFont()
+{
+	// 이 패널은 시작 로그를 받으려고 ImGui 컨텍스트보다 먼저 만들어진다. 글꼴은 컨텍스트가 생긴 뒤에 읽는다.
+	if (LogFont || !ImGui::GetCurrentContext())
+		return;
+
+	// UE처럼 로그는 고정폭 글꼴로 보여 준다. 한글 로그가 깨지지 않도록 나눔스퀘어를 합친다.
+	ImGuiIO& IO = ImGui::GetIO();
+	wchar_t WindowsDir[MAX_PATH]{};
+	if (::GetWindowsDirectoryW(WindowsDir, MAX_PATH) > 0)
+	{
+		const std::filesystem::path MonoPath = std::filesystem::path(WindowsDir) / L"Fonts" / L"consola.ttf";
+		std::error_code Error;
+		if (std::filesystem::exists(MonoPath, Error))
+		{
+			LogFont = IO.Fonts->AddFontFromFileTTF(FPaths::ToUtf8(MonoPath).c_str(), 14.0f);
+			if (LogFont)
+			{
+				ImFontConfig Merge;
+				Merge.MergeMode = true;
+				IO.Fonts->AddFontFromFileTTF(FPaths::EngineFileUtf8("EngineResources/Fonts/NanumSquareR.ttf").c_str(), 14.0f,
+					&Merge, IO.Fonts->GetGlyphRangesKorean());
+			}
+		}
+	}
+}
+
 void FOutputLogPanel::Tick(float DeltaTime)
 {
 }
 
 void FOutputLogPanel::OnRender()
 {
+	using namespace ViewportToolbarWidgets;
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
 
-	ImGui::Begin("Output Log");
+	ImGui::Begin("Output Log", GetOpenFlag());
+	const ImGuiStyle& Style = ImGui::GetStyle();
+	bool CopyToClipboard = false;
 
 	//////////////////////////////////////////////////////////
+	// 상단 바 (UE): [돋보기 Search Log][Filters v] ............ [Settings v]
 
-	ImGui::TextDisabled("Filter");
-	ImGui::SameLine();
+	const float FiltersWidth = IconButtonWidth("Filters", true);
+	const float SettingsWidth = IconButtonWidth("Settings", true);
+	// 검색창은 적당한 길이로 두고, 창이 좁을 때만 남은 폭에 맞춰 줄인다.
+	const float SearchRoom = ImGui::GetContentRegionAvail().x - FiltersWidth - SettingsWidth - Style.ItemSpacing.x * 2.0f - EditorStyle::Scale(24.0f);
+	const float SearchWidth = std::clamp(SearchRoom, EditorStyle::Scale(120.0f), EditorStyle::Scale(320.0f));
 
-	Filter.Draw("##Filter", 180.0f);
-
-	ImGui::SameLine();
-	ImGui::TextDisabled("[?]");
-
-	if (ImGui::IsItemHovered())
-	{
-		ImGui::SetTooltip(
-			"Filter syntax:\n"
+	// 왼쪽에 돋보기를 그릴 자리만큼 안쪽 여백을 준다.
+	const ImVec2 SearchPos = ImGui::GetCursorScreenPos();
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { Style.FramePadding.x + IconSize() + EditorStyle::Scale(4.0f), Style.FramePadding.y });
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, EditorStyle::Scale(4.0f));
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 15, 15, 255));
+	ImGui::SetNextItemWidth(SearchWidth);
+	if (ImGui::InputTextWithHint("##SearchLog", "Search Log", Filter.InputBuf, IM_COUNTOF(Filter.InputBuf)))
+		Filter.Build();
+	ImGui::PopStyleColor();
+	ImGui::PopStyleVar(2);
+	if (ImGui::IsItemHovered() && !ImGui::IsItemActive())
+		ImGui::SetTooltip("Filter syntax:\n"
 			"error        Include matching lines\n"
 			"-warning     Exclude matching lines\n"
-			"error,-warn  Combine filters"
-		);
+			"error,-warn  Combine filters");
+	if (const ImTextureID SearchIcon = GetIcon("Search"); SearchIcon != ImTextureID_Invalid)
+	{
+		const float CenterY = SearchPos.y + ImGui::GetFrameHeight() * 0.5f;
+		const float X = SearchPos.x + Style.FramePadding.x;
+		ImGui::GetWindowDrawList()->AddImage(SearchIcon, { X, CenterY - IconSize() * 0.5f }, { X + IconSize(), CenterY + IconSize() * 0.5f },
+			{ 0, 0 }, { 1, 1 }, IM_COL32(150, 150, 150, 255));
 	}
 
+	// 드롭다운 버튼은 UE처럼 배경 없이 그린다.
+	ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
 	ImGui::SameLine();
-	ImGui::Checkbox("Auto-scroll", &AutoScroll);
+	if (IconButton("##LogFilters", "Filter", "Filters", true, FiltersWidth))
+		ImGui::OpenPopup("LogFiltersPopup");
+	const EditorStyle::FPopupAnchor FiltersAnchor = EditorStyle::LastItemAnchor();
 
 	ImGui::SameLine();
-	if (ImGui::SmallButton("Clear"))
-		ClearLog();
+	ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, ImGui::GetContentRegionAvail().x - SettingsWidth));
+	if (IconButton("##LogSettings", "Settings", "Settings", true, SettingsWidth))
+		ImGui::OpenPopup("LogSettingsPopup");
+	const EditorStyle::FPopupAnchor SettingsAnchor = EditorStyle::LastItemAnchor();
+	ImGui::PopStyleColor();
 
-	ImGui::SameLine();
-    bool CopyToClipboard = ImGui::SmallButton("Copy");
-    ImGui::SameLine();
-    const bool bSaveLogs = ImGui::SmallButton("Save to Logs");
-    if (ImGui::IsItemHovered()) ImGui::SetTooltip("Save filtered output. Full session logs are also saved automatically to the project's Logs folder.");
-    if (bSaveLogs)
-    {
-        const auto Directory = FPaths::ProjectDir() / "Logs";
-        std::error_code Error;
-        std::filesystem::create_directories(Directory, Error);
-        const auto Stamp = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
-        const auto Path = Directory / ("Output-" + std::to_string(Stamp) + ".log");
-        std::ofstream File(Path, std::ios::out);
-        for (const auto& Item : Items) if (Filter.PassFilter(Item.message.c_str())) File << Item.message << '\n';
-        File.flush();
-        const bool bSaved = !Error && File.good();
-        File.close();
-        if (bSaved) HTR_LOG(Info, "Output saved to {}", FPaths::ToUtf8(Path));
-        else HTR_LOG(Error, "Could not save output to {}", FPaths::ToUtf8(Path));
-    }
-
-	ImGui::Separator();
+	if (EditorStyle::BeginButtonPopup("LogFiltersPopup", FiltersAnchor, EditorStyle::Scale(180.0f)))
+	{
+		SectionHeader("Verbosity");
+		ImGui::Checkbox("Messages", &bShowMessages);
+		ImGui::Checkbox("Warnings", &bShowWarnings);
+		ImGui::Checkbox("Errors", &bShowErrors);
+		ImGui::Checkbox("Commands", &bShowCommands);
+		ImGui::Separator();
+		if (ImGui::MenuItem("Show All"))
+			bShowMessages = bShowWarnings = bShowErrors = bShowCommands = true;
+		ImGui::EndPopup();
+	}
+	if (EditorStyle::BeginButtonPopup("LogSettingsPopup", SettingsAnchor, EditorStyle::Scale(200.0f)))
+	{
+		ImGui::Checkbox("Auto-scroll", &AutoScroll);
+		ImGui::Separator();
+		if (ImGui::MenuItem("Copy")) CopyToClipboard = true;
+		if (ImGui::MenuItem("Clear Log")) ClearLog();
+		if (ImGui::MenuItem("Save to Logs")) SaveFilteredLog();
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip("Save filtered output. Full session logs are also saved automatically to the project's Logs folder.");
+		ImGui::EndPopup();
+	}
 
 	//////////////////////////////////////////////////////////
+	// 로그 본문: 어두운 배경 + 고정폭 글꼴
 
-	ImGuiStyle& style = ImGui::GetStyle();
-	const float footer_height_to_reserve = style.SeparatorSize + style.ItemSpacing.y + ImGui::GetFrameHeightWithSpacing();
-	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -footer_height_to_reserve), ImGuiChildFlags_NavFlattened, ImGuiWindowFlags_HorizontalScrollbar)) // ImGui Window 안에 Child Window를 생성
+	const float FooterHeight = Style.ItemSpacing.y + ImGui::GetFrameHeight();
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(15, 15, 15, 255));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f) });
+	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -FooterHeight), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding,
+		ImGuiWindowFlags_HorizontalScrollbar))
 	{
 		if (ImGui::BeginPopupContextWindow())
 		{
 			if (ImGui::Selectable("Copy")) CopyToClipboard = true;
-			if (ImGui::Selectable("Clear"))
+			if (ImGui::Selectable("Clear Log"))
 				ClearLog();
 			ImGui::EndPopup();
 		}
 
-		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(ImGui::GetStyle().ItemSpacing.x, ImGui::GetStyle().ItemSpacing.y * 0.5f));
+		if (LogFont) ImGui::PushFont(LogFont, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Style.ItemSpacing.x, 0.0f));
 		if (CopyToClipboard)
 			ImGui::LogToClipboard();
 		for (const FLogData& item : Items)
 		{
-			if (!Filter.PassFilter(item.message.c_str()))
+			if (!PassVerbosity(item.Verbosity) || !Filter.PassFilter(item.message.c_str()))
 				continue;
 
-			ImVec4 color = item.Color;
-			ImGui::PushStyleColor(ImGuiCol_Text, color);
+			ImGui::PushStyleColor(ImGuiCol_Text, item.Color);
 			ImGui::TextUnformatted(item.message.c_str());
 			ImGui::PopStyleColor();
 		}
@@ -164,21 +218,39 @@ void FOutputLogPanel::OnRender()
 		ScrollToBottom = false;
 
 		ImGui::PopStyleVar();
+		if (LogFont) ImGui::PopFont();
 	}
 	ImGui::EndChild();
-	ImGui::Separator();
+	ImGui::PopStyleVar();
+	ImGui::PopStyleColor();
 
 	//////////////////////////////////////////////////////////
+	// 하단 (UE): [콘솔 Cmd v][Enter Console Command]
 
-	bool reclaim_focus = false;
-	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory;
-	ImGui::TextDisabled(">");
+	const float CmdWidth = IconButtonWidth("Cmd", true);
+	ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+	if (IconButton("##LogCmd", "Console", "Cmd", true, CmdWidth))
+		ImGui::OpenPopup("LogCmdPopup");
+	const EditorStyle::FPopupAnchor CmdAnchor = EditorStyle::LastItemAnchor();
+	ImGui::PopStyleColor();
+	if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("LogCmdPopup"))
+		ImGui::SetTooltip("Console command executor");
+	if (EditorStyle::BeginButtonPopup("LogCmdPopup", CmdAnchor, EditorStyle::Scale(200.0f)))
+	{
+		ImGui::MenuItem("Cmd", nullptr, true);
+		ImGui::Separator();
+		if (ImGui::MenuItem("Show Commands (HELP)"))
+			ExecCommand("HELP");
+		ImGui::EndPopup();
+	}
 
 	ImGui::SameLine();
-
+	bool reclaim_focus = false;
+	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory;
 	ImGui::SetNextItemWidth(-1.0f);
-
-	if (ImGui::InputTextWithHint("##OutputLogInput", "Enter command...  (HELP for commands)", InputBuf, IM_COUNTOF(InputBuf), input_text_flags, &TextEditCallbackStub, this))
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 15, 15, 255));
+	if (LogFont) ImGui::PushFont(LogFont, 0.0f);
+	if (ImGui::InputTextWithHint("##OutputLogInput", "Enter Console Command", InputBuf, IM_COUNTOF(InputBuf), input_text_flags, &TextEditCallbackStub, this))
 	{
 		char* s = InputBuf;
 		if (s[0])
@@ -188,6 +260,8 @@ void FOutputLogPanel::OnRender()
 		s[0] = 0;
 		reclaim_focus = true;
 	}
+	if (LogFont) ImGui::PopFont();
+	ImGui::PopStyleColor();
 
 	ImGui::SetItemDefaultFocus();
 	if (reclaim_focus)
@@ -196,6 +270,34 @@ void FOutputLogPanel::OnRender()
 	//////////////////////////////////////////////////////////
 
 	ImGui::End();
+}
+
+bool FOutputLogPanel::PassVerbosity(ELogVerbosity Verbosity) const
+{
+	switch (Verbosity)
+	{
+	case ELogVerbosity::Input:   return bShowCommands;
+	case ELogVerbosity::Warning: return bShowWarnings;
+	case ELogVerbosity::Error:   return bShowErrors;
+	default:                     return bShowMessages;
+	}
+}
+
+void FOutputLogPanel::SaveFilteredLog()
+{
+	const auto Directory = FPaths::ProjectDir() / "Logs";
+	std::error_code Error;
+	std::filesystem::create_directories(Directory, Error);
+	const auto Stamp = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::system_clock::now().time_since_epoch()).count();
+	const auto Path = Directory / ("Output-" + std::to_string(Stamp) + ".log");
+	std::ofstream File(Path, std::ios::out);
+	for (const auto& Item : Items)
+		if (PassVerbosity(Item.Verbosity) && Filter.PassFilter(Item.message.c_str())) File << Item.message << '\n';
+	File.flush();
+	const bool bSaved = !Error && File.good();
+	File.close();
+	if (bSaved) HTR_LOG(Info, "Output saved to {}", FPaths::ToUtf8(Path));
+	else HTR_LOG(Error, "Could not save output to {}", FPaths::ToUtf8(Path));
 }
 
 void FOutputLogPanel::ClearLog()
@@ -432,20 +534,22 @@ void FOutputLogPanel::AddToHistory(const FString& CommandLine)
 void FOutputLogPanel::OnLog(ELogVerbosity Verbosity, const FString& Message)
 {
 	FLogData LogData;
+	LogData.Verbosity = Verbosity;
 
+	// UE Output Log 색: 일반은 밝은 회색, 경고는 노랑, 오류는 빨강.
 	switch (Verbosity)
 	{
 	case ELogVerbosity::Input:
-		LogData.Color = ImVec4(1.0f, 0.8f, 0.6f, 1.0f);
-		break;
-	case ELogVerbosity::Info:
-		LogData.Color = ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+		LogData.Color = ImVec4(0.85f, 0.85f, 0.85f, 1.0f);
 		break;
 	case ELogVerbosity::Warning:
-		LogData.Color = ImVec4(1.0f, 0.75f, 0.2f, 1.0f);
+		LogData.Color = ImVec4(0.90f, 0.78f, 0.18f, 1.0f);
 		break;
 	case ELogVerbosity::Error:
-		LogData.Color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f);
+		LogData.Color = ImVec4(0.96f, 0.30f, 0.30f, 1.0f);
+		break;
+	default:
+		LogData.Color = ImVec4(0.75f, 0.75f, 0.75f, 1.0f);
 		break;
 	}
 	LogData.message = Message;

@@ -71,13 +71,16 @@ public:
 	void SetWorld(UWorld* InWorld) { World = InWorld; }
 	void SetGizmo(FGizmo* InGizmo) { Gizmo = InGizmo; }
 	void SetEditorSettings(FEditorSettingsManager* InSettings) { EditorSettings = InSettings; }
+	// 메인 툴바의 Add/Grid 드롭다운이 쓴다. Add는 활성 뷰 카메라 앞에 액터를 놓는다.
+	void DrawSpawnMenuForActiveView();
+	void DrawGridMenu();
+	int32 GetGridSpacing() const;
 	void SetActorSpawnedCallback(std::function<void(AActor*)> Callback) { OnActorSpawned = std::move(Callback); }
 	void SetIsPlayingQuery(std::function<bool()> Query) { IsPlayingQuery = std::move(Query); }
 
 private:
 	void DrawViewportToolbar(int32 ViewIndex);
 	void DrawSpawnMenu(FEditorViewportClient& Client);
-	void DrawGridMenu();
 	void DrawShowMenu();
 	void DrawRenderMenu();
 	// UE 뷰포트 툴바 방식의 드롭다운 (아이콘 + 라벨 + 화살표)

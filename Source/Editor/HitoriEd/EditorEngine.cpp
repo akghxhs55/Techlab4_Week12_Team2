@@ -240,6 +240,8 @@ void UEditorEngine::InitPanels()
 {
 	DetailsPanel = LevelEditorTab->AddPanel<FDetailsPanel>();
 	DetailsPanel->SetImGuiRenderer(ImGuiRenderer.get());
+	// 기본 글꼴(Details 패널)이 정해진 다음에 로그 글꼴을 더한다.
+	if (OutputLogPanel) OutputLogPanel->LoadLogFont();
 	DetailsPanel->SetShadowPreviewQuery([this](const ULightComponent* Light, FTexture2DArray*& Atlas,
 		TArray<FLightShadowRenderData>& Shadows)
 		{
@@ -408,6 +410,24 @@ void UEditorEngine::InitCommands()
 	Play.CanExecute = [this]()->bool {return !PlayWorld; };
 	Play.Execute = [this]() { RequestPlaySession(); };
 
+	// 툴바 아이콘은 UE5 Starship SVG(MainToolbar/PlaySimulate_20, eject, PlayPossess_20)를 PNG로 바꾼 것이다.
+	Simulate = { "Simulate", "Simulate", UAssetManager::GetAssetByPath<UTexture2D>("Engine/Icons/Toolbar/Simulate.png"), White, { EKeyCode::S, false, true } };
+
+	Simulate.CanExecute = [this]()->bool {return !PlayWorld; };
+	Simulate.IsVisible = [this]()->bool {return !PlayWorld; };
+	Simulate.Execute = [this]() { RequestSimulateSession(); };
+
+	// UE처럼 실행 중에는 Simulate 자리가 Eject(게임 → SIE) / Possess(SIE → 게임) 버튼이 된다. 단축키는 F8.
+	// F8 키 자체는 TickPIEInput이 처리하므로 여기 Shortcut은 툴팁 표시용이다 (ProcessShortcuts에 넣지 않는다).
+	Eject = { "Eject", "Eject from player controller", UAssetManager::GetAssetByPath<UTexture2D>("Engine/Icons/Toolbar/PIEEject.png"), White, { EKeyCode::F8 } };
+	Eject.IsVisible = [this]()->bool { return PlayWorld && !bIsSimulatingInEditor; };
+	Eject.CanExecute = [this]()->bool { return PlayWorld && !IsPIEInWindow(); };
+	Eject.Execute = [this]() { bTogglePIESIERequested = true; };
+
+	Possess = { "Possess", "Possess the player controller", UAssetManager::GetAssetByPath<UTexture2D>("Engine/Icons/Toolbar/Possess.png"), White, { EKeyCode::F8 } };
+	Possess.IsVisible = [this]()->bool { return PlayWorld && bIsSimulatingInEditor; };
+	Possess.Execute = [this]() { bTogglePIESIERequested = true; };
+
 	Pause = { "Pause",  "Pause",			UAssetManager::GetAssetByPath<UTexture2D>("Engine/Icons/Toolbar/Pause.png"), White, { EKeyCode::Pause } };
 
 	Pause.CanExecute = [this]()->bool {return !bIsPaused && PlayWorld; };
@@ -430,8 +450,18 @@ void UEditorEngine::InitCommands()
 	Stop.CanExecute = [this]()->bool {return PlayWorld; };
 	Stop.Execute = [this]() { RequestEndPlayMap(); };
 
+	// UE처럼 Play/Pause/Resume은 한 자리에서 상태에 맞는 하나만 보인다. Step/Stop은 항상 보이고 쓸 수 없을 때 비활성.
+	Play.IsVisible = [this]()->bool { return !PlayWorld; };
+	Pause.IsVisible = [this]()->bool { return PlayWorld && !bIsPaused; };
+	Resume.IsVisible = [this]()->bool { return PlayWorld && bIsPaused; };
+	Resume.IconTint = Green;
+
 	FLevelEditorToolbar& LevelEditorToolbar = *LevelEditorTab->GetToolbar();
-	LevelEditorToolbar.SetCommands({ Play, Pause, Resume, StepFrame, Stop });
+	LevelEditorToolbar.SetCommands({ Play, Pause, Resume, StepFrame, Stop, Simulate, Eject, Possess });
+	LevelEditorToolbar.SetPlacementMenus(
+		[this]() { if (ViewportsPanel) ViewportsPanel->DrawSpawnMenuForActiveView(); },
+		[this]() { if (ViewportsPanel) ViewportsPanel->DrawGridMenu(); },
+		[this]() { return ViewportsPanel ? ViewportsPanel->GetGridSpacing() : 1; });
 	LevelEditorToolbar.SetPlayModeBinding(
 		[this]() { return PlayMode; },
 		[this](EPlayModeType Mode) { PlayMode = Mode; },
@@ -447,7 +477,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 		RequestEndPlayMap();
 	// 에디터 단축키 (UE와 같은 키: Ctrl+N, Ctrl+O, Ctrl+S, Ctrl+Alt+S, Alt+P, Pause).
 	// Stop(Esc)은 PIE 입력 처리에서 따로 받으므로 여기서 빼서 두 번 실행되지 않게 한다.
-	EditorCommandUI::ProcessShortcuts({ &NewScene, &OpenSceneCommand, &Save, &SaveAs, &Play, &Pause, &Resume });
+	EditorCommandUI::ProcessShortcuts({ &NewScene, &OpenSceneCommand, &Save, &SaveAs, &Play, &Simulate, &Pause, &Resume });
 
 	if (bRequestEndPlayMapQueued) { bRequestEndPlayMapQueued = false; EndPlayMap(); }
 	StartQueuedPlaySessionRequest();
@@ -606,7 +636,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 		}
 
 		int32 WheelDelta = FInputSystem::GetWheelDelta();
-		if (!PlayWorld && CapturedViewportIndex != -1 && WheelDelta != 0)
+		// 우클릭 캡처 중 휠은 카메라 속도. 게임 화면 View는 캡처할 수 없으므로 PIE/SIE 중에도 그대로 허용한다.
+		if (CapturedViewportIndex != -1 && WheelDelta != 0)
 		{
 			auto& Settings = EditorSettings->GetMutableSettings();
 			Settings.CameraSpeed = FMath::Clamp(Settings.CameraSpeed * powf(1.2f, WheelDelta / 120.0f), 0.1f, 10.0f);
@@ -676,8 +707,12 @@ void UEditorEngine::Tick(const float DeltaTime)
 	// 게임 입력 처리
 	if (PlayWorld)
 	{
+		// 툴바의 Eject/Possess는 UI를 그리는 도중에 눌리므로 여기서 전환한다.
+		if (bTogglePIESIERequested)
+			ToggleBetweenPIEandSIE();
 		TickPIEInput(DeltaTime);
 	}
+	bTogglePIESIERequested = false;
 
 	{
 		SCOPE_CYCLE_COUNTER(STAT_WorldTick);
@@ -867,7 +902,8 @@ void UEditorEngine::UpdateSingleViewportClient(FEditorViewportClient* ViewClient
 	int32 TargetPlayerIndex = -1;
 
 	// SIE에서는 이 View도 에디터 뷰포트로 그린다. UE도 Simulate 화면은 레벨 에디터 뷰포트 클라이언트가 그린다.
-	if (bIsPIE && !bIsSimulatingInEditor && !IsPIEInWindow() && PlayMode == EPlayModeType::InViewport &&
+	// 별도 창을 만들지 못했거나 Simulate로 시작한 경우에도 View 안에서 돌므로 PlayMode 대신 실제 창 유무로 판단한다.
+	if (bIsPIE && !bIsSimulatingInEditor && !IsPIEInWindow() &&
 		ViewIndex == PIEStartEditorViewIndex)
 	{
 		bIsGameView = true;
