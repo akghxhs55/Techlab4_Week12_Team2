@@ -20,7 +20,7 @@ public:
 		float SpawnTime;
 		FBaseParticle* ParticleBase;
 	};
-	virtual void Spawn(const FSpawnContext& Context);
+	virtual void Spawn(const FSpawnContext& Context) {}
 
 	struct FUpdateContext
 	{
@@ -28,5 +28,5 @@ public:
 		int32 Offset;
 		float DeltaTime;
 	};
-	virtual void Update(const FUpdateContext& Context);
+	virtual void Update(const FUpdateContext& Context) {}
 };

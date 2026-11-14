@@ -49,3 +49,8 @@ void UParticleEmitter::SetToSensibleDefaults()
 
 	LODLevels[0]->RequiredModule->SetMaterial(UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial"));
 }
+
+const TArray<UParticleLODLevel*>& UParticleEmitter::GetLODLevels() const
+{
+	return LODLevels;
+}

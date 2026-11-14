@@ -35,6 +35,9 @@ struct FParticleEmitterInstance
 	float SpawnFraction = 0.0f;
 	float EmitterTime = 0.0f;
 
+	FVector Location;
+	FVector OldLocation;
+
 	virtual void InitParameters(UParticleEmitter* InEmitter);
 	virtual void Init();
 	virtual void Tick(float DeltaTime, bool bSuppressSpawning);
@@ -42,5 +45,7 @@ struct FParticleEmitterInstance
 	virtual bool Resize(int32 NewMaxActiveParticles);
 
 	FBaseParticle* GetParticle(int32 Index);
-	void SpawnParticles(int32 Count);
+
+	void SpawnParticles(int32 Count, float StartTime, float Increment, const FVector& InitialLocation, const FVector& InitialVelocity);
+	void KillParticles();
 };

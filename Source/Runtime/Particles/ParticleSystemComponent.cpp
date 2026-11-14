@@ -60,15 +60,42 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	{
 		Instance->Tick(DeltaTime, bSuppressSpawning);
 	}
+
+	FBox WorldBox{
+		.Min = FVector{ FLT_MAX },
+		.Max = FVector{ -FLT_MAX },
+	};
+	bool bHasParticle = false;
+	for (const auto& Instance : EmitterInstances)
+	{
+		for (int32 i = 0; i < Instance->ActiveParticles; ++i)
+		{
+			const FBaseParticle* Particle = Instance->GetParticle(i);
+			const FVector Half = Particle->Size * 0.5f;
+			WorldBox.Min = FMath::Min(WorldBox.Min, Particle->Location - Half);
+			WorldBox.Max = FMath::Max(WorldBox.Max, Particle->Location + Half);
+
+			bHasParticle = true;
+		}
+	}
+
+	if (bHasParticle)
+	{
+		CachedLocalBounds = WorldBox.GetWorldAABB(GetWorldMatrix().Inverse());
+	}
+	else
+	{
+		CachedLocalBounds = FBox{
+			.Min = FVector{ -0.5f },
+			.Max = FVector{ 0.5f },
+		};
+	}
+	OnTransformDirty();
 }
 
 FBox UParticleSystemComponent::CalcLocalBounds() const
 {
-	constexpr float Extent = 4.0f;
-	return FBox{
-		.Min = FVector{-Extent},
-		.Max = FVector{Extent},
-	};
+	return CachedLocalBounds;
 }
 
 void UParticleSystemComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const FViewContext& ViewContext)

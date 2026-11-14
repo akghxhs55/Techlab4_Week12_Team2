@@ -17,6 +17,8 @@ public:
 	int32 CreateLODLevel(int32 LODLevel);
 	void SetToSensibleDefaults();
 
+	const TArray<UParticleLODLevel*>& GetLODLevels() const;
+
 private:
 	TArray<UParticleLODLevel*> LODLevels;
 };

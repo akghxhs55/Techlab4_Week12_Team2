@@ -3,7 +3,9 @@
 
 #include "ParticleEmitter.h"
 #include "ParticleLODLevel.h"
-#include "ParticleSpriteEmitter.h"
+#include "ParticleModuleLifetime.h"
+#include "ParticleModuleSize.h"
+#include "ParticleModuleVelocity.h"
 #include "ParticleSystem.h"
 #include "ParticleSystemComponent.h"
 #include "Asset/AssetManager.h"
@@ -15,9 +17,16 @@ AEmitter::AEmitter()
 	SetRootComponent(ParticleSystemComponent);
 
 	UParticleSystem* System = NewObject<UParticleSystem>();
-	UParticleSpriteEmitter* Emitter = NewObject<UParticleSpriteEmitter>(System);
+	UParticleEmitter* Emitter = NewObject<UParticleEmitter>(System);
 	Emitter->CreateLODLevel(0);
 	Emitter->SetToSensibleDefaults();
+
+	UParticleLODLevel* LOD = Emitter->GetLODLevels()[0];
+	LOD->Modules.Add(NewObject<UParticleModuleLifetime>(System));
+	LOD->Modules.Add(NewObject<UParticleModuleSize>(System));
+	LOD->Modules.Add(NewObject<UParticleModuleVelocity>(System));
+	LOD->UpdateModuleLists();
+
 	System->Emitters.Add(Emitter);
 	ParticleSystemComponent->SetTemplate(System);
 	

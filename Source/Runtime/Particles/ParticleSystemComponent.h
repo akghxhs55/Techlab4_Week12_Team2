@@ -38,4 +38,6 @@ private:
 
 	UStaticMesh* QuadMesh = nullptr;
 	TArray<FSubUVConstants> Constants;
+
+	FBox CachedLocalBounds{ .Min = FVector{ -0.5f }, .Max = FVector{ 0.5f } };
 };
