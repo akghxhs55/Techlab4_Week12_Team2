@@ -4,6 +4,8 @@
 #include "ParticleModule.h"
 #include "ParticleTypes.h"
 #include "ParticleEmitterInstance.h"
+#include "Module/ParticleModuleRequired.h"
+#include "Module/ParticleModuleSpawn.h"
 
 FParticleEmitterInstance* UParticleEmitter::CreateInstance(UParticleSystemComponent* InComponent)
 {
@@ -26,9 +28,13 @@ void UParticleEmitter::Build()
 	if (!LODLevel) return;
 
 	// 분포 굽기
-	if (UParticleModule* RequiredModule = reinterpret_cast<UParticleModule*>(LODLevel->GetRequiredModule()))
+	if (UParticleModule* RequiredModule = LODLevel->GetRequiredModule())
 	{
 		RequiredModule->BakeDistributions();
+	}
+	if (UParticleModule* SpawnModule = LODLevel->GetSpawnModule())
+	{
+		SpawnModule->BakeDistributions();
 	}
 	for (UParticleModule* Module : LODLevel->GetModules())
 	{

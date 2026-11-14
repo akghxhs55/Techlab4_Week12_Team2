@@ -50,6 +50,7 @@ struct FDistributionLookupTable
 
 	void Empty()
 	{
+		Values.Empty();
 		Op = ERawDistributionOperation::Uninitialized;
 		EntryCount = 0;
 		EntryStride = 0;

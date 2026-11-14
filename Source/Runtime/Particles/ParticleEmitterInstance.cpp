@@ -4,6 +4,8 @@
 #include "ParticleLODLevel.h"
 #include "ParticleModule.h"
 #include "ParticleTypes.h"
+#include "Module/ParticleModuleRequired.h"
+#include "Module/ParticleModuleSpawn.h"
 
 #include <malloc.h>
 #include <cstring>
@@ -51,8 +53,14 @@ void FParticleEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSyste
 	ActiveParticles = 0;
 	ParticleCounter = 0;
 	SpawnFraction = 0.0f;
-	EmitterTime = 0.0f;
 	SecondsSinceCreation = 0.0f;
+	LoopCount = 0;
+	BurstFired.Empty();
+
+	// 첫 루프의 Delay만큼 음수에서 시작 → 0이 될 때까지 생성하지 않는다
+	const UParticleModuleRequired* Required = CurrentLODLevel ? CurrentLODLevel->GetRequiredModule() : nullptr;
+	EmitterTime = Required ? -Required->GetDelayForLoop(0) : 0.0f;
+
 	BoundingBox = FBox(FVector(FLT_MAX), FVector(-FLT_MAX));
 	RandomStream.GenerateNewSeed();
 	Resize(64);
@@ -121,12 +129,6 @@ void FParticleEmitterInstance::PreSpawn(FBaseParticle* Particle, const FVector& 
 
 void FParticleEmitterInstance::PostSpawn(FBaseParticle* Particle, float SpawnTime)
 {
-	// TODO: Lifetime 모듈 구현 후 제거. 수명이 없으면 파티클이 죽지 않고 계속 쌓인다.
-	if (Particle->OneOverMaxLifetime == 0.0f)
-	{
-		Particle->OneOverMaxLifetime = 0.5f; // 임시 수명 2초
-	}
-
 	Particle->OldLocation = Particle->Location;
 	Particle->Location += Particle->Velocity * SpawnTime;
 	Particle->Flags |= (ParticleCounter++ & STATE_CounterMask);
@@ -153,30 +155,110 @@ void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, floa
 	}
 }
 
+bool FParticleEmitterInstance::HasCompletedLoops() const
+{
+	const UParticleModuleRequired* Required = CurrentLODLevel ? CurrentLODLevel->GetRequiredModule() : nullptr;
+	if (!Required)
+		return false;
+	const int32 Loops = Required->GetEmitterLoops();
+	return Loops > 0 && LoopCount >= Loops;
+}
+
+void FParticleEmitterInstance::UpdateEmitterTime(float DeltaTime)
+{
+	SecondsSinceCreation += DeltaTime;
+	EmitterTime += DeltaTime;
+
+	const UParticleModuleRequired* Required = CurrentLODLevel->GetRequiredModule();
+	if (!Required)
+		return;
+
+	const float Duration = Required->GetEmitterDuration();
+	if (Duration <= 0.0f)
+		return;   // 루프 없음: EmitterTime이 계속 증가
+
+	// 큰 DeltaTime에 루프를 여러 번 넘을 수 있으므로 while
+	while (EmitterTime >= Duration && !HasCompletedLoops())
+	{
+		++LoopCount;
+		// 다음 루프의 Delay만큼 다시 음수로 (bDelayFirstLoopOnly면 0)
+		EmitterTime -= Duration + Required->GetDelayForLoop(LoopCount);
+		// 새 루프에서는 Burst를 다시 터뜨린다
+		BurstFired.Init(0, BurstFired.Num());
+	}
+}
+
+int32 FParticleEmitterInstance::ComputeBurstCount()
+{
+	const UParticleModuleSpawn* SpawnModule = CurrentLODLevel->GetSpawnModule();
+	if (!SpawnModule)
+		return 0;
+
+	const TArray<FParticleBurst>& Bursts = SpawnModule->GetBurstList();
+	if (BurstFired.Num() != Bursts.Num())
+	{
+		// Burst 목록이 바뀌었으면 기록을 새로 만든다
+		BurstFired.Init(0, Bursts.Num());
+	}
+
+	int32 Total = 0;
+	for (int32 i = 0; i < Bursts.Num(); ++i)
+	{
+		if (!BurstFired[i] && EmitterTime >= Bursts[i].Time)
+		{
+			Total += SpawnModule->GetBurstCount(i, RandomStream);
+			BurstFired[i] = 1;
+		}
+	}
+	return Total;
+}
+
 void FParticleEmitterInstance::Spawn(float DeltaTime)
 {
-	float OldLeftover = SpawnFraction;
-	float Rate = 20.0f; // 초당 생성 수
-	float NewLeftover = OldLeftover + DeltaTime * Rate;
+	// Delay 대기 중이거나 루프를 다 끝냈으면 생성하지 않는다
+	if (EmitterTime < 0.0f || HasCompletedLoops())
+		return;
+
+	UParticleModuleSpawn* SpawnModule = CurrentLODLevel->GetSpawnModule();
+	if (!SpawnModule || !SpawnModule->IsEnabled())
+		return;
+
+	// 초당 생성 (UE 공식: 남은 소수점 SpawnFraction을 다음 프레임으로 넘긴다)
+	const float Rate = SpawnModule->GetSpawnRate(EmitterTime, RandomStream);
+	const float OldLeftover = SpawnFraction;
+	const float NewLeftover = OldLeftover + DeltaTime * Rate;
 	int32 Number = FMath::FloorToInt(NewLeftover);
-	float Increment = 1.0f / Rate;
-	float StartTime = DeltaTime + OldLeftover * Increment - Increment;
+	const float Increment = Rate > 0.0f ? 1.0f / Rate : 0.0f;
+	const float StartTime = DeltaTime + OldLeftover * Increment - Increment;
 	SpawnFraction = NewLeftover - Number;
-	if (ActiveParticles + Number > MaxActiveParticles)
+
+	int32 BurstNumber = ComputeBurstCount();
+
+	const int32 Needed = ActiveParticles + Number + BurstNumber;
+	if (Needed > MaxActiveParticles)
 	{
-		int32 NewMax = static_cast<int32>((ActiveParticles + Number) * 1.5f);
+		int32 NewMax = static_cast<int32>(Needed * 1.5f);
 		if (NewMax > 65535)
 		{
 			NewMax = 65535;
 		}
-		if (!Resize(NewMax) || ActiveParticles + Number > MaxActiveParticles)
-		{
-			Number = MaxActiveParticles - ActiveParticles;
-		}
+		Resize(NewMax);
 	}
+
+	// 칸이 모자라면 Rate 먼저, 남은 칸에 Burst
+	const int32 FreeSlots = MaxActiveParticles - ActiveParticles;
+	Number = Number < FreeSlots ? Number : FreeSlots;
 	if (Number > 0)
 	{
 		SpawnParticles(Number, StartTime, Increment);
+	}
+
+	const int32 FreeSlotsAfter = MaxActiveParticles - ActiveParticles;
+	BurstNumber = BurstNumber < FreeSlotsAfter ? BurstNumber : FreeSlotsAfter;
+	if (BurstNumber > 0)
+	{
+		// Burst는 이번 프레임 끝에 한꺼번에 생성 (SpawnTime 0 → 미리 이동 없음)
+		SpawnParticles(BurstNumber, 0.0f, 0.0f);
 	}
 }
 
@@ -188,10 +270,17 @@ void FParticleEmitterInstance::UpdateBoundingBox(float DeltaTime)
 		uint16 SlotIndex = ParticleIndices[i];
 		FBaseParticle* Particle = GetParticle(SlotIndex);
 		Particle->OldLocation = Particle->Location;
-		Particle->Location += Particle->Velocity * DeltaTime;
-		Particle->Rotation += Particle->RotationRate * DeltaTime;
-		NewBox.Expand(FBox(Particle->Location, Particle->Location));
+
+		// 이번 프레임에 생성된 파티클은 PostSpawn에서 SpawnTime만큼 이미 이동했으므로 적분을 건너뛴다 (UE 동일)
+		const bool bJustSpawned = (Particle->Flags & STATE_Particle_JustSpawned) != 0;
 		Particle->Flags &= ~STATE_Particle_JustSpawned;
+		if (!bJustSpawned)
+		{
+			Particle->Location += Particle->Velocity * DeltaTime;
+			Particle->Rotation += Particle->RotationRate * DeltaTime;
+		}
+
+		NewBox.Expand(FBox(Particle->Location, Particle->Location));
 	}
 	BoundingBox = NewBox;
 }
@@ -201,8 +290,7 @@ void FParticleEmitterInstance::Tick(float DeltaTime)
 	if (SpriteTemplate == nullptr || CurrentLODLevel == nullptr)
 		return;
 
-	SecondsSinceCreation += DeltaTime;
-	EmitterTime = SecondsSinceCreation;
+	UpdateEmitterTime(DeltaTime);
 
 	KillParticles();
 	ResetParticleParameters(DeltaTime);

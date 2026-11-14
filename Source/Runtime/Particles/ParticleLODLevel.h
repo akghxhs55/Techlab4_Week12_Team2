@@ -6,6 +6,7 @@
 
 class UParticleModule;
 class UParticleModuleRequired;
+class UParticleModuleSpawn;
 
 UCLASS()
 class UParticleLODLevel : public UObject
@@ -22,6 +23,10 @@ public:
 	UParticleModuleRequired* GetRequiredModule() const { return RequiredModule; }
 	void SetRequiredModule(UParticleModuleRequired* InModule) { RequiredModule = InModule; }
 
+	// Required처럼 전용 슬롯. Modules 배열에는 넣지 않는다 (인스턴스 Spawn(dt)이 직접 읽음)
+	UParticleModuleSpawn* GetSpawnModule() const { return SpawnModule; }
+	void SetSpawnModule(UParticleModuleSpawn* InModule) { SpawnModule = InModule; }
+
 	const TArray<UParticleModule*>& GetModules() const { return Modules; }
 	void AddModule(UParticleModule* InModule);
 	void RemoveModule(UParticleModule* InModule);
@@ -34,6 +39,7 @@ private:
 	int32 Level = 0;
 	bool  bEnabled = true;
 	UParticleModuleRequired* RequiredModule = nullptr;
+	UParticleModuleSpawn*    SpawnModule = nullptr;
 	TArray<UParticleModule*> Modules;
 	TArray<UParticleModule*> SpawnModules;
 	TArray<UParticleModule*> UpdateModules;
