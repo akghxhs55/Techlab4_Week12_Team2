@@ -68,6 +68,28 @@ namespace EditorStyle
 
     inline void PopSelectedButton(bool bSelected) { if (bSelected) ImGui::PopStyleColor(3); }
 
+    // 아웃라이너처럼 패널 맨 위에 두는 꽉 찬 폭의 검색창. 내용이 바뀌면 true.
+    inline bool SearchBox(const char* Id, char* Buffer, size_t BufferSize)
+    {
+        ImGui::SetNextItemWidth(-FLT_MIN);
+        return ImGui::InputTextWithHint(Id, "Search...", Buffer, BufferSize);
+    }
+
+    // 대소문자를 무시한 부분 문자열 검색. 빈 패턴은 항상 일치한다.
+    inline bool ContainsIgnoreCase(const char* Text, const char* Pattern)
+    {
+        if (!Pattern || !*Pattern) return true;
+        if (!Text) return false;
+        for (; *Text; ++Text)
+        {
+            const char* T = Text;
+            const char* P = Pattern;
+            while (*T && *P && ImToUpper(*T) == ImToUpper(*P)) { ++T; ++P; }
+            if (!*P) return true;
+        }
+        return false;
+    }
+
     inline void SameLineOrWrap(float NextWidth)
     {
         const float Right = ImGui::GetCursorScreenPos().x + ImGui::GetContentRegionAvail().x;

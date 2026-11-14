@@ -284,6 +284,9 @@ void UEditorEngine::InitPanels()
 	// StaticMesh / SkeletalMesh Viewer 열기
 	ContentDrawerPanel->SetOpenMeshCallback([this](const FString& Path) { EditorManager->OpenEditor(Path); });
 
+	// .scene 더블클릭 → 레벨 에디터에 그 씬을 연다
+	ContentDrawerPanel->SetOpenSceneCallback([this](const FString& Path) { OpenSceneFromPath(Path); });
+
 	ContentDrawerPanel->SetBlendSpaceCreatedCallback([this](const FString& Path) { EditorManager->OpenEditor(Path); });
     ContentDrawerPanel->SetAnimBlueprintCreatedCallback([this](const FString& Path) { EditorManager->OpenEditor(Path); });
 
@@ -1163,6 +1166,22 @@ void UEditorEngine::OpenScene()
 		return;
 	}
 	if (!FEditorFileUtils::LoadScene(EditorWorld))
+		return;
+
+	ResetSceneSelection();
+
+	LevelEditorTab->OnLevelLoaded.Broadcast(FEditorFileUtils::CurrentScenePath);
+}
+
+// 콘텐츠 드로어에서 더블클릭한 씬 파일을 바로 연다.
+void UEditorEngine::OpenSceneFromPath(const FString& Path)
+{
+	if (IsPlaying())
+	{
+		HTR_LOG(Warning, "Cannot open a scene during PIE. Stop the play session first.");
+		return;
+	}
+	if (!FEditorFileUtils::LoadScene(EditorWorld, Path))
 		return;
 
 	ResetSceneSelection();

@@ -232,6 +232,8 @@ private:
 
 	void CreateNewScene();
 	void OpenScene();
+	// AddDynamic에 묶인 OpenScene()과 겹치지 않도록 이름을 따로 둔다.
+	void OpenSceneFromPath(const FString& Path);
 	void SaveCurrentScene();
 	void SaveSceneAs();
 

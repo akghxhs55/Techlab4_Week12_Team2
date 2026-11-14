@@ -1489,6 +1489,16 @@ namespace FPropertyEditor
 	{
 		DrawProperties(Object, CustomFont);
 	}
+
+	bool DrawVector3(const char* Label, float* Values, float ResetValue)
+	{
+		return DrawVector3Controller(Label, Values, ResetValue, 55.0f);
+	}
+
+	bool DrawRotator(const char* Label, FRotator& Rotator)
+	{
+		return DrawRotatorAsXYZ(Label, Rotator);
+	}
 }
 
 bool FDetailsPanel::Init()

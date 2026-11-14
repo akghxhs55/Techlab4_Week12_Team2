@@ -2,39 +2,8 @@
 #include "StaticMeshEditorPanel.h"
 #include "Editor/StaticMeshEditor/StaticMeshEditor.h"
 
+// 창 ID 형식("이름###StaticMeshPanel:이름:경로")은 그대로 유지되어 저장된 도킹 배치가 깨지지 않습니다.
 FStaticMeshEditorPanel::FStaticMeshEditorPanel(FStaticMeshEditor& InEditor, const char* InName)
-	: Editor(InEditor)
-	, PanelName(InName)
-	, WindowName(PanelName + "###StaticMeshPanel:" + InName + ":" + InEditor.GetAssetPath())
+	: TAssetEditorPanel<FStaticMeshEditor>(InEditor, InName, "StaticMeshPanel")
 {
-}
-
-bool FStaticMeshEditorPanel::Init()
-{
-	return true;
-}
-
-void FStaticMeshEditorPanel::Tick(float DeltaTime)
-{
-}
-
-void FStaticMeshEditorPanel::OnRender()
-{
-	// 같은 Viewer의 패널끼리 도킹하고, 다른 탭의 도킹 영역과 섞이지 않도록 합니다.
-	const ImGuiWindowClass WindowClass = EditorDock::MakePanelClass(DockClassId);
-	ImGui::SetNextWindowClass(&WindowClass);
-	ImGui::SetNextWindowSize(ImVec2(480.0f, 320.0f), ImGuiCond_FirstUseEver);
-
-	if (ImGui::Begin(GetWindowName(), GetOpenFlag()))
-	{
-		DrawContent();
-	}
-	ImGui::End();
-}
-
-bool FStaticMeshEditorPanel::IsDetached(ImGuiID DockSpaceId) const
-{
-	// 플랫폼 창 ID 대신 실제 도킹 트리의 루트를 기준으로 분리 여부를 판단합니다.
-	const ImGuiWindow* Window = ImGui::FindWindowByName(GetWindowName());
-	return Window && (!Window->DockNode || ImGui::DockNodeGetRootNode(Window->DockNode)->ID != DockSpaceId);
 }

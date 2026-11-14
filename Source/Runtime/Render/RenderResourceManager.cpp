@@ -27,7 +27,7 @@ constexpr FPipelineTableEntry PipelineTable[] =
 	{ EPSOType::StaticMesh_Translucent,  "EngineResources/Shaders/StaticMeshTranslucentShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidBack, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
 	{ EPSOType::StaticMesh_Wireframe,    nullptr,                                    EPrimitiveTopology::TriangleList, ERasterizerState::Wireframe, EBlendState::Opaque,       EDepthStencilState::Default },
 	{ EPSOType::Reserved_5, nullptr, EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Opaque, EDepthStencilState::Disabled },
-	{ EPSOType::Grid,                    "EngineResources/Shaders/GridShader.hlsl",          EPrimitiveTopology::TriangleList, ERasterizerState::SolidBack, EBlendState::AlphaBlend,   EDepthStencilState::Default },
+	{ EPSOType::Grid,                    "EngineResources/Shaders/GridShader.hlsl",          EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
 	{ EPSOType::Outline_Mask,            "EngineResources/Shaders/OutlineShader.hlsl",       EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::NoColorWrite, EDepthStencilState::StencilMask },
 	{ EPSOType::Outline_Draw,            "EngineResources/Shaders/OutlineShader.hlsl",       EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Opaque,       EDepthStencilState::StencilOutline },
 	{ EPSOType::Reserved_9, nullptr, EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Opaque, EDepthStencilState::Disabled },

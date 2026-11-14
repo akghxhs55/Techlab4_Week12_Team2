@@ -6,6 +6,7 @@
 #include "Asset/AssetManager.h"
 #include "Asset/AssetUtils.h"
 #include "Core/Misc/Paths.h"
+#include "Editor/EditorUI/EditorStyle.h"
 
 #include <algorithm>
 #include <filesystem>
@@ -22,7 +23,7 @@ namespace
 
 void FAnimSkeletonTreePanel::DrawContent()
 {
-    FBoneHierarchyPanel::DrawTree(Editor);
+    FBoneHierarchyPanel::DrawTree(Editor, SearchBuffer, sizeof(SearchBuffer));
 }
 
 void FAnimAssetBrowserPanel::Refresh()
@@ -70,12 +71,16 @@ void FAnimAssetBrowserPanel::DrawContent()
         Refresh();
     }
 
-    if (ImGui::Button("Refresh"))
+    // 다른 패널과 같은 "Search..." 검색창. Refresh는 오른쪽 끝에 둔다.
+    const char* RefreshLabel = "Refresh";
+    const float RefreshWidth = ImGui::CalcTextSize(RefreshLabel).x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    ImGui::SetNextItemWidth(std::max(1.0f, ImGui::GetContentRegionAvail().x - RefreshWidth - ImGui::GetStyle().ItemSpacing.x));
+    ImGui::InputTextWithHint("##AnimSearch", "Search...", SearchBuffer, sizeof(SearchBuffer));
+    ImGui::SameLine();
+    if (ImGui::Button(RefreshLabel))
     {
         Refresh();
     }
-    ImGui::SameLine();
-    Filter.Draw("##AnimFilter", -FLT_MIN);
 
     if (Editor.IsDirty())
     {
@@ -87,7 +92,7 @@ void FAnimAssetBrowserPanel::DrawContent()
         for (const FString& Path : Entries)
         {
             const FString Name = std::filesystem::path(Path).filename().string();
-            if (!Filter.PassFilter(Name.c_str()))
+            if (!EditorStyle::ContainsIgnoreCase(Name.c_str(), SearchBuffer))
             {
                 continue;
             }

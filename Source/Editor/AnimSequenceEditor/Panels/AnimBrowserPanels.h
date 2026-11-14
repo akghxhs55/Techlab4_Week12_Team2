@@ -16,6 +16,9 @@ public:
 
 protected:
     void DrawContent() override;
+
+private:
+    char SearchBuffer[128] = {};
 };
 
 // Unreal 애니메이션 뷰어의 Asset Browser.
@@ -37,5 +40,5 @@ private:
 
     TArray<FString> Entries;
     bool bScanned = false;
-    ImGuiTextFilter Filter;
+    char SearchBuffer[128] = {};
 };

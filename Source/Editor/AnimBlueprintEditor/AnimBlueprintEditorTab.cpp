@@ -40,24 +40,18 @@ void FAnimBlueprintEditorTab::BuildDefaultLayout(ImGuiID InDockSpaceId, const Im
 const char* FAnimBlueprintEditorTab::GetTabName() const
 {
     DisplayName = FPaths::ToUtf8(FPaths::FromUtf8(Editor.GetAssetPath()).filename());
-    DisplayName += Editor.HasUnsavedChanges() ? " * (AnimBlueprint)" : " (AnimBlueprint)";
+    DisplayName += Editor.HasUnsavedChanges() ? "* (AnimBlueprint)" : " (AnimBlueprint)";
     DisplayName += "###AssetEditor:" + Editor.GetAssetPath();
     return DisplayName.c_str();
 }
 
-void FAnimBlueprintEditorTab::DrawMenuBar()
+bool FAnimBlueprintEditorTab::DrawFileMenuItems()
 {
-    if (ImGui::BeginMenu("File"))
+    if (ImGui::MenuItem("Save", "Ctrl+S"))
     {
-        if (ImGui::MenuItem("Save", "Ctrl+S"))
-        {
-            Editor.RequestSave();
-        }
-
-        ImGui::EndMenu();
+        Editor.RequestSave();
     }
-
-    FDockedAssetEditorTab::DrawMenuBar();
+    return true;
 }
 
 void FAnimBlueprintEditorTab::OnRender(bool bActive)

@@ -23,19 +23,23 @@ void FAnimSequenceEditorTab::BeforeRender()
     AnimEditor.SetViewportState(0, 0, {});
 }
 
-void FAnimSequenceEditorTab::DrawMenuBar()
+bool FAnimSequenceEditorTab::DrawFileMenuItems()
 {
-    if (ImGui::BeginMenu("Viewer"))
+    if (ImGui::MenuItem("Save", "Ctrl+S", false, AnimEditor.IsDirty()))
     {
-        if (ImGui::MenuItem("Save", "Ctrl+S", false, AnimEditor.IsDirty()))
-        {
-            AnimEditor.Save();
-        }
-        if (ImGui::MenuItem("Revert to Saved", nullptr, false, AnimEditor.IsDirty()))
-        {
-            AnimEditor.RevertToSaved();
-        }
-        ImGui::Separator();
+        AnimEditor.Save();
+    }
+    if (ImGui::MenuItem("Revert to Saved", nullptr, false, AnimEditor.IsDirty()))
+    {
+        AnimEditor.RevertToSaved();
+    }
+    return true;
+}
+
+void FAnimSequenceEditorTab::DrawEditMenu()
+{
+    if (ImGui::BeginMenu("Edit"))
+    {
         if (ImGui::MenuItem("Undo", "Ctrl+Z", false, AnimEditor.CanUndoNotifyEdit()))
         {
             AnimEditor.UndoNotifyEdit();
@@ -44,15 +48,8 @@ void FAnimSequenceEditorTab::DrawMenuBar()
         {
             AnimEditor.RedoNotifyEdit();
         }
-        ImGui::Separator();
-        if (ImGui::MenuItem("Close Viewer"))
-        {
-            AnimEditor.Close();
-        }
         ImGui::EndMenu();
     }
-
-    EditorDock::DrawWindowMenu(Panels);
 }
 
 void FAnimSequenceEditorTab::BuildDefaultLayout(ImGuiID InDockSpaceId, const ImVec2& Size)

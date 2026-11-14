@@ -30,6 +30,9 @@ protected:
 	// 스크롤 금지처럼 창 플래그가 필요한 패널만 재정의합니다.
 	virtual ImGuiWindowFlags GetWindowFlags() const { return ImGuiWindowFlags_None; }
 
+	// 프리뷰 화면을 그리는 패널은 true. 창 여백과 스크롤바 없이 렌더 결과로 창을 꽉 채운다.
+	virtual bool IsViewportPanel() const { return false; }
+
 private:
 	FString PanelName;
 	FString WindowName;

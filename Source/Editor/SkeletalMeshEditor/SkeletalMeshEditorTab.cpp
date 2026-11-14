@@ -30,9 +30,10 @@ FSkeletalMeshEditorTab::FSkeletalMeshEditorTab(FSkeletalMeshEditor& InEditor)
 
 void FSkeletalMeshEditorTab::DrawMenuBar()
 {
-	if (ImGui::BeginMenu("Viewer"))
+	// 레벨 에디터와 같은 순서: File → Window
+	if (ImGui::BeginMenu("File"))
 	{
-		if (ImGui::MenuItem("Close Viewer"))
+		if (ImGui::MenuItem("Close Editor"))
 		{
 			MeshEditor.Close();
 		}

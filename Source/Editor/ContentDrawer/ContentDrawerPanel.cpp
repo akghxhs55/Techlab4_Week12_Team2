@@ -125,6 +125,12 @@ void FContentDrawerPanel::OnRender()
 		// 빈 곳 우클릭 (항목 위 우클릭은 제외)
 		if (ImGui::BeginPopupContextWindow("##DrawerContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 		{
+			if (ImGui::MenuItem("New Folder"))
+			{
+				strcpy_s(NewAssetName, "NewFolder");
+				bOpenCreateFolder = true;   // Create Widget과 같은 이유로 다음 줄에서 모달을 연다
+			}
+			ImGui::Separator();
 			if (ImGui::MenuItem("Create Widget"))
 			{
 				strcpy_s(NewAssetName, "NewWidget");
@@ -146,6 +152,43 @@ void FContentDrawerPanel::OnRender()
 			{
 				OnCreateWidget(Target.generic_string());   // "Content/UI/GameOver.widget" 형식
 				ImGui::CloseCurrentPopup();
+			}
+			ImGui::EndDisabled();
+			ImGui::SameLine();
+			if (ImGui::Button("Cancel")) ImGui::CloseCurrentPopup();
+			ImGui::EndPopup();
+		}
+
+		if (bOpenCreateFolder) { ImGui::OpenPopup("New Folder"); bOpenCreateFolder = false; }
+
+		if (ImGui::BeginPopupModal("New Folder", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+		{
+			if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
+			const bool bEnter = ImGui::InputText("Name", NewAssetName, sizeof(NewAssetName), ImGuiInputTextFlags_EnterReturnsTrue);
+
+			// 경로 구분자나 Windows에서 금지된 문자가 들어가면 만들지 않는다
+			const FString FolderName = NewAssetName;
+			const bool bInvalidName = FolderName.empty() || FolderName == "." || FolderName == ".."
+				|| FolderName.find_first_of("\\/:*?\"<>|") != FString::npos;
+			const fs::path Target = CurrentPath / FPaths::FromUtf8(FolderName);   // 한글 폴더 이름도 깨지지 않게
+			std::error_code ExistsError;
+			const bool bExists = !bInvalidName && fs::exists(Target, ExistsError);
+
+			if (bExists) ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "A file or folder with this name already exists.");
+			else if (bInvalidName && !FolderName.empty()) ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "Invalid folder name.");
+
+			ImGui::BeginDisabled(bExists || bInvalidName);
+			if (ImGui::Button("Create") || (bEnter && !bExists && !bInvalidName))
+			{
+				std::error_code CreateError;
+				if (fs::create_directory(Target, CreateError))
+				{
+					ImGui::CloseCurrentPopup();
+				}
+				else
+				{
+					HTR_LOG(Warning, "Failed to create folder {} : {}", FPaths::ToUtf8(Target), CreateError.message());
+				}
 			}
 			ImGui::EndDisabled();
 			ImGui::SameLine();
@@ -302,6 +345,11 @@ void FContentDrawerPanel::OnRender()
 					else if (Path.extension() == ".widget" && OnOpenWidget)
 					{
 						OnOpenWidget(PathString);
+					}
+
+					else if (Path.extension() == ".scene" && OnOpenScene)
+					{
+						OnOpenScene(PathString);
 					}
 
 					else if ((Path.extension() == ".obj" || FFbxMeshBake::IsBakedPath(PathString)

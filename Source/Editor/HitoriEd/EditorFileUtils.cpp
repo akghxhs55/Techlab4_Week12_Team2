@@ -116,13 +116,21 @@ bool FEditorFileUtils::LoadScene(UWorld* World)
 	if (!World)
 		return false;
 
-	FString FilePath = OpenLoadSceneDialog();
+	const FString FilePath = OpenLoadSceneDialog();
 
 	// 파일 선택 취소
 	if (FilePath.empty())
 		return false;
 
-	FilePath = std::filesystem::absolute(FilePath).lexically_normal().string();
+	return LoadScene(World, FilePath);
+}
+
+bool FEditorFileUtils::LoadScene(UWorld* World, const FString& InFilePath)
+{
+	if (!World || InFilePath.empty())
+		return false;
+
+	const FString FilePath = std::filesystem::absolute(InFilePath).lexically_normal().string();
 
 	if (!FJsonArchive::LoadWorld(World, FilePath))
 		return false;

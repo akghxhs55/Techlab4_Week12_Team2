@@ -77,6 +77,63 @@ namespace ViewportToolbarWidgets
         return bClicked;
     }
 
+    // 뷰포트 위에 겹쳐 그리는 툴바 바탕. 레벨 뷰포트 툴바와 같은 색·여백·둥글기를 쓴다.
+    // 반드시 EndOverlayToolbar와 짝으로 부른다.
+    inline bool BeginOverlayToolbar(const char* Id, ImVec2 ScreenPos, ImVec2 Size)
+    {
+        const float Pad = EditorStyle::Scale(4.0f);
+        ImGui::SetCursorScreenPos(ScreenPos);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { Pad, Pad });
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { Pad, Pad });
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(2.0f));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 26, 30, 235));
+        return ImGui::BeginChild(Id, Size, ImGuiChildFlags_AlwaysUseWindowPadding,
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    }
+
+    inline void EndOverlayToolbar()
+    {
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(3);
+    }
+
+    // 이동/회전/크기 기즈모 버튼 세 개를 뷰포트 왼쪽 위에 겹쳐 그린다. 레벨 뷰포트 툴바의 왼쪽 묶음과 같은 모양이다.
+    // CurrentMode는 0=이동, 1=회전, 2=크기. 누른 버튼의 번호를 돌려주고, 누르지 않았으면 -1.
+    inline int TransformModeOverlay(const char* Id, ImVec2 ViewportOrigin, int CurrentMode)
+    {
+        static constexpr const char* Icons[] = { "TransformMove", "TransformRotate", "TransformScale" };
+        static constexpr const char* Tooltips[] = {
+            "Translate (W)\nSpace: cycle Move / Rotate / Scale",
+            "Rotate (E)\nSpace: cycle Move / Rotate / Scale",
+            "Scale (R)\nSpace: cycle Move / Rotate / Scale" };
+        constexpr int Count = IM_ARRAYSIZE(Icons);
+
+        const float Pad = EditorStyle::Scale(4.0f);
+        const float ButtonWidth = IconButtonWidth(nullptr, false);
+        const ImVec2 Size{ Pad * 2.0f + ButtonWidth * Count + Pad * (Count - 1), Pad * 2.0f + ImGui::GetFrameHeight() };
+        const ImVec2 Pos{ ViewportOrigin.x + EditorStyle::Scale(6.0f), ViewportOrigin.y + EditorStyle::Scale(6.0f) };
+
+        int Clicked = -1;
+        if (BeginOverlayToolbar(Id, Pos, Size))
+        {
+            for (int Mode = 0; Mode < Count; ++Mode)
+            {
+                if (Mode > 0) ImGui::SameLine();
+                const bool bSelected = Mode == CurrentMode;
+                EditorStyle::PushSelectedButton(bSelected);
+                ImGui::PushID(Mode);
+                if (IconButton("##Mode", Icons[Mode], nullptr, false, ButtonWidth))
+                    Clicked = Mode;
+                ImGui::PopID();
+                EditorStyle::PopSelectedButton(bSelected);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", Tooltips[Mode]);
+            }
+        }
+        EndOverlayToolbar();
+        return Clicked;
+    }
+
     // UE 메뉴의 회색 구역 제목과 가로줄
     inline void SectionHeader(const char* Title)
     {

@@ -189,7 +189,7 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 				case ELevelViewportType::Left: GridPlane = EGridPlane::XZ; break;
 				default: break;
 				}
-				DrawHelper.OnRenderBatchGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
+				DrawHelper.OnRenderGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
 					SceneView.ViewForward, GridPlane,
 					static_cast<float>(Settings.GridSpacing),
 					SceneView.bIsPerspective, ViewportSetting);
