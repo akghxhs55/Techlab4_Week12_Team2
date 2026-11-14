@@ -17,6 +17,7 @@
 #include "GameFramework/Actor/AmbientLightActor.h"
 #include "GameFramework/Actor/DecalActor.h"
 #include "GameFramework/Character.h"
+#include "Particles/Emitter.h"
 #include "Core/StatOverlay.h"
 #include "Core/Stats/LightweightStats.h"
 #include <algorithm>
@@ -441,6 +442,7 @@ void FViewportsPanel::DrawSpawnMenu(FEditorViewportClient& Client)
     Spawn("Decal", ADecalActor::StaticClass());
     Spawn("Height Fog", AExponentialHeightFogActor::StaticClass());
     Spawn("Particle", AParticleActor::StaticClass());
+    Spawn("Particle System", AEmitter::StaticClass());
     ImGui::EndDisabled();
     if (World) ImGui::TextDisabled("%d actors", World->GetActorNum());
 }

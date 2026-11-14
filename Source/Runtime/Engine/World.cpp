@@ -43,6 +43,7 @@
 #include "Script/LuaBindings.h"
 #include "Physics/Collision.h"
 #include "Components/ShapeComponent.h"
+#include "Particles/ParticleSystemComponent.h"
 
 namespace
 {
@@ -247,6 +248,16 @@ void UWorld::EditorWorldTick(float DeltaTime)
 		if (Comp->GetParticlesForView().IsEmpty())
 		{
 			Comp->SetParticles(10);
+		}
+
+		Comp->TickComponent(DeltaTime);
+	}
+
+	for (TObjectIterator<UParticleSystemComponent> Comp; Comp; ++Comp)
+	{
+		if (!Comp || !Comp->IsRegistered() || Comp->GetWorld() != this)
+		{
+			continue;
 		}
 
 		Comp->TickComponent(DeltaTime);
