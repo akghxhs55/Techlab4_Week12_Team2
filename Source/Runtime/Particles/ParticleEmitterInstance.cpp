@@ -55,6 +55,7 @@ void FParticleEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSyste
 	SpawnFraction = 0.0f;
 	SecondsSinceCreation = 0.0f;
 	LoopCount = 0;
+	bSpawningEnabled = true;
 	BurstFired.Empty();
 
 	// 첫 루프의 Delay만큼 음수에서 시작 → 0이 될 때까지 생성하지 않는다
@@ -215,8 +216,8 @@ int32 FParticleEmitterInstance::ComputeBurstCount()
 
 void FParticleEmitterInstance::Spawn(float DeltaTime)
 {
-	// Delay 대기 중이거나 루프를 다 끝냈으면 생성하지 않는다
-	if (EmitterTime < 0.0f || HasCompletedLoops())
+	// 비활성화됐거나, Delay 대기 중이거나, 루프를 다 끝냈으면 생성하지 않는다
+	if (!bSpawningEnabled || EmitterTime < 0.0f || HasCompletedLoops())
 		return;
 
 	UParticleModuleSpawn* SpawnModule = CurrentLODLevel->GetSpawnModule();

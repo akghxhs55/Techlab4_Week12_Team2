@@ -34,6 +34,7 @@ struct FParticleEmitterInstance
 	float EmitterTime = 0.0f;   // 이번 루프 안에서의 시간 (Delay 차감, 대기 중이면 음수)
 	float SecondsSinceCreation = 0.0f;
 	int32 LoopCount = 0;          // 완료한 루프 수
+	bool  bSpawningEnabled = true;  // false면 생성만 멈춤 (PSC DeactivateSystem). 살아 있는 파티클은 계속 갱신
 	TArray<uint8> BurstFired;     // Burst별 이번 루프에 터졌는지 (모듈은 공유 에셋이라 인스턴스가 보관)
 	FRandomStream RandomStream;
 
@@ -46,7 +47,8 @@ struct FParticleEmitterInstance
 	// 루프를 모두 끝내 더 이상 생성하지 않는 상태 (Loops = 0이면 항상 false)
 	bool HasCompletedLoops() const;
 	// 생성이 끝났고 살아 있는 파티클도 없음 → PSC가 완료 판정에 사용
-	bool IsComplete() const { return HasCompletedLoops() && ActiveParticles == 0; }
+	// (루프 종료 또는 비활성화) + 살아 있는 파티클 없음
+	bool IsComplete() const { return (HasCompletedLoops() || !bSpawningEnabled) && ActiveParticles == 0; }
 
 protected:
 	virtual void UpdateEmitterTime(float DeltaTime);                            // UE Tick_EmitterTimeSetup

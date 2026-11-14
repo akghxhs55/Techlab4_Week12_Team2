@@ -14,7 +14,6 @@
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/SkinnedMeshComponent.h"
 #include "Components/TextRenderComponent.h"
-#include "Components/ParticleSubUVComponent.h"
 #include "Components/SpotLightComponent.h"
 #include "Editor/EditorUI/ImGuiRenderer.h"
 #include "Components/DirectionalLightComponent.h"
