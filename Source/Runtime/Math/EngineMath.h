@@ -336,4 +336,7 @@ namespace FMath
 		return fmod(X, Y);
 	}
 
+	static inline int32 TruncToInt(float Value) { return static_cast<int32>(Value); }
+	static inline float TruncToFloat(float Value) { return std::trunc(Value); }
+	static inline int32 FloorToInt(float Value) { return static_cast<int32>(std::floor(Value)); }
 }

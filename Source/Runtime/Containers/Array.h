@@ -216,6 +216,11 @@ public:
 		Add(std::move(Item));
 	}
 
+	bool Contains(const ElementType& Item) const
+	{
+		return Find(Item) != -1;
+	}
+
 	template<typename... Args>
 	uint32 Emplace(Args&&... args);
 	uint32 Insert(const T& data, uint32 index);
@@ -251,6 +256,15 @@ public:
 	bool IsEmpty() const;
 
 	void Reset(SizeType NewSize = 0);
+
+	void Remove(const ElementType& Item)
+	{
+		int32 Index = Find(Item);
+		if (Index != -1)
+		{
+			RemoveAt(static_cast<uint32>(Index));
+		}
+	}
 
 	void RemoveAt(uint32 Index)
 	{
