@@ -135,7 +135,8 @@ void UParticleSystemComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, co
 				.CurrentFrame = 0.0f,
 				.AtlasRowSize = 1.0f,
 				.AtlasColSize = 1.0f,
-				.Alpha = 1.0f,
+				.Alpha = Particle->Color.W,
+				.Tint = FVector4{ Particle->Color.X, Particle->Color.Y, Particle->Color.Z, 1.0f },
 				.DecodeSRGB = 0.0f,
 			};
 			const uint32 ConstantIndex = Constants.Add(Value);

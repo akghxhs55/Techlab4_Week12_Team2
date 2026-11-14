@@ -47,7 +47,18 @@ void UParticleEmitter::SetToSensibleDefaults()
 		return;
 	}
 
-	LODLevels[0]->RequiredModule->SetMaterial(UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial"));
+	UMaterial* Base = UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial");
+	UTexture2D* Texture = UAssetManager::GetAssetByPath<UTexture2D>("Engine/Textures/SpotLightWarm.png");
+	if (!Base)
+	{
+		return;
+	}
+	UMaterial* Material = UMaterial::CreateInstance(Base);
+	if (Texture && !Material->Textures.IsEmpty())
+	{
+		Material->Textures[0] = Texture;
+	}
+	LODLevels[0]->RequiredModule->SetMaterial(Material);
 }
 
 const TArray<UParticleLODLevel*>& UParticleEmitter::GetLODLevels() const

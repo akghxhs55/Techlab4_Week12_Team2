@@ -4,6 +4,9 @@ struct FBaseParticle
 {
 	FVector Location;
 
+	FVector4 BaseColor;
+	FVector4 Color;
+
 	FVector BaseVelocity;
 	FVector Velocity;
 

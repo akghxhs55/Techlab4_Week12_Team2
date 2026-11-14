@@ -3,6 +3,7 @@
 
 #include "ParticleEmitter.h"
 #include "ParticleLODLevel.h"
+#include "ParticleModuleColor.h"
 #include "ParticleModuleLifetime.h"
 #include "ParticleModuleSize.h"
 #include "ParticleModuleVelocity.h"
@@ -25,6 +26,7 @@ AEmitter::AEmitter()
 	LOD->Modules.Add(NewObject<UParticleModuleLifetime>(System));
 	LOD->Modules.Add(NewObject<UParticleModuleSize>(System));
 	LOD->Modules.Add(NewObject<UParticleModuleVelocity>(System));
+	LOD->Modules.Add(NewObject<UParticleModuleColor>(System));
 	LOD->UpdateModuleLists();
 
 	System->Emitters.Add(Emitter);

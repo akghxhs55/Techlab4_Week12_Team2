@@ -55,6 +55,7 @@ void FParticleEmitterInstance::Tick(float DeltaTime, bool bSuppressSpawning)
 	for (int32 i = 0; i < ActiveParticles; ++i)
 	{
 		FBaseParticle* Particle = GetParticle(i);
+		Particle->Color = Particle->BaseColor;
 		Particle->Velocity = Particle->BaseVelocity;
 		Particle->Size = Particle->BaseSize;
 		Particle->RotationRate = Particle->BaseRotationRate;
@@ -142,6 +143,8 @@ void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, floa
 		FBaseParticle* Particle = GetParticle(ActiveParticles);
 
 		FMemory::Memzero(Particle, ParticleStride);
+		Particle->BaseColor = FVector4{ 1.0f, 1.0f, 1.0f, 1.0f };
+		Particle->Color = FVector4{ 1.0f, 1.0f, 1.0f, 1.0f };
 		Particle->Location = InitialLocation;
 		Particle->BaseVelocity = InitialVelocity;
 		Particle->Velocity = InitialVelocity;
