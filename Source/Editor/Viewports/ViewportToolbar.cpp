@@ -8,7 +8,6 @@
 #include "Camera/CameraActor.h"
 #include "GameFramework/Actor/StaticMeshActor.h"
 #include "GameFramework/Actor/SkeletalMeshActor.h"
-#include "GameFramework/Actor/ParticleActor.h"
 #include "GameFramework/Actor/TextRenderActor.h"
 #include "GameFramework/Actor/ExponentialHeightFogActor.h"
 #include "GameFramework/Actor/DirectionalLightActor.h"
@@ -440,7 +439,6 @@ void FViewportsPanel::DrawSpawnMenu(FEditorViewportClient& Client)
     ImGui::SeparatorText("Effects");
     Spawn("Decal", ADecalActor::StaticClass());
     Spawn("Height Fog", AExponentialHeightFogActor::StaticClass());
-    Spawn("Particle", AParticleActor::StaticClass());
     ImGui::EndDisabled();
     if (World) ImGui::TextDisabled("%d actors", World->GetActorNum());
 }

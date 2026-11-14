@@ -324,7 +324,7 @@ project "Shaders"
 		Shadows = { "Shadow*.hlsl", "CascadeFloorShader.hlsl" },
 		Lighting = { "TileBasedLightCulling.hlsl", "LightCullingDebug.hlsl" },
 		PostProcess = { "CameraOverlay.hlsl", "FxaaShader.hlsl", "HeightFogShader.hlsl", "OutlineShader.hlsl", "ToneMapShader.hlsl" },
-		Effects = { "BillboardShader.hlsl", "ParticleSubUVShader.hlsl" },
+		Effects = { "BillboardShader.hlsl" },
 		Editor = { "BoundingBoxShader.hlsl", "GizmoShader.hlsl", "GridShader*.hlsl" },
 		UI = { "TextShader.hlsl", "UIShader.hlsl" },
 	}

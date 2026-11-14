@@ -167,7 +167,6 @@ void UAssetManager::Init(const FAssetLoadProgress& OnProgress)
 	FLoadStageTimer DefaultsTimer{ "Init/Defaults after scan" };
 	Get().CreateDefaultMeshes();
 	Get().CreateBillboardMaterial();
-	Get().CreateParticleMaterial();
 	Get().CreateEditorArrowMaterial();
 }
 
@@ -381,7 +380,7 @@ void UAssetManager::CreateDefaultMeshes()
 	FStaticMeshData* GizmoSphereData = FGeometryGenerator::GetMeshData("GizmoSphere");
 	RegisterAsset("GizmoSphere", CreateStaticMesh(GizmoSphereData));
 
-	const FParticleVertex Vertices[] =
+	const FBillboardVertex Vertices[] =
 	{
 		{ FVector(0.0f, -0.5f,  0.5f), FVector2(0.0f, 0.0f) },
 		{ FVector(0.0f, 0.5f,  0.5f), FVector2(1.0f, 0.0f) },
@@ -398,7 +397,7 @@ void UAssetManager::CreateDefaultMeshes()
 	UStaticMesh* Mesh = NewObject<UStaticMesh>();
 	Mesh->VertexBuffer = RenderCommand::CreateStaticVertexBuffer(
 		Vertices,
-		sizeof(Vertices), sizeof(FParticleVertex));
+		sizeof(Vertices), sizeof(FBillboardVertex));
 	Mesh->IndexBuffer = RenderCommand::CreateStaticIndexBuffer(
 		Indices,
 		ARRAYSIZE(Indices));
@@ -419,7 +418,7 @@ void UAssetManager::CreateDefaultMeshes()
 	Mesh->MeshData.AABB.Max = FVector(0.001f, 0.5, 0.5);
 	Mesh->RebuildRenderData();
 
-	RegisterAsset("ParticleQuad", Mesh);
+	RegisterAsset("BillboardQuad", Mesh);
 }
 
 void UAssetManager::CreateDefaultMaterial() {
@@ -440,21 +439,8 @@ void UAssetManager::CreateBillboardMaterial()
 	BillboardMat->BlendState = EBlendState::AlphaBlend;
 	BillboardMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	BillboardMat->SamplerState = ESamplerState::LinearClamp;
-	BillboardMat->ParamLayout = EMaterialParamLayout::ParticleSubUV;
+	BillboardMat->ParamLayout = EMaterialParamLayout::Billboard;
 	RegisterAsset("BillboardMaterial", BillboardMat);
-}
-
-void UAssetManager::CreateParticleMaterial()
-{
-	UMaterial* ParticleMat = NewObject<UMaterial>();
-	ParticleMat->PSOType = EPSOType::Particle_AlphaBlend;
-	ParticleMat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/ParticleSubUVShader.hlsl");
-	ParticleMat->Textures.Add(GetAssetByPath<UTexture2D>("Engine/SubUV/StarParticle.png"));
-	ParticleMat->BlendState = EBlendState::AlphaBlend;
-	ParticleMat->DepthStencilState = EDepthStencilState::ReadOnly;
-	ParticleMat->ParamLayout = EMaterialParamLayout::ParticleSubUV;
-	ParticleMat->ParamBuffer = RenderCommand::CreateConstantBuffer(256);
-	RegisterAsset("SubUVMaterial", ParticleMat);
 }
 
 void UAssetManager::CreateEditorArrowMaterial() {

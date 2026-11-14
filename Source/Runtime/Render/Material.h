@@ -12,7 +12,7 @@ enum class EMaterialParamLayout
 {
 	None,
 	StaticMesh,
-	ParticleSubUV
+	Billboard
 };
 
 struct FStaticMeshMaterialParams

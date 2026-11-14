@@ -33,7 +33,7 @@ namespace
 // Billboard 컴포넌트의 초기 상태를 구성한다.
 UBillboardComponent::UBillboardComponent()
 {
-	QuadMesh = UAssetManager::GetAssetByPath<UStaticMesh>("ParticleQuad");
+	QuadMesh = UAssetManager::GetAssetByPath<UStaticMesh>("BillboardQuad");
 	Material = UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial");
 }
 
@@ -114,7 +114,7 @@ void UBillboardComponent::SubmitToRenderQueue(FRenderQueue& RenderQueue, const F
 	Packet.Material = Material;
 	Packet.Model = RenderQueue.StoreWorldMatrix(BillboardWorldMatrix);
 	Packet.MaterialParamData = &IconParams;
-	Packet.MaterialParamDataSize = sizeof(FSubUVConstants);
+	Packet.MaterialParamDataSize = sizeof(FBillboardConstants);
 	RenderQueue.Add(Packet);
 }
 

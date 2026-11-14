@@ -4,9 +4,9 @@
 #include "LightComponentBase.h"
 #include "BillboardComponent.generated.h"
 
-struct FSubUVConstants
+struct FBillboardConstants
 {
-	// 한 파티클을 그릴 때 Shader에 전달할 Atlas 프레임과 투명도 값을 담는다.
+	// 빌보드를 그릴 때 Shader에 전달할 Atlas 프레임과 투명도 값을 담는다.
 	float CurrentFrame;
 	float AtlasRowSize;
 	float AtlasColSize;
@@ -17,7 +17,7 @@ struct FSubUVConstants
 	float DecodeSRGB = 1.0f;
 	float Padding[3]{};
 };
-static_assert(sizeof(FSubUVConstants) == 48, "ParticleSubUVShader.hlsl cbuffer subuv와 크기가 같아야 한다");
+static_assert(sizeof(FBillboardConstants) == 48, "BillboardShader.hlsl cbuffer MaterialParams와 크기가 같아야 한다");
 
 UCLASS()
 class UBillboardComponent : public UPrimitiveComponent
@@ -61,7 +61,7 @@ public:
 protected:
 	UMaterial* Material = nullptr;
 	UStaticMesh* QuadMesh = nullptr;
-	FSubUVConstants IconParams{ 0.0f, 1.0f, 1.0f, 1.0f };	// CurrentFrame, RowSize, ColSize, Alpha
+	FBillboardConstants IconParams{ 0.0f, 1.0f, 1.0f, 1.0f };	// CurrentFrame, RowSize, ColSize, Alpha
 private:
 	const ULightComponentBase* TintSource = nullptr;
 	bool bEditorIcon = false;

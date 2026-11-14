@@ -27,10 +27,7 @@ enum class EPrimitiveType
 	Sphere,
 	Cube,
 	Cone,
-	Plane,
-
-	Particle,
-	ParticleQuad
+	Plane
 };
 
 UCLASS()
