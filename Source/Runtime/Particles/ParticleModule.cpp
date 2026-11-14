@@ -5,6 +5,12 @@ void UParticleModule::Spawn(FParticleEmitterInstance& Owner, int32 Offset, float
 {
 }
 
+void UParticleModule::PostEditChangeProperty(const FProperty& Property)
+{
+	Super::PostEditChangeProperty(Property);
+	BakeDistributions();
+}
+
 void UParticleModule::Update(FParticleEmitterInstance& Owner, int32 Offset, float DeltaTime)
 {
 }

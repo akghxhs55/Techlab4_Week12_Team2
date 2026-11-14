@@ -62,13 +62,13 @@ struct FDistributionLookupTable
 	{
 		return Values.Num() == 0 || EntryCount == 0;
 	}
-	inline float GetValuesPerEntry() const
+	inline int32 GetValuesPerEntry() const
 	{
-		return (float)(EntryStride - SubEntryStride);
+		return static_cast<int32>(EntryStride - SubEntryStride);
 	}
-	inline float GetValueCount() const
+	inline int32 GetValueCount() const
 	{
-		return (float)(Values.Num());
+		return static_cast<int32>(Values.Num());
 	}
 	inline void GetEntry(float Time, const float*& Entry1, const float*& Entry2, float& LerpAlpha) const
 	{
@@ -88,7 +88,7 @@ struct FDistributionLookupTable
 	{
 		if (EntryCount > 0)
 		{
-			const int32 ValuesPerEntry = (int32)GetValuesPerEntry();
+			const int32 ValuesPerEntry = GetValuesPerEntry();
 			const float* Entry = Values.GetData();
 
 			// Initialize to the first entry in the table.

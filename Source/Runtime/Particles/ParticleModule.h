@@ -19,6 +19,9 @@ public:
 	virtual uint32 RequiredBytes() const { return 0; }
 	virtual void BakeDistributions() {}
 
+	// 디테일 패널에서 값이 바뀌면 분포를 다시 굽는다 (UE도 모듈 PostEditChangeProperty에서 처리)
+	void PostEditChangeProperty(const FProperty& Property) override;
+
 	bool IsSpawnModule() const { return bSpawnModule; }
 	bool IsUpdateModule() const { return bUpdateModule; }
 	bool IsEnabled() const { return bEnabled; }

@@ -13,7 +13,7 @@ class UParticleSystemComponent;
 struct FParticleEmitterInstance
 {
 	FParticleEmitterInstance() = default;
-	~FParticleEmitterInstance();
+	virtual ~FParticleEmitterInstance();   // Sprite/Mesh 인스턴스가 상속한다
 	FParticleEmitterInstance(const FParticleEmitterInstance&) = delete;
 	FParticleEmitterInstance& operator=(const FParticleEmitterInstance&) = delete;
 
@@ -36,18 +36,20 @@ struct FParticleEmitterInstance
 
 	FBox BoundingBox;
 
-	void Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent);
-	bool Resize(int32 NewMaxActiveParticles);
-	void Tick(float DeltaTime);
+	// 다시 호출해도 된다 (기존 블록을 해제하고 새 템플릿 기준으로 다시 잡는다)
+	virtual void Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent);
+	virtual bool Resize(int32 NewMaxActiveParticles);
+	virtual void Tick(float DeltaTime);
 
-private:
-	void KillParticles();
-	void ResetParticleParameters(float DeltaTime);
-	void Spawn(float DeltaTime);                                        // 이번 프레임 개수 결정
-	void SpawnParticles(int32 Count, float StartTime, float Increment); // 실제 N개 생성
-	void PreSpawn(FBaseParticle* Particle, const FVector& InitialLocation);
-	void PostSpawn(FBaseParticle* Particle, float SpawnTime);
-	void UpdateBoundingBox(float DeltaTime);                            // 위치 적분 + 바운드
+protected:
+	virtual void KillParticles();
+	virtual void ResetParticleParameters(float DeltaTime);
+	virtual void Spawn(float DeltaTime);                                        // 이번 프레임 개수 결정
+	virtual void SpawnParticles(int32 Count, float StartTime, float Increment); // 실제 N개 생성
+	virtual void PreSpawn(FBaseParticle* Particle, const FVector& InitialLocation);
+	virtual void PostSpawn(FBaseParticle* Particle, float SpawnTime);
+	virtual void UpdateBoundingBox(float DeltaTime);                            // 위치 적분 + 바운드
 
 	FBaseParticle* GetParticle(int32 SlotIndex) const;   // ParticleData + SlotIndex × ParticleStride
+	void FreeParticleMemory();                           // 블록 해제 + MaxActiveParticles = 0
 };

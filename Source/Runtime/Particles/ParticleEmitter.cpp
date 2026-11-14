@@ -3,6 +3,14 @@
 #include "ParticleLODLevel.h"
 #include "ParticleModule.h"
 #include "ParticleTypes.h"
+#include "ParticleEmitterInstance.h"
+
+FParticleEmitterInstance* UParticleEmitter::CreateInstance(UParticleSystemComponent* InComponent)
+{
+	FParticleEmitterInstance* Instance = new FParticleEmitterInstance();
+	Instance->Init(this, InComponent);
+	return Instance;
+}
 
 void UParticleEmitter::AddLODLevel(UParticleLODLevel* InLODLevel)
 {

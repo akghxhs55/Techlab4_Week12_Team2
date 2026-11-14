@@ -9,7 +9,8 @@ void UParticleLODLevel::UpdateModuleLists()
 
 	for (UParticleModule* Module : Modules)
 	{
-		if (!Module || !Module->IsEnabled())
+		// 비활성 모듈도 목록에 둔다. bEnabled는 실행 루프에서 검사한다 (UE와 동일)
+		if (!Module)
 			continue;
 
 		if (Module->IsSpawnModule())  SpawnModules.Add(Module);
