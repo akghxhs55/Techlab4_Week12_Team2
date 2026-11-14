@@ -1,0 +1,55 @@
+{
+    "Format": "HitoriAnimBlueprint",
+    "Graphs": [
+        {
+            "EditorSettings": "",
+            "Id": 1,
+            "Links": [],
+            "Name": "AnimGraph",
+            "Nodes": [
+                {
+                    "BlendSpacePath": "",
+                    "ChildGraphId": -1,
+                    "FloatInput": {
+                        "Constant": 0.0,
+                        "Variable": "",
+                        "bUseVariable": false
+                    },
+                    "Id": 2,
+                    "InputPosePinId": 3,
+                    "Name": "Output Pose",
+                    "OutputPosePinId": -1,
+                    "PlayRate": 1.0,
+                    "Position": {
+                        "X": 360.0,
+                        "Y": 100.0
+                    },
+                    "SecondInputPosePinId": -1,
+                    "SequencePath": "",
+                    "TransitionInputPinId": -1,
+                    "TransitionOutputPinId": -1,
+                    "Type": 0,
+                    "bLooping": true,
+                    "bResetOnEntry": true
+                }
+            ],
+            "OwnerNodeId": -1,
+            "ParentGraphId": -1,
+            "Transitions": [],
+            "Type": 0
+        }
+    ],
+    "NextId": 4,
+    "PreviewMeshPath": "FBX/HipHopDancing/HipHopDancing.fbx.bin",
+    "RootGraphId": 1,
+    "RootMotionMode": 2,
+    "Variables": [
+        {
+            "DefaultFloat": 0.0,
+            "Name": "GroundSpeed",
+            "Type": 0,
+            "bDefaultBool": false
+        }
+    ],
+    "Version": 1
+}

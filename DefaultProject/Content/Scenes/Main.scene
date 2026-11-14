@@ -1,1 +1,10 @@
-{"Version":4,"World":{"PersistentLevel":{"Actors":[],"Properties":{}},"Properties":{}}}
+{
+    "Version": 4,
+    "World": {
+        "PersistentLevel": {
+            "Actors": [],
+            "Properties": {}
+        },
+        "Properties": {}
+    }
+}
