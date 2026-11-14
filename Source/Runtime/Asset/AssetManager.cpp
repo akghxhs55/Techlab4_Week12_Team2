@@ -446,15 +446,19 @@ void UAssetManager::CreateBillboardMaterial()
 
 void UAssetManager::CreateParticleMaterial()
 {
-	UMaterial* ParticleMat = NewObject<UMaterial>();
-	ParticleMat->PSOType = EPSOType::Particle_AlphaBlend;
-	ParticleMat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/ParticleSubUVShader.hlsl");
-	ParticleMat->Textures.Add(GetAssetByPath<UTexture2D>("Engine/SubUV/StarParticle.png"));
-	ParticleMat->BlendState = EBlendState::AlphaBlend;
-	ParticleMat->DepthStencilState = EDepthStencilState::ReadOnly;
-	ParticleMat->ParamLayout = EMaterialParamLayout::ParticleSubUV;
-	ParticleMat->ParamBuffer = RenderCommand::CreateConstantBuffer(256);
-	RegisterAsset("SubUVMaterial", ParticleMat);
+	auto MakeSpriteMaterial = [this](EPSOType PSOType, EBlendState Blend, const char* Name)
+		{
+			UMaterial* Mat = NewObject<UMaterial>();
+			Mat->PSOType = PSOType;
+			Mat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/ParticleSpriteShader.hlsl");
+			Mat->Textures.Add(GetAssetByPath<UTexture2D>("Engine/SubUV/StarParticle.png"));
+			Mat->BlendState = Blend;
+			Mat->DepthStencilState = EDepthStencilState::ReadOnly;
+			Mat->SamplerState = ESamplerState::LinearClamp;
+			RegisterAsset(Name, Mat);
+		};
+	MakeSpriteMaterial(EPSOType::Particle_Additive, EBlendState::Additive, "ParticleSpriteAdditive");
+	MakeSpriteMaterial(EPSOType::Particle_AlphaBlend, EBlendState::AlphaBlend, "ParticleSpriteAlphaBlend");
 }
 
 void UAssetManager::CreateEditorArrowMaterial() {

@@ -8,6 +8,7 @@
 #include "Components/DecalComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SpotLightComponent.h"
+#include "Components/ParticleSystemComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Actor/DecalActor.h"
 #include "GameFramework/Actor/PointLightActor.h"
@@ -172,6 +173,7 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 				// 이 뷰포트가 보고 있는 월드의 것을 그린다. PIE와 SIE 중에는 PIE 월드다.
 				DrawCollisionShapes(GetWorld(), LineBatcher, SelectedActor);
 				DrawSpringArms(GetWorld(), LineBatcher, SelectedActor);
+				DrawParticleSystems(GetWorld(), LineBatcher);
 
 				LineBatcher->OnRender(SceneView.ViewProjectionMatrix);
 			};

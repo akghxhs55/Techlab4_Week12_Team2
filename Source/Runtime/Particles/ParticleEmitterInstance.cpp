@@ -6,6 +6,12 @@
 #include "ParticleTypes.h"
 #include "Module/ParticleModuleRequired.h"
 #include "Module/ParticleModuleSpawn.h"
+#include "Module/ParticleModuleSubUV.h"
+
+#include "Components/ParticleSystemComponent.h"
+
+#include "Engine/ParticleSystemSceneProxy.h"
+#include "Engine/Scene.h"
 
 #include <malloc.h>
 #include <cstring>
@@ -40,7 +46,7 @@ FBaseParticle* FParticleEmitterInstance::GetParticle(int32 SlotIndex) const
 void FParticleEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent)
 {
 	assert(InTemplate);
-	// 재호출 시 Stride가 바뀔 수 있으므로 기존 블록을 버리고 새로 잡는다
+	// 재호출 시 Stride가 바뀔 수 있으므로 새로 잡는다
 	FreeParticleMemory();
 
 	SpriteTemplate = InTemplate;
@@ -58,12 +64,24 @@ void FParticleEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSyste
 	bSpawningEnabled = true;
 	BurstFired.Empty();
 
-	// 첫 루프의 Delay만큼 음수에서 시작 → 0이 될 때까지 생성하지 않는다
+	// 음수인 동안(Delay)은 생성하지 않는다
 	const UParticleModuleRequired* Required = CurrentLODLevel ? CurrentLODLevel->GetRequiredModule() : nullptr;
 	EmitterTime = Required ? -Required->GetDelayForLoop(0) : 0.0f;
 
 	BoundingBox = FBox(FVector(FLT_MAX), FVector(-FLT_MAX));
 	RandomStream.GenerateNewSeed();
+	SubUVDataOffset = 0;
+	if (CurrentLODLevel)
+	{
+		for (UParticleModule* Module : CurrentLODLevel->GetModules())
+		{
+			if (Cast<UParticleModuleSubUV>(Module))
+			{
+				SubUVDataOffset = SpriteTemplate->GetModuleOffset(Module);
+				break;
+			}
+		}
+	}
 	Resize(64);
 }
 
@@ -138,13 +156,15 @@ void FParticleEmitterInstance::PostSpawn(FBaseParticle* Particle, float SpawnTim
 
 void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, float Increment)
 {
+	const FVector Origin = GetEmitterOrigin();
+
 	for (int32 i = 0; i < Count; i++)
 	{
 		uint16 SlotIndex = ParticleIndices[ActiveParticles];
 		FBaseParticle* Particle = GetParticle(SlotIndex);
 		float SpawnTime = StartTime - Increment * i;
 
-		PreSpawn(Particle, FVector::ZeroVector);
+		PreSpawn(Particle, Origin);
 		for (UParticleModule* Module : CurrentLODLevel->GetSpawnModules())
 		{
 			if (!Module->IsEnabled())
@@ -165,6 +185,30 @@ bool FParticleEmitterInstance::HasCompletedLoops() const
 	return Loops > 0 && LoopCount >= Loops;
 }
 
+bool FParticleEmitterInstance::IsLocalSpace() const
+{
+	const UParticleModuleRequired* Required = CurrentLODLevel ? CurrentLODLevel->GetRequiredModule() : nullptr;
+	return Required && Required->IsUseLocalSpace();
+}
+
+FVector FParticleEmitterInstance::GetEmitterOrigin() const
+{
+	if (IsLocalSpace() || Component == nullptr)
+	{
+		return FVector::ZeroVector;
+	}
+	return Component->GetWorldLocation();
+}
+
+FVector FParticleEmitterInstance::SimulationToWorld(const FVector& SimulationPosition) const
+{
+	if (IsLocalSpace() && Component)
+	{
+		return Component->GetWorldMatrix().TransformPosition(SimulationPosition);
+	}
+	return SimulationPosition;
+}
+
 void FParticleEmitterInstance::UpdateEmitterTime(float DeltaTime)
 {
 	SecondsSinceCreation += DeltaTime;
@@ -182,9 +226,7 @@ void FParticleEmitterInstance::UpdateEmitterTime(float DeltaTime)
 	while (EmitterTime >= Duration && !HasCompletedLoops())
 	{
 		++LoopCount;
-		// 다음 루프의 Delay만큼 다시 음수로 (bDelayFirstLoopOnly면 0)
 		EmitterTime -= Duration + Required->GetDelayForLoop(LoopCount);
-		// 새 루프에서는 Burst를 다시 터뜨린다
 		BurstFired.Init(0, BurstFired.Num());
 	}
 }
@@ -198,7 +240,6 @@ int32 FParticleEmitterInstance::ComputeBurstCount()
 	const TArray<FParticleBurst>& Bursts = SpawnModule->GetBurstList();
 	if (BurstFired.Num() != Bursts.Num())
 	{
-		// Burst 목록이 바뀌었으면 기록을 새로 만든다
 		BurstFired.Init(0, Bursts.Num());
 	}
 
@@ -216,7 +257,6 @@ int32 FParticleEmitterInstance::ComputeBurstCount()
 
 void FParticleEmitterInstance::Spawn(float DeltaTime)
 {
-	// 비활성화됐거나, Delay 대기 중이거나, 루프를 다 끝냈으면 생성하지 않는다
 	if (!bSpawningEnabled || EmitterTime < 0.0f || HasCompletedLoops())
 		return;
 
@@ -224,7 +264,6 @@ void FParticleEmitterInstance::Spawn(float DeltaTime)
 	if (!SpawnModule || !SpawnModule->IsEnabled())
 		return;
 
-	// 초당 생성 (UE 공식: 남은 소수점 SpawnFraction을 다음 프레임으로 넘긴다)
 	const float Rate = SpawnModule->GetSpawnRate(EmitterTime, RandomStream);
 	const float OldLeftover = SpawnFraction;
 	const float NewLeftover = OldLeftover + DeltaTime * Rate;
@@ -258,7 +297,6 @@ void FParticleEmitterInstance::Spawn(float DeltaTime)
 	BurstNumber = BurstNumber < FreeSlotsAfter ? BurstNumber : FreeSlotsAfter;
 	if (BurstNumber > 0)
 	{
-		// Burst는 이번 프레임 끝에 한꺼번에 생성 (SpawnTime 0 → 미리 이동 없음)
 		SpawnParticles(BurstNumber, 0.0f, 0.0f);
 	}
 }
@@ -272,7 +310,7 @@ void FParticleEmitterInstance::UpdateBoundingBox(float DeltaTime)
 		FBaseParticle* Particle = GetParticle(SlotIndex);
 		Particle->OldLocation = Particle->Location;
 
-		// 이번 프레임에 생성된 파티클은 PostSpawn에서 SpawnTime만큼 이미 이동했으므로 적분을 건너뛴다 (UE 동일)
+		// 이번 프레임에 생성된 파티클은 PostSpawn에서 이미 이동했다
 		const bool bJustSpawned = (Particle->Flags & STATE_Particle_JustSpawned) != 0;
 		Particle->Flags &= ~STATE_Particle_JustSpawned;
 		if (!bJustSpawned)

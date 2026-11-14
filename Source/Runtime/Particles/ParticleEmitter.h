@@ -18,8 +18,7 @@ public:
 	// 모듈 구성이 바뀐 뒤 한 번 호출
 	void Build();
 
-	// 이 에미터용 런타임 인스턴스를 만들고 Init까지 한다. 호출자(PSC)가 소유하고 delete한다.
-	// Mesh 에미터 등은 override해서 다른 인스턴스 타입을 만든다.
+	// 호출자가 소유하고 delete한다
 	virtual FParticleEmitterInstance* CreateInstance(UParticleSystemComponent* InComponent);
 
 	const TArray<UParticleLODLevel*>& GetLODLevels() const { return LODLevels; }

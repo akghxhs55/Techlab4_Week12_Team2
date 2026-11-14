@@ -4,6 +4,16 @@
 #include "Particles/ParticleModule.h"
 #include "ParticleModuleRequired.generated.h"
 
+UENUM()
+enum class EParticleSubUVInterpMethod : uint8
+{
+	None,
+	Linear,
+	Linear_Blend,
+	Random,
+	Random_Blend,
+};
+
 // 에미터 전체 규칙 . 파티클을 직접 건드리지 않으므로 Spawn/Update 플래그는 둘 다 false.
 // LODLevel의 RequiredModule 슬롯에만 둔다
 UCLASS()
@@ -22,6 +32,13 @@ public:
 	{
 		return (bDelayFirstLoopOnly && LoopIndex > 0) ? 0.0f : EmitterDelay;
 	}
+
+	EParticleSubUVInterpMethod GetSubUVMethod() const { return InterpolationMethod; }
+	int32 GetSubImagesHorizontal() const { return SubImages_Horizontal; }
+	int32 GetSubImagesVertical() const { return SubImages_Vertical; }
+	int32 GetTotalSubImages() const { return SubImages_Horizontal * SubImages_Vertical; }
+	float GetRandomImageTime() const { return RandomImageTime; }
+	bool UsesSubUV() const { return InterpolationMethod != EParticleSubUVInterpMethod::None && GetTotalSubImages() > 1; }
 
 private:
 	// 한 루프 길이. 0 이하면 루프 없이 계속 생성
@@ -42,4 +59,16 @@ private:
 	// true면 파티클이 컴포넌트를 따라 움직인다
 	UPROPERTY(EditAnywhere)
 	bool bUseLocalSpace = false;
+
+	UPROPERTY(EditAnywhere)
+	EParticleSubUVInterpMethod InterpolationMethod = EParticleSubUVInterpMethod::None;
+
+	UPROPERTY(EditAnywhere)
+	int32 SubImages_Horizontal = 1;
+
+	UPROPERTY(EditAnywhere)
+	int32 SubImages_Vertical = 1;
+
+	// Random 모드에서 칸을 다시 뽑는 간격 (RelativeTime 단위). 0이면 매 프레임, 1 이상이면 생성 때 한 번
+	UPROPERTY(EditAnywhere)
 };

@@ -8,15 +8,22 @@
 #include "Particles/Module/ParticleModuleSpawn.h"
 #include "Particles/Module/ParticleModuleLifetime.h"
 #include "Particles/Module/ParticleModuleVelocity.h"
+#include "Particles/Module/ParticleModuleSize.h"
+#include "Particles/Module/ParticleModuleColor.h"
+#include "Particles/ParticleHelper.h"
+#include "Render/LineBatcher.h"
+#include "UObject/UObjectIterator.h"
+#include "Engine/ParticleSystemSceneProxy.h"
+#include "Engine/Scene.h"
 
 UParticleSystemComponent::UParticleSystemComponent()
 {
 	PrimaryComponentTick.bCanEverTick = true;
+	bCastShadow = false;
 }
 
 UParticleSystemComponent::~UParticleSystemComponent()
 {
-	// Unregister 없이 소멸하는 경우 대비
 	ResetParticles();
 	DestroyOwnedTemplate();
 }
@@ -25,13 +32,13 @@ void UParticleSystemComponent::OnRegister()
 {
 	Super::OnRegister();
 
-	// 에셋이 없으면 테스트 템플릿. PIE 복제본도 Template이 비어 있으므로 여기서 자기 것을 만든다
+	// PIE 복제본은 Template이 복사되지 않으므로 여기서 자기 것을 만든다
 	if (!Template)
 	{
 		CreateDefaultTemplate();
 	}
 
-	// 에디터 월드는 BeginPlay가 없으므로 여기서 시작한다 (PIE는 BeginPlay → Activate가 한 번 더 오지만 인스턴스가 있으면 재생성하지 않음)
+	// 에디터 월드는 BeginPlay가 없으므로 여기서 시작
 	if (IsAutoActivate())
 	{
 		ActivateSystem();
@@ -40,7 +47,6 @@ void UParticleSystemComponent::OnRegister()
 
 void UParticleSystemComponent::OnUnregister()
 {
-	// 생성의 역순: 내 것을 먼저 정리하고 부모
 	ResetParticles();
 	Super::OnUnregister();
 }
@@ -53,7 +59,7 @@ void UParticleSystemComponent::Activate(bool bReset)
 
 void UParticleSystemComponent::Deactivate()
 {
-	// 부모는 bIsActive = false + Tick 끔. Tick이 꺼지면 남은 파티클이 그 자리에 멈추므로 다시 켠다
+	// 부모가 Tick을 끄면 남은 파티클이 그 자리에 멈추므로 다시 켠다
 	Super::Deactivate();
 	SetComponentTickEnabled(true);
 	DeactivateSystem();
@@ -74,7 +80,6 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 	{
 		if (!Emitter)
 			continue;
-		// 팩토리를 거쳐야 나중에 Mesh 에미터면 Mesh 인스턴스로 분기할 수 있다
 		if (FParticleEmitterInstance* Instance = Emitter->CreateInstance(this))
 		{
 			EmitterInstances.Add(Instance);
@@ -131,7 +136,12 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 		}
 	}
 	bWasCompleted = bAllComplete;
-	// 스프라이트는 동적 VB를 매 프레임 갱신하므로 렌더 상태 재생성(MarkRenderStateDirty)은 하지 않는다
+
+	// 바운드는 Transform이 바뀔 때만 갱신되므로 매 프레임 요청
+	if (FPrimitiveSceneProxy* Proxy = GetSceneProxy())
+	{
+		Proxy->GetScene()->MarkDirty(Proxy);
+	}
 }
 
 void UParticleSystemComponent::CreateDefaultTemplate()
@@ -144,19 +154,22 @@ void UParticleSystemComponent::CreateDefaultTemplate()
 	UParticleModuleSpawn*    Spawn    = NewObject<UParticleModuleSpawn>(LOD);
 	UParticleModuleLifetime* Lifetime = NewObject<UParticleModuleLifetime>(LOD);
 	UParticleModuleVelocity* Velocity = NewObject<UParticleModuleVelocity>(LOD);
+	UParticleModuleSize*     Size     = NewObject<UParticleModuleSize>(LOD);
+	UParticleModuleColor*    Color    = NewObject<UParticleModuleColor>(LOD);
 
 	LOD->SetRequiredModule(Required);
 	LOD->SetSpawnModule(Spawn);
 	LOD->AddModule(Lifetime);
 	LOD->AddModule(Velocity);
+	LOD->AddModule(Size);
+	LOD->AddModule(Color);
 	Emitter->AddLODLevel(LOD);
 	System->AddEmitter(Emitter);
 
-	// 인스턴스 Init 전에 Bake + 레이아웃(ParticleSize) 계산이 끝나 있어야 한다
+	// 인스턴스 Init 전에 ParticleSize 계산이 끝나 있어야 한다
 	System->BuildEmitters();
 
-	// 자식 → 부모 순서로 기록 (해제도 이 순서)
-	OwnedObjects = { Required, Spawn, Lifetime, Velocity, LOD, Emitter, System };
+	OwnedObjects = { Required, Spawn, Lifetime, Velocity, Size, Color, LOD, Emitter, System };
 	Template = System;
 	bOwnsTemplate = true;
 }
@@ -173,4 +186,68 @@ void UParticleSystemComponent::DestroyOwnedTemplate()
 	OwnedObjects.Empty();
 	Template = nullptr;
 	bOwnsTemplate = false;
+}
+
+FPrimitiveSceneProxy* UParticleSystemComponent::CreateSceneProxy()
+{
+	return new FParticleSystemSceneProxy(this);
+}
+
+FBox UParticleSystemComponent::CalcLocalBounds() const
+{
+	FBox SimBounds(FVector(FLT_MAX), FVector(-FLT_MAX));
+	bool bAny = false;
+	bool bLocalSpace = false;
+	for (const FParticleEmitterInstance* Instance : EmitterInstances)
+	{
+		if (!Instance || Instance->ActiveParticles == 0)
+			continue;
+		SimBounds.Expand(Instance->BoundingBox);
+		bLocalSpace = Instance->IsLocalSpace();
+		bAny = true;
+	}
+	if (!bAny)
+		return FBox(FVector(-1.0f), FVector(1.0f));
+
+	// 위치만 담긴 박스라 스프라이트 크기만큼 여유를 준다
+	const FVector Pad(50.0f);
+	SimBounds = FBox(SimBounds.Min - Pad, SimBounds.Max + Pad);
+
+	// 프록시가 LocalToWorld를 다시 곱하므로 World Space면 로컬로 되돌린다
+	return bLocalSpace ? SimBounds : SimBounds.GetWorldAABB(GetWorldMatrix().Inverse());
+}
+
+
+
+void DrawParticleSystems(UWorld* World, FLineBatcher* LineBatcher, const AActor* Selected)
+{
+	if (!World || !LineBatcher)
+		return;
+
+	constexpr float HalfLength = 3.0f;
+	const FVector4 Color(1.0f, 1.0f, 0.0f, 1.0f);
+
+	for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+	{
+		UParticleSystemComponent* PSC = *It;
+		if (!PSC || !PSC->IsRegistered() || PSC->GetWorld() != World)
+			continue;
+		if (Selected && PSC->GetOwner() != Selected)
+			continue;
+
+		for (FParticleEmitterInstance* Instance : PSC->GetEmitterInstances())
+		{
+			if (!Instance || Instance->ActiveParticles == 0)
+				continue;
+
+			ParticleHelper::ForEachParticle(*Instance, [&](FBaseParticle& Particle, uint8* /*ParticleBase*/)
+				{
+						const FVector P = Instance->SimulationToWorld(Particle.Location);
+
+					LineBatcher->AddLine(P - FVector(HalfLength, 0, 0), P + FVector(HalfLength, 0, 0), Color);
+					LineBatcher->AddLine(P - FVector(0, HalfLength, 0), P + FVector(0, HalfLength, 0), Color);
+					LineBatcher->AddLine(P - FVector(0, 0, HalfLength), P + FVector(0, 0, HalfLength), Color);
+				});
+		}
+	}
 }

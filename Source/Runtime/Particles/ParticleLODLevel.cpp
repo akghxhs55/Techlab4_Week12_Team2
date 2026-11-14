@@ -9,7 +9,7 @@ void UParticleLODLevel::UpdateModuleLists()
 
 	for (UParticleModule* Module : Modules)
 	{
-		// 비활성 모듈도 목록에 둔다. bEnabled는 실행 루프에서 검사한다 (UE와 동일)
+		// 비활성 모듈도 목록에 둔다. bEnabled는 실행 루프에서 검사
 		if (!Module)
 			continue;
 

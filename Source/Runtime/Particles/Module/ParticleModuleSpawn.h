@@ -25,9 +25,7 @@ public:
 
 	void BakeDistributions() override;
 
-	// Rate × RateScale (EmitterTime 기준)
 	float GetSpawnRate(float EmitterTime, FRandomStream& Random) const;
-	// Burst 하나의 이번 개수 (CountLow 랜덤 반영)
 	int32 GetBurstCount(int32 BurstIndex, FRandomStream& Random) const;
 
 	FFloatDistribution& GetRate() { return Rate; }

@@ -23,7 +23,7 @@ public:
 	UParticleModuleRequired* GetRequiredModule() const { return RequiredModule; }
 	void SetRequiredModule(UParticleModuleRequired* InModule) { RequiredModule = InModule; }
 
-	// Required처럼 전용 슬롯. Modules 배열에는 넣지 않는다 (인스턴스 Spawn(dt)이 직접 읽음)
+	// Modules 배열에는 넣지 않는다
 	UParticleModuleSpawn* GetSpawnModule() const { return SpawnModule; }
 	void SetSpawnModule(UParticleModuleSpawn* InModule) { SpawnModule = InModule; }
 

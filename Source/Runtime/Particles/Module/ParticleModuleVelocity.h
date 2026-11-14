@@ -5,7 +5,6 @@
 #include "Particles/Distributions.h"
 #include "ParticleModuleVelocity.generated.h"
 
-// 초기 속도
 UCLASS()
 class UParticleModuleVelocity : public UParticleModule
 {
@@ -20,6 +19,5 @@ public:
 	FFloatDistribution& GetStartVelocityRadial() { return StartVelocityRadial; }
 
 private:
-	FVectorDistribution StartVelocity;        // 고정 방향 속도
-	FFloatDistribution  StartVelocityRadial;  // 에미터 원점 → 파티클 방향으로 더하는 속도
+	FVectorDistribution StartVelocity;	FFloatDistribution  StartVelocityRadial;  // 에미터 원점 → 파티클 방향으로 더하는 속도
 };

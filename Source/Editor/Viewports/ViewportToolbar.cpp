@@ -9,6 +9,7 @@
 #include "GameFramework/Actor/StaticMeshActor.h"
 #include "GameFramework/Actor/SkeletalMeshActor.h"
 #include "GameFramework/Actor/TextRenderActor.h"
+#include "GameFramework/Actor/ParticleSystemActor.h"
 #include "GameFramework/Actor/ExponentialHeightFogActor.h"
 #include "GameFramework/Actor/DirectionalLightActor.h"
 #include "GameFramework/Actor/PointLightActor.h"
@@ -439,7 +440,7 @@ void FViewportsPanel::DrawSpawnMenu(FEditorViewportClient& Client)
     ImGui::SeparatorText("Effects");
     Spawn("Decal", ADecalActor::StaticClass());
     Spawn("Height Fog", AExponentialHeightFogActor::StaticClass());
-    // TODO: 새 파티클 시스템 액터를 만들면 여기에 Spawn("Particle System", ...) 추가
+    Spawn("Particle System", AParticleSystemActor::StaticClass());
     ImGui::EndDisabled();
     if (World) ImGui::TextDisabled("%d actors", World->GetActorNum());
 }

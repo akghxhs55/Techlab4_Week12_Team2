@@ -32,7 +32,6 @@ namespace ParticleHelper
 	template <typename T>
 	inline T& GetPayload(uint8* ParticleBase, int32 Offset)
 	{
-		// Payload는 FBaseParticle 뒤에 있다. 0 이하면 Payload 없는 모듈이 호출한 것 (FBaseParticle을 덮어씀)
 		assert(Offset >= static_cast<int32>(sizeof(FBaseParticle)) && "Payload가 없는 모듈에서 GetPayload 호출");
 		return *reinterpret_cast<T*>(ParticleBase + Offset);
 	}

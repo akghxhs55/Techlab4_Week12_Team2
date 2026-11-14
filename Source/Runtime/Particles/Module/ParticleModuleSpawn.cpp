@@ -9,7 +9,7 @@ UParticleModuleSpawn::UParticleModuleSpawn()
 	RateScale.Mode = EDistributionMode::Constant;
 	RateScale.Constant = 1.0f;
 
-	// Build() 전에도 기본값이 동작하도록 한 번 굽는다
+	// Build() 전에도 기본값이 동작하도록
 	BakeDistributions();
 }
 
