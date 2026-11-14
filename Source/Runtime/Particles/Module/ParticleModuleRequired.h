@@ -40,6 +40,14 @@ public:
 	float GetRandomImageTime() const { return RandomImageTime; }
 	bool UsesSubUV() const { return InterpolationMethod != EParticleSubUVInterpMethod::None && GetTotalSubImages() > 1; }
 
+	void SetSubUV(EParticleSubUVInterpMethod InMethod, int32 InHorizontal, int32 InVertical, float InRandomImageTime)
+	{
+		InterpolationMethod = InMethod;
+		SubImages_Horizontal = InHorizontal > 0 ? InHorizontal : 1;
+		SubImages_Vertical = InVertical > 0 ? InVertical : 1;
+		RandomImageTime = InRandomImageTime;
+	}
+
 private:
 	// 한 루프 길이. 0 이하면 루프 없이 계속 생성
 	UPROPERTY(EditAnywhere)
@@ -71,4 +79,5 @@ private:
 
 	// Random 모드에서 칸을 다시 뽑는 간격 (RelativeTime 단위). 0이면 매 프레임, 1 이상이면 생성 때 한 번
 	UPROPERTY(EditAnywhere)
+	float RandomImageTime = 0.0f;
 };

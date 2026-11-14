@@ -47,6 +47,7 @@ void FRenderer::BindBatch(const FMeshDrawBatch& Batch)
 	
 	RenderCommand::BindVertexBuffer(Batch.VertexBuffer);
 	RenderCommand::BindIndexBuffer(Batch.IndexBuffer);
+	RenderCommand::BindInstanceBuffer(Batch.InstanceBuffer);
 	if (Batch.BoneBuffer)
 		RenderCommand::BindShaderResource(BoneMatrixBufferSlot, Batch.BoneBuffer, EShaderBindFlagBits::Vertex);
 
@@ -95,7 +96,10 @@ void FRenderer::DrawMeshes(std::span<const FMeshDrawBatch> Batches)
 		for (const FMeshDrawBatch::FItem& Item : Batch.Items)
 		{
 			BindObject(Batch, Item);
-			RenderCommand::DrawIndexed(Item.IndexCount, Item.StartIndex);
+			if (Item.InstanceCount > 0)
+				RenderCommand::DrawIndexedInstanced(Item.IndexCount, Item.InstanceCount, Item.StartIndex);
+			else
+				RenderCommand::DrawIndexed(Item.IndexCount, Item.StartIndex);
 		}
 	}
 }

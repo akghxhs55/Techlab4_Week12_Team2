@@ -33,6 +33,7 @@ struct FMeshDrawBatch
 		uint32 ObjectSlot = InvalidObjectSlot;
 		uint32 StartIndex = 0;
 		uint32 IndexCount = 0;
+		uint32 InstanceCount = 0;
 		const void* ObjectKey = nullptr;
 		bool bReceivesDecals = true;
 		FAABB Bounds{};
@@ -44,6 +45,7 @@ struct FMeshDrawBatch
 	FVertexBuffer* VertexBuffer = nullptr;
 	FIndexBuffer* IndexBuffer = nullptr;
 	const FStructuredBuffer* BoneBuffer = nullptr;
+	FVertexBuffer* InstanceBuffer = nullptr;
 
 	TArray<FTextureBinding> Textures;
 	ESamplerState Sampler = ESamplerState::LinearClamp;

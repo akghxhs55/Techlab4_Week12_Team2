@@ -7,21 +7,36 @@ class UParticleSystemComponent;
 class UMaterial;
 struct FParticleEmitterInstance;
 
-struct FParticleSpriteVertex
+struct FParticleSpriteCorner
+{
+	FVector2 UV;
+};
+static_assert(sizeof(FParticleSpriteCorner) == 8, "ParticleSpriteShader 슬롯 0과 맞아야 한다");
+
+struct FParticleSpriteInstance
 {
 	FVector Position;
-	FVector2 TexCoord;
+	float Rotation;
+	FVector2 Size;
+	float SubImageIndex;
 	FLinearColor Color;
-	FVector2 TexCoord2;   // Blend 상대 칸의 UV
-	float BlendAlpha;     // 0이면 TexCoord만 사용
 };
-static_assert(sizeof(FParticleSpriteVertex) == 48, "ParticleSpriteShader VS_INPUT과 맞아야 한다");
+static_assert(sizeof(FParticleSpriteInstance) == 44, "ParticleSpriteShader INSTANCE_* 와 맞아야 한다");
 
-// 에미터 하나의 렌더 리소스. 메시 에미터가 생기면 종류별로 나눈다
+struct FParticleSpriteConstants
+{
+	FVector4 CameraRight;
+	FVector4 CameraUp;
+	FVector4 SubImageSize;
+};
+static_assert(sizeof(FParticleSpriteConstants) % 16 == 0, "cbuffer 16바이트 정렬");
+
 struct FParticleSpriteRenderData
 {
-	TUniquePtr<FVertexBuffer> VertexBuffer;
-	int32 Capacity = 0;   // 파티클 수
+	TUniquePtr<FVertexBuffer> InstanceBuffer;
+	int32 Capacity = 0;
+	// 패킷이 이 주소를 가리키므로 배치가 복사할 때까지 살아 있어야 한다
+	FParticleSpriteConstants Constants;
 };
 
 class FParticleSystemSceneProxy : public FPrimitiveSceneProxy
@@ -35,12 +50,11 @@ public:
 
 private:
 	bool EnsureBuffers(int32 EmitterIndex, const FParticleEmitterInstance& Instance);
-	// 정점 수를 반환
-	int32 BuildSpriteVertices(FParticleEmitterInstance& Instance, const FViewContext& View);
+	int32 BuildSpriteInstances(FParticleEmitterInstance& Instance);
 
-	TArray<FParticleSpriteRenderData> EmitterRenderData;   // EmitterInstances와 같은 인덱스
-	TUniquePtr<FIndexBuffer> IndexBuffer;                  // 모든 에미터가 공유
-	int32 IndexCapacity = 0;
-	TArray<FParticleSpriteVertex> VertexScratch;
+	TArray<FParticleSpriteRenderData> EmitterRenderData;
+	TUniquePtr<FVertexBuffer> QuadVertexBuffer;
+	TUniquePtr<FIndexBuffer> QuadIndexBuffer;
+	TArray<FParticleSpriteInstance> InstanceScratch;
 	UMaterial* Material = nullptr;
 };

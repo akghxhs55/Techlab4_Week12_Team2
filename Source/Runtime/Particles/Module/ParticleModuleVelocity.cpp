@@ -25,7 +25,7 @@ void UParticleModuleVelocity::BakeDistributions()
 
 void UParticleModuleVelocity::Spawn(FParticleEmitterInstance& Owner, int32 Offset, float SpawnTime, FBaseParticle& Particle)
 {
-	FVector Vel = StartVelocity.GetVectorValue(Owner.EmitterTime, Owner.RandomStream);
+	FVector Vel = Owner.EmitterToSimulationVector(StartVelocity.GetVectorValue(Owner.EmitterTime, Owner.RandomStream));
 
 	const FVector EmitterOrigin = Owner.GetEmitterOrigin();
 	const FVector FromOrigin = (Particle.Location - EmitterOrigin).GetSafeNormal();

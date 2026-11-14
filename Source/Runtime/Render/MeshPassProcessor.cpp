@@ -103,6 +103,8 @@ namespace
 			{
 				std::memcpy(Batch.MaterialData.data(), OverrideParams, OverrideSize);
 				Batch.MaterialDataSize = OverrideSize;
+				if (Type == EPSOType::Particle_Additive || Type == EPSOType::Particle_AlphaBlend)
+					Batch.MaterialStages = EShaderBindFlagBits::Vertex | EShaderBindFlagBits::Pixel;
 			}
 		}
 		Batch.Sampler = Material->SamplerState;
@@ -253,6 +255,7 @@ bool FMeshPassProcessor::Build(const FSceneView& View, const FRenderQueue& Queue
 		if (!BuildBatch(Batch, VB, IB, Packet.Material, Pass, View,
 			LightingModel, Packet.MaterialParamData, Packet.MaterialParamDataSize)) return false;
 		if (!ApplyGpuSkin(Batch, Packet)) continue;
+		Batch.InstanceBuffer = Packet.InstanceBuffer;
 
 		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Batch.IndexBuffer->GetIndexCount();
 		const void* ObjectKey = Packet.Proxy ? static_cast<const void*>(Packet.Proxy) : static_cast<const void*>(&Packet);
@@ -261,6 +264,7 @@ bool FMeshPassProcessor::Build(const FSceneView& View, const FRenderQueue& Queue
 			Packet.StartIndex, IndexCount, ObjectKey, !Packet.Proxy || Packet.Proxy->bReceiveShadow,
 			!Packet.Proxy || Packet.Proxy->bReceivesDecals,
 			Packet.Proxy ? Packet.Proxy->GetBounds() : ConservativeBounds, Packet.Proxy));
+		Batch.Items.Last().InstanceCount = Packet.InstanceCount;
 
 		// 웨이트 히트맵: Forward 패스의 오브젝트 상수 빈 칸(ShadowFlags.y)에 본 번호 + 1을 싣는다
 		if (Pass == EMeshPassType::Forward && Packet.DebugWeightBone >= 0)

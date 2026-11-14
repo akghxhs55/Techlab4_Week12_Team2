@@ -209,6 +209,15 @@ FVector FParticleEmitterInstance::SimulationToWorld(const FVector& SimulationPos
 	return SimulationPosition;
 }
 
+FVector FParticleEmitterInstance::EmitterToSimulationVector(const FVector& EmitterVector) const
+{
+	if (IsLocalSpace() || Component == nullptr)
+	{
+		return EmitterVector;
+	}
+	return Component->GetWorldMatrix().TransformVector(EmitterVector);
+}
+
 void FParticleEmitterInstance::UpdateEmitterTime(float DeltaTime)
 {
 	SecondsSinceCreation += DeltaTime;

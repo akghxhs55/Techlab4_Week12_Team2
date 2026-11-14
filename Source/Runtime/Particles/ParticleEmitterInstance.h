@@ -53,6 +53,8 @@ struct FParticleEmitterInstance
 	FVector GetEmitterOrigin() const;
 	bool IsLocalSpace() const;
 	FVector SimulationToWorld(const FVector& SimulationPosition) const;
+	// 에미터 기준 방향/오프셋 → 시뮬레이션 공간 (회전·스케일만, 이동 제외)
+	FVector EmitterToSimulationVector(const FVector& EmitterVector) const;
 
 protected:
 	virtual void UpdateEmitterTime(float DeltaTime);

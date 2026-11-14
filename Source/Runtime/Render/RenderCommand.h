@@ -59,7 +59,6 @@ public:
 
 	static void Draw(uint32 VertexCount, uint32 StartIndexLocation = 0);
 	static void DrawIndexed(uint32 IndexCount, uint32 StartIndexLocation = 0, int32 BaseVertexLocation = 0);
-	static void DrawInstance(uint32 IndexCount, uint32 StartIndexLocation = 0, int32 BaseVertexLocation = 0);
 
 	template <typename T>
 	static void UpdateBufferData(FBuffer* InBuffer, T* Data)
@@ -84,6 +83,9 @@ public:
 	static void BindShaderResource(uint32 Slot, UTexture2D* Texture2D, EShaderBindFlagBits FlagBits);
 	static void BindShaderResource(uint32 Slot, const FStructuredBuffer* StructuredBuffer, EShaderBindFlagBits FlagBits);
 	static void UnbindShaderResources(uint32 FirstSlot, uint32 Count, EShaderBindFlagBits FlagBits);
+
+	static void BindInstanceBuffer(FVertexBuffer* InstanceBuffer);
+	static void DrawIndexedInstanced(uint32 IndexCountPerInstance, uint32 InstanceCount, uint32 StartIndexLocation = 0, int32 BaseVertexLocation = 0, uint32 StartInstanceLocation = 0);
 
 	static void BeginRenderPass(FTexture2D* ColorTarget, FTexture2D* DepthTarget, uint32 Width, uint32 Height);
 	static void BindRenderPassNoClear(FTexture2D* ColorTarget, FTexture2D* DepthTarget, uint32 Width, uint32 Height);

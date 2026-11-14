@@ -10,6 +10,8 @@
 #include "Particles/Module/ParticleModuleVelocity.h"
 #include "Particles/Module/ParticleModuleSize.h"
 #include "Particles/Module/ParticleModuleColor.h"
+#include "Particles/Module/ParticleModuleSubUV.h"
+#include "Particles/Module/ParticleModuleLocation.h"
 #include "Particles/ParticleHelper.h"
 #include "Render/LineBatcher.h"
 #include "UObject/UObjectIterator.h"
@@ -153,23 +155,31 @@ void UParticleSystemComponent::CreateDefaultTemplate()
 	UParticleModuleRequired* Required = NewObject<UParticleModuleRequired>(LOD);
 	UParticleModuleSpawn*    Spawn    = NewObject<UParticleModuleSpawn>(LOD);
 	UParticleModuleLifetime* Lifetime = NewObject<UParticleModuleLifetime>(LOD);
+	UParticleModuleLocation* Location = NewObject<UParticleModuleLocation>(LOD);
 	UParticleModuleVelocity* Velocity = NewObject<UParticleModuleVelocity>(LOD);
 	UParticleModuleSize*     Size     = NewObject<UParticleModuleSize>(LOD);
 	UParticleModuleColor*    Color    = NewObject<UParticleModuleColor>(LOD);
+	UParticleModuleSubUV*    SubUV    = NewObject<UParticleModuleSubUV>(LOD);
+
+	// StarParticle.png는 8x8 아틀라스
+	Required->SetSubUV(EParticleSubUVInterpMethod::Random, 8, 8, 1.0f);
 
 	LOD->SetRequiredModule(Required);
 	LOD->SetSpawnModule(Spawn);
 	LOD->AddModule(Lifetime);
+	// Velocity의 Radial이 이동된 위치를 기준으로 방향을 잡도록 먼저
+	LOD->AddModule(Location);
 	LOD->AddModule(Velocity);
 	LOD->AddModule(Size);
 	LOD->AddModule(Color);
+	LOD->AddModule(SubUV);
 	Emitter->AddLODLevel(LOD);
 	System->AddEmitter(Emitter);
 
 	// 인스턴스 Init 전에 ParticleSize 계산이 끝나 있어야 한다
 	System->BuildEmitters();
 
-	OwnedObjects = { Required, Spawn, Lifetime, Velocity, Size, Color, LOD, Emitter, System };
+	OwnedObjects = { Required, Spawn, Lifetime, Location, Velocity, Size, Color, SubUV, LOD, Emitter, System };
 	Template = System;
 	bOwnsTemplate = true;
 }

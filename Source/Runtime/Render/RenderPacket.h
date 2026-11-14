@@ -21,6 +21,8 @@ struct FRenderPacket
 	FVertexBuffer* VertexBuffer = nullptr; // dynamic
 	FIndexBuffer* IndexBuffer= nullptr; // dynamic
 	const FStructuredBuffer* BoneBuffer = nullptr; // GPU 스킨
+	FVertexBuffer* InstanceBuffer = nullptr;
+	uint32 InstanceCount = 0;
 
 	UMaterial* Material = nullptr;
 	const void* MaterialParamData = nullptr;

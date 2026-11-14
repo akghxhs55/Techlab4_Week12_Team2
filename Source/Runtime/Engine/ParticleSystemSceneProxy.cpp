@@ -6,6 +6,9 @@
 #include "Render/RenderCommand.h"
 #include "Render/Material.h"
 #include "Asset/AssetManager.h"
+#include "Particles/ParticleLODLevel.h"
+#include "Particles/Module/ParticleModuleRequired.h"
+#include "Particles/Module/ParticleModuleSubUV.h"
 #include <cmath>
 
 FParticleSystemSceneProxy::FParticleSystemSceneProxy(UParticleSystemComponent* InComponent)
@@ -27,65 +30,47 @@ void FParticleSystemSceneProxy::UpdateRenderState()
 
 bool FParticleSystemSceneProxy::EnsureBuffers(int32 EmitterIndex, const FParticleEmitterInstance& Instance)
 {
+	if (!QuadVertexBuffer)
+	{
+		const FParticleSpriteCorner Corners[4] = {
+			{ FVector2(0.0f, 1.0f) },{ FVector2(0.0f, 0.0f) },{ FVector2(1.0f, 0.0f) },{ FVector2(1.0f, 1.0f) } };
+		const uint32 Indices[6] = { 0, 1, 2, 0, 2, 3 };
+		QuadVertexBuffer = RenderCommand::CreateStaticVertexBuffer(Corners, sizeof(Corners), sizeof(FParticleSpriteCorner));
+		QuadIndexBuffer = RenderCommand::CreateStaticIndexBuffer(Indices, 6);
+	}
+
 	FParticleSpriteRenderData& Data = EmitterRenderData[EmitterIndex];
-	const int32 Capacity = Instance.MaxActiveParticles;
-
-	if (!Data.VertexBuffer || Data.Capacity < Instance.ActiveParticles)
+	if (!Data.InstanceBuffer || Data.Capacity < Instance.ActiveParticles)
 	{
-		Data.VertexBuffer = RenderCommand::CreateDynamicVertexBuffer(
-			sizeof(FParticleSpriteVertex) * 4 * Capacity, sizeof(FParticleSpriteVertex));
-		Data.Capacity = Capacity;
+		Data.Capacity = Instance.MaxActiveParticles;
+		Data.InstanceBuffer = RenderCommand::CreateDynamicVertexBuffer(
+			sizeof(FParticleSpriteInstance) * Data.Capacity, sizeof(FParticleSpriteInstance));
 	}
-
-	if (!IndexBuffer || IndexCapacity < Instance.ActiveParticles)
-	{
-		TArray<uint32> Indices;
-		Indices.Reserve(Capacity * 6);
-		for (uint32 Quad = 0; Quad < static_cast<uint32>(Capacity); ++Quad)
-		{
-			const uint32 V = Quad * 4;
-			Indices.Add(V + 0); Indices.Add(V + 1); Indices.Add(V + 2);
-			Indices.Add(V + 0); Indices.Add(V + 2); Indices.Add(V + 3);
-		}
-		IndexBuffer = RenderCommand::CreateStaticIndexBuffer(Indices.GetData(), Indices.Num());
-		IndexCapacity = Capacity;
-	}
-	return Data.VertexBuffer && IndexBuffer;
+	return QuadVertexBuffer && QuadIndexBuffer && Data.InstanceBuffer;
 }
 
-int32 FParticleSystemSceneProxy::BuildSpriteVertices(FParticleEmitterInstance& Instance, const FViewContext& View)
+int32 FParticleSystemSceneProxy::BuildSpriteInstances(FParticleEmitterInstance& Instance)
 {
-	const FVector Forward = View.CameraForward.Normalized();
-	FVector Right = FVector::Cross(FVector(0.0f, 0.0f, 1.0f), Forward).Normalized();
-	if (Right.Length() <= 1e-6f)
-		Right = FVector(0.0f, 1.0f, 0.0f);
-	const FVector Up = FVector::Cross(Forward, Right).Normalized();
+	InstanceScratch.SetNum(Instance.ActiveParticles, false);
+	FParticleSpriteInstance* Out = InstanceScratch.GetData();
+	const int32 SubUVOffset = Instance.SubUVDataOffset;
 
-	VertexScratch.SetNum(Instance.ActiveParticles * 4, false);
-	FParticleSpriteVertex* Out = VertexScratch.GetData();
-
-	ParticleHelper::ForEachParticle(Instance, [&](FBaseParticle& Particle, uint8*)
+	ParticleHelper::ForEachParticle(Instance, [&](FBaseParticle& Particle, uint8* ParticleBase)
 		{
-			const FVector P = Instance.SimulationToWorld(Particle.Location);
-			const float C = std::cos(Particle.Rotation);
-			const float S = std::sin(Particle.Rotation);
-			const FVector R = (Right * C + Up * S) * (Particle.Size.X * 0.5f);
-			const FVector U = (Up * C - Right * S) * (Particle.Size.Y * 0.5f);
-
-			Out[0] = { P - R - U, FVector2(0.0f, 1.0f), Particle.Color };
-			Out[1] = { P - R + U, FVector2(0.0f, 0.0f), Particle.Color };
-			Out[2] = { P + R + U, FVector2(1.0f, 0.0f), Particle.Color };
-			Out[3] = { P + R - U, FVector2(1.0f, 1.0f), Particle.Color };
-			Out += 4;
+			Out->Position = Instance.SimulationToWorld(Particle.Location);
+			Out->Rotation = Particle.Rotation;
+			Out->Size = FVector2(Particle.Size.X, Particle.Size.Y);
+			Out->SubImageIndex = SubUVOffset > 0
+				? ParticleHelper::GetPayload<FFullSubUVPayload>(ParticleBase, SubUVOffset).ImageIndex
+				: 0.0f;
+			Out->Color = Particle.Color;
+			++Out;
 		});
-
-	// Freeze된 파티클은 건너뛰므로 실제로 채운 수
-	return static_cast<int32>(Out - VertexScratch.GetData());
+	return static_cast<int32>(Out - InstanceScratch.GetData());
 }
 
 void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, const FViewContext& View)
 {
-	// 프록시가 머티리얼 등록보다 먼저 만들어졌을 수 있다
 	if (!Material)
 	{
 		Material = UAssetManager::GetAssetByPath<UMaterial>("ParticleSpriteAdditive");
@@ -95,13 +80,18 @@ void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, cons
 
 	const UParticleSystemComponent* PSC = static_cast<const UParticleSystemComponent*>(GetComponent());
 	const TArray<FParticleEmitterInstance*>& Instances = PSC->GetEmitterInstances();
-
-	// 인스턴스가 다시 만들어지면 개수가 바뀐다
 	if (EmitterRenderData.Num() != Instances.Num())
 	{
 		EmitterRenderData.Empty();
 		EmitterRenderData.SetNum(Instances.Num());
 	}
+
+	// FViewContext::BuildBillboardMatrix와 같은 축 (왼손, X 앞 / Y 오른쪽 / Z 위)
+	const FVector Forward = View.CameraForward.Normalized();
+	FVector Right = FVector::Cross(FVector(0.0f, 0.0f, 1.0f), Forward).Normalized();
+	if (Right.Length() <= 1e-6f)
+		Right = FVector(0.0f, 1.0f, 0.0f);
+	const FVector Up = FVector::Cross(Forward, Right).Normalized();
 
 	const FVector Delta = GetBounds().Center - View.CameraPosition;
 	const float DistanceSq = Delta.Dot(Delta);
@@ -114,22 +104,40 @@ void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, cons
 		if (!EnsureBuffers(EmitterIndex, *Instance))
 			continue;
 
-		const int32 VertexCount = BuildSpriteVertices(*Instance, View);
-		if (VertexCount == 0)
+		const int32 Count = BuildSpriteInstances(*Instance);
+		if (Count == 0)
 			continue;
 
 		FParticleSpriteRenderData& Data = EmitterRenderData[EmitterIndex];
-		RenderCommand::UpdateBufferData(Data.VertexBuffer.get(),
-			VertexScratch.GetData(), sizeof(FParticleSpriteVertex) * VertexCount);
+		RenderCommand::UpdateBufferData(Data.InstanceBuffer.get(),
+			InstanceScratch.GetData(), sizeof(FParticleSpriteInstance) * Count);
 
-		FRenderPacket& Packet = Queue.AddDefaulted_GetRef();
-		// Proxy를 넣으면 LocalToWorld가 World 행렬로 쓰인다. 정점이 이미 월드 좌표라 비워둔다
+		Data.Constants.CameraRight = FVector4(Right.X, Right.Y, Right.Z, 0.0f);
+		Data.Constants.CameraUp = FVector4(Up.X, Up.Y, Up.Z, 0.0f);
+		const UParticleModuleRequired* Required = Instance->CurrentLODLevel ? Instance->CurrentLODLevel->GetRequiredModule() : nullptr;
+		if (Required && Required->UsesSubUV() && Instance->SubUVDataOffset > 0)
+		{
+			const float H = static_cast<float>(Required->GetSubImagesHorizontal());
+			const float V = static_cast<float>(Required->GetSubImagesVertical());
+			Data.Constants.SubImageSize = FVector4(H, V, 1.0f / H, 1.0f / V);
+		}
+		else
+		{
+			Data.Constants.SubImageSize = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
+		}
+
+		FRenderPacket Packet;
 		Packet.Model = Queue.StoreWorldMatrix(FMatrix::Identity);
-		Packet.VertexBuffer = Data.VertexBuffer.get();
-		Packet.IndexBuffer = IndexBuffer.get();
+		Packet.VertexBuffer = QuadVertexBuffer.get();
+		Packet.IndexBuffer = QuadIndexBuffer.get();
 		Packet.StartIndex = 0;
-		Packet.IndexCount = static_cast<uint32>(VertexCount / 4 * 6);
+		Packet.IndexCount = 6;
+		Packet.InstanceBuffer = Data.InstanceBuffer.get();
+		Packet.InstanceCount = static_cast<uint32>(Count);
 		Packet.Material = Material;
+		Packet.MaterialParamData = &Data.Constants;
+		Packet.MaterialParamDataSize = sizeof(FParticleSpriteConstants);
 		Packet.CameraToParticleDistance = DistanceSq;
+		Queue.Add(Packet);
 	}
 }
