@@ -4,6 +4,8 @@
 #include "Particles/ParticleModule.h"
 #include "ParticleModuleRequired.generated.h"
 
+class UMaterial;
+
 UENUM()
 enum class EParticleSubUVInterpMethod : uint8
 {
@@ -12,6 +14,16 @@ enum class EParticleSubUVInterpMethod : uint8
 	Linear_Blend,
 	Random,
 	Random_Blend,
+};
+
+UENUM()
+enum class EParticleSortMode : uint8
+{
+	None,
+	ViewProjDepth,
+	DistanceToView,
+	Age_OldestFirst,
+	Age_NewestFirst,
 };
 
 // 에미터 전체 규칙 . 파티클을 직접 건드리지 않으므로 Spawn/Update 플래그는 둘 다 false.
@@ -48,6 +60,11 @@ public:
 		RandomImageTime = InRandomImageTime;
 	}
 
+	UMaterial* GetMaterial() const { return Material; }
+	void SetMaterial(UMaterial* InMaterial) { Material = InMaterial; }
+	EParticleSortMode GetSortMode() const { return SortMode; }
+	void SetSortMode(EParticleSortMode InSortMode) { SortMode = InSortMode; }
+
 private:
 	// 한 루프 길이. 0 이하면 루프 없이 계속 생성
 	UPROPERTY(EditAnywhere)
@@ -80,4 +97,9 @@ private:
 	// Random 모드에서 칸을 다시 뽑는 간격 (RelativeTime 단위). 0이면 매 프레임, 1 이상이면 생성 때 한 번
 	UPROPERTY(EditAnywhere)
 	float RandomImageTime = 0.0f;
+
+	UMaterial* Material = nullptr;
+
+	UPROPERTY(EditAnywhere)
+	EParticleSortMode SortMode = EParticleSortMode::None;
 };

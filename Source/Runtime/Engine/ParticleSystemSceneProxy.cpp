@@ -9,7 +9,9 @@
 #include "Particles/ParticleLODLevel.h"
 #include "Particles/Module/ParticleModuleRequired.h"
 #include "Particles/Module/ParticleModuleSubUV.h"
+
 #include <cmath>
+#include <algorithm>
 
 FParticleSystemSceneProxy::FParticleSystemSceneProxy(UParticleSystemComponent* InComponent)
 	: FPrimitiveSceneProxy(InComponent)
@@ -49,28 +51,79 @@ bool FParticleSystemSceneProxy::EnsureBuffers(int32 EmitterIndex, const FParticl
 	return QuadVertexBuffer && QuadIndexBuffer && Data.InstanceBuffer;
 }
 
-int32 FParticleSystemSceneProxy::BuildSpriteInstances(FParticleEmitterInstance& Instance)
+int32 FParticleSystemSceneProxy::BuildSpriteInstances(FParticleEmitterInstance& Instance, const FViewContext& View, EParticleSortMode SortMode)
 {
-	InstanceScratch.SetNum(Instance.ActiveParticles, false);
-	FParticleSpriteInstance* Out = InstanceScratch.GetData();
-	const int32 SubUVOffset = Instance.SubUVDataOffset;
+	SortScratch.SetNum(0, false);
+	const FVector CameraPos = View.CameraPosition;
+	const FVector Forward = View.CameraForward.Normalized();
 
 	ParticleHelper::ForEachParticle(Instance, [&](FBaseParticle& Particle, uint8* ParticleBase)
 		{
-			Out->Position = Instance.SimulationToWorld(Particle.Location);
-			Out->Rotation = Particle.Rotation;
-			Out->Size = FVector2(Particle.Size.X, Particle.Size.Y);
-			Out->SubImageIndex = SubUVOffset > 0
-				? ParticleHelper::GetPayload<FFullSubUVPayload>(ParticleBase, SubUVOffset).ImageIndex
-				: 0.0f;
-			Out->Color = Particle.Color;
-			++Out;
+			float Key = 0.0f;
+			switch (SortMode)
+			{
+			case EParticleSortMode::ViewProjDepth:
+				Key = (Instance.SimulationToWorld(Particle.Location) - CameraPos).Dot(Forward);
+				break;
+			case EParticleSortMode::DistanceToView:
+			{
+				const FVector D = Instance.SimulationToWorld(Particle.Location) - CameraPos;
+				Key = D.Dot(D);
+				break;
+			}
+			case EParticleSortMode::Age_OldestFirst:
+			case EParticleSortMode::Age_NewestFirst:
+				Key = static_cast<float>(Particle.Flags & STATE_CounterMask);
+				break;
+			default:
+				break;
+			}
+			SortScratch.Add({ Key, &Particle, ParticleBase });
 		});
-	return static_cast<int32>(Out - InstanceScratch.GetData());
+
+	// 거리/깊이: 먼 것부터 (뒤에서 앞으로 그려야 AlphaBlend가 맞다)
+	// Age: OldestFirst는 순번이 작은 것부터
+	switch (SortMode)
+	{
+	case EParticleSortMode::ViewProjDepth:
+	case EParticleSortMode::DistanceToView:
+	case EParticleSortMode::Age_NewestFirst:
+		std::sort(SortScratch.begin(), SortScratch.end(),
+			[](const FParticleSortEntry& A, const FParticleSortEntry& B) { return A.Key > B.Key; });
+		break;
+	case EParticleSortMode::Age_OldestFirst:
+		std::sort(SortScratch.begin(), SortScratch.end(),
+			[](const FParticleSortEntry& A, const FParticleSortEntry& B) { return A.Key < B.Key; });
+		break;
+	default:
+		break;
+	}
+
+	const int32 Count = SortScratch.Num();
+	InstanceScratch.SetNum(Count, false);
+	const int32 SubUVOffset = Instance.SubUVDataOffset;
+
+	for (int32 i = 0; i < Count; ++i)
+	{
+		const FBaseParticle& Particle = *SortScratch[i].Particle;
+		FParticleSpriteInstance& Out = InstanceScratch[i];
+		Out.Position = Instance.SimulationToWorld(Particle.Location);
+		Out.Rotation = Particle.Rotation;
+		Out.Size = FVector2(Particle.Size.X, Particle.Size.Y);
+		Out.SubImageIndex = SubUVOffset > 0
+			? ParticleHelper::GetPayload<FFullSubUVPayload>(const_cast<uint8*>(SortScratch[i].ParticleBase), SubUVOffset).ImageIndex
+			: 0.0f;
+		Out.Color = Particle.Color;
+	}
+	return Count;
 }
 
 void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, const FViewContext& View)
 {
+	if (!DefaultMaterial)
+	{
+		DefaultMaterial = UAssetManager::GetAssetByPath<UMaterial>("ParticleSpriteAdditive");
+	}
 	if (!Material)
 	{
 		Material = UAssetManager::GetAssetByPath<UMaterial>("ParticleSpriteAdditive");

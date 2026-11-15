@@ -6,6 +6,7 @@
 class UParticleSystemComponent;
 class UMaterial;
 struct FParticleEmitterInstance;
+enum class EParticleSortMode : uint8;
 
 struct FParticleSpriteCorner
 {
@@ -39,6 +40,13 @@ struct FParticleSpriteRenderData
 	FParticleSpriteConstants Constants;
 };
 
+struct FParticleSortEntry
+{
+	float Key;
+	const FBaseParticle* Particle;
+	const uint8* ParticleBase;
+};
+
 class FParticleSystemSceneProxy : public FPrimitiveSceneProxy
 {
 public:
@@ -50,7 +58,10 @@ public:
 
 private:
 	bool EnsureBuffers(int32 EmitterIndex, const FParticleEmitterInstance& Instance);
-	int32 BuildSpriteInstances(FParticleEmitterInstance& Instance);
+	int32 BuildSpriteInstances(FParticleEmitterInstance& Instance, const FViewContext& View, EParticleSortMode SortMode);
+
+	TArray<FParticleSortEntry> SortScratch;
+	UMaterial* DefaultMaterial = nullptr;
 
 	TArray<FParticleSpriteRenderData> EmitterRenderData;
 	TUniquePtr<FVertexBuffer> QuadVertexBuffer;
