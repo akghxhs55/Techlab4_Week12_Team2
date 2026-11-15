@@ -10,11 +10,16 @@ bool FSkeletalMeshEditor::InitializeResources()
 	BoneGizmoTarget = Cast<USceneComponent>(PreviewScene.AddComponent(USceneComponent::StaticClass()));
 	if (!BoneGizmoTarget) return false;
 	BoneGizmoTarget->DetachFromParent();
+	ResetBonePoseHistory();
 	return true;
 }
 
 void FSkeletalMeshEditor::ShutdownResources()
 {
+	PoseUndoStack.Empty();
+	PoseRedoStack.Empty();
+	CommittedBonePose.Empty();
+	bPoseUndoPending = false;
 	BoneGizmo.EndDrag();
 	BoneGizmo.SetTarget(nullptr);
 	BoneGizmoTarget = nullptr;
@@ -180,6 +185,7 @@ void FSkeletalMeshEditor::ApplyBoneGizmoTransform()
 	// 조작한 성분만 변경하고 나머지는 드래그 시작 시점의 로컬 값을 유지합니다.
 	MeshComponent->SetBoneLocalTransform(SelectedBoneIndex, Local);
 	MeshComponent->RefreshBoneTransformsNow();
+	bPoseUndoPending = true;
 }
 
 bool FSkeletalMeshEditor::GetSelectedBoneLocalTransform(FTransform& OutTransform) const
@@ -203,6 +209,7 @@ void FSkeletalMeshEditor::SetSelectedBoneLocalTransform(const FTransform& Transf
 	// 원본 애셋 대신 프리뷰 컴포넌트의 포즈만 수정합니다. 본 갱신은 다음 World Tick에서 수행합니다.
 	BoneGizmo.EndDrag();
 	MeshComponent->SetBoneLocalTransform(SelectedBoneIndex, Transform);
+	bPoseUndoPending = true;
 }
 
 void FSkeletalMeshEditor::ResetPose()
@@ -214,6 +221,7 @@ void FSkeletalMeshEditor::ResetPose()
 
 	BoneGizmo.EndDrag();
 	MeshComponent->ResetPose();
+	bPoseUndoPending = true;
 }
 
 void FSkeletalMeshEditor::ResetBone(int32 BoneIndex)
@@ -236,4 +244,119 @@ void FSkeletalMeshEditor::ResetBone(int32 BoneIndex)
 	BoneGizmo.EndDrag();
 	FTransform Transform = Mesh->GetRefSkeleton()[BoneIndex].LocalBindPose;
 	MeshComponent->SetBoneLocalTransform(BoneIndex, Transform);
+	bPoseUndoPending = true;
+}
+
+namespace
+{
+	bool AreBonePosesEqual(const TArray<FTransform>& A, const TArray<FTransform>& B)
+	{
+		if (A.Num() != B.Num())
+		{
+			return false;
+		}
+		for (int32 i = 0; i < A.Num(); ++i)
+		{
+			if (A[i].Location.X != B[i].Location.X || A[i].Location.Y != B[i].Location.Y || A[i].Location.Z != B[i].Location.Z ||
+				A[i].Rotation.X != B[i].Rotation.X || A[i].Rotation.Y != B[i].Rotation.Y || A[i].Rotation.Z != B[i].Rotation.Z || A[i].Rotation.W != B[i].Rotation.W ||
+				A[i].Scale.X != B[i].Scale.X || A[i].Scale.Y != B[i].Scale.Y || A[i].Scale.Z != B[i].Scale.Z)
+			{
+				return false;
+			}
+		}
+		return true;
+	}
+}
+
+TArray<FTransform> FSkeletalMeshEditor::CaptureBonePose() const
+{
+	TArray<FTransform> Pose;
+	if (!Mesh || !MeshComponent)
+	{
+		return Pose;
+	}
+
+	const int32 NumBones = Mesh->GetRefSkeleton().Num();
+	Pose.Reserve(NumBones);
+	for (int32 i = 0; i < NumBones; ++i)
+	{
+		Pose.Add(MeshComponent->GetBoneLocalTransform(i));
+	}
+	return Pose;
+}
+
+void FSkeletalMeshEditor::ApplyBonePose(const TArray<FTransform>& Pose)
+{
+	if (!Mesh || !MeshComponent)
+	{
+		return;
+	}
+
+	BoneGizmo.EndDrag();
+	const int32 NumBones = std::min(static_cast<int32>(Pose.Num()), static_cast<int32>(Mesh->GetRefSkeleton().Num()));
+	for (int32 i = 0; i < NumBones; ++i)
+	{
+		MeshComponent->SetBoneLocalTransform(i, Pose[i]);
+	}
+	MeshComponent->RefreshBoneTransformsNow();
+	SyncBoneGizmo();
+}
+
+void FSkeletalMeshEditor::ResetBonePoseHistory()
+{
+	PoseUndoStack.Empty();
+	PoseRedoStack.Empty();
+	CommittedBonePose = CaptureBonePose();
+	bPoseUndoPending = false;
+}
+
+void FSkeletalMeshEditor::CommitBonePoseUndo(bool bInteractionActive)
+{
+	if (!bPoseUndoPending || bInteractionActive || !MeshComponent)
+	{
+		return;
+	}
+	bPoseUndoPending = false;
+
+	TArray<FTransform> Current = CaptureBonePose();
+	if (AreBonePosesEqual(Current, CommittedBonePose))
+	{
+		return;
+	}
+
+	PoseUndoStack.Add(std::move(CommittedBonePose));
+	if (PoseUndoStack.Num() > MaxUndoSteps)
+	{
+		PoseUndoStack.RemoveAt(0);
+	}
+	PoseRedoStack.Empty();
+	CommittedBonePose = std::move(Current);
+}
+
+void FSkeletalMeshEditor::UndoPoseEdit()
+{
+	CommitBonePoseUndo(false);
+	if (PoseUndoStack.IsEmpty() || !MeshComponent)
+	{
+		return;
+	}
+
+	PoseRedoStack.Add(std::move(CommittedBonePose));
+	CommittedBonePose = std::move(PoseUndoStack[PoseUndoStack.Num() - 1]);
+	PoseUndoStack.RemoveAt(PoseUndoStack.Num() - 1);
+	ApplyBonePose(CommittedBonePose);
+}
+
+void FSkeletalMeshEditor::RedoPoseEdit()
+{
+	CommitBonePoseUndo(false);
+	if (PoseRedoStack.IsEmpty() || !MeshComponent)
+	{
+		return;
+	}
+
+	PoseUndoStack.Add(std::move(CommittedBonePose));
+	CommittedBonePose = std::move(PoseRedoStack[PoseRedoStack.Num() - 1]);
+	PoseRedoStack.RemoveAt(PoseRedoStack.Num() - 1);
+	ApplyBonePose(CommittedBonePose);
 }

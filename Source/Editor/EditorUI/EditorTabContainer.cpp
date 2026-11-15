@@ -258,7 +258,8 @@ void FEditorTabContainer::DrawTabs()
 
 		// 숨겨진 탭도 내부 도킹 노드를 유지할 수 있도록 호출한다.
 		Tab->OnRender(bVisible);
-		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_DockHierarchy))
+		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_DockHierarchy) ||
+			Tab->HasFocusedSubWindow())
 		{
 			FocusedTab = Tab;
 		}

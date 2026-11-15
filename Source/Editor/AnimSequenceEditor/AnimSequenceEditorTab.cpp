@@ -84,9 +84,11 @@ void FAnimSequenceEditorTab::OnRender(bool bActive)
     // 이번 프레임의 편집을 실행 취소 단계로 확정 (드래그/입력 중이면 놓을 때까지 미룬다)
     AnimEditor.CommitNotifyUndo(ImGui::IsAnyItemActive());
 
-    // 단축키: 이 탭이 보이고 있을 때만 (레벨 에디터 등 다른 탭과 겹치지 않게)
+    // 단축키: 이 탭(또는 분리된 하위 패널)에 포커스가 있을 때만 (레벨 에디터 등 다른 탭과 겹치지 않게)
     const ImGuiIO& IO = ImGui::GetIO();
-    if (bActive && IO.KeyCtrl && !IO.WantTextInput)
+    const bool bTabFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_DockHierarchy) ||
+        HasFocusedSubWindow();
+    if (bActive && bTabFocused && IO.KeyCtrl && !IO.WantTextInput)
     {
         if (ImGui::IsKeyPressed(ImGuiKey_S, false) && AnimEditor.IsDirty())
         {

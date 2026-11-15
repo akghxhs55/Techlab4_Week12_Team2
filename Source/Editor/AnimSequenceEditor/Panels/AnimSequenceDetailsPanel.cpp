@@ -45,6 +45,7 @@ void FAnimSequenceDetailsPanel::DrawContent()
     {
         Sequence->SetEnableRootMotion(bEnableRootMotion);
         Editor.MarkPoseDirty();   // 일시정지 중에도 포즈를 다시 계산해 root 고정을 바로 보여준다
+        Editor.MarkRootMotionDirty();
     }
 
     // root를 고정할 기준. 일시정지 중에도 변경된 기준으로 포즈를 갱신한다.
@@ -54,6 +55,7 @@ void FAnimSequenceDetailsPanel::DrawContent()
     {
         Sequence->SetRootMotionRootLock(static_cast<ERootMotionRootLock>(RootLock));
         Editor.MarkPoseDirty();
+        Editor.MarkRootMotionDirty();
     }
 
     // 루트 모션이 꺼져 있어도 root를 고정한다 (Actor는 움직이지 않는 제자리 재생)
@@ -62,6 +64,7 @@ void FAnimSequenceDetailsPanel::DrawContent()
     {
         Sequence->SetForceRootLock(bForceRootLock);
         Editor.MarkPoseDirty();
+        Editor.MarkRootMotionDirty();
     }
 
     // 바꾸면 Unsaved changes로 표시되고, 타임라인의 Save(Ctrl+S)로 .anim.bin에 저장한다.

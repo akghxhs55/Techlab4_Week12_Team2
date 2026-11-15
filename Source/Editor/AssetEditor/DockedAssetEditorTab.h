@@ -10,6 +10,7 @@ public:
     FDockedAssetEditorTab(FAssetEditor& InEditor, const char* DockSpaceName, const char* PanelClassName);
 
     void DrawMenuBar() override;
+    bool HasFocusedSubWindow() const override { return EditorDock::HasFocusedPanel(Panels); }
     void OnRender(bool bActive) override;
 
 protected:

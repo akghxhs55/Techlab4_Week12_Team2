@@ -43,6 +43,7 @@
 #include "Core/EngineLog.h"
 
 #include "Editor/HitoriEd/EditorFileUtils.h"
+#include "Editor/HitoriEd/EditorUndo.h"
 #include "Script/LuaScriptManager.h"
 
 
@@ -61,6 +62,85 @@ namespace
 		const float Max = (std::min)(Meta.UIMax, Meta.ClampMax);
 		const bool bHasRange = Min > -FLT_MAX || Max < FLT_MAX;
 		return { Meta.Delta > 0.0f ? Meta.Delta : DefaultSpeed, bHasRange ? Min : 0.0f, bHasRange ? Max : 0.0f };
+	}
+
+	FString TruncateTextToWidth(const FString& Text, float MaxWidth)
+	{
+		if (MaxWidth <= 0.0f || Text.empty())
+		{
+			return {};
+		}
+		if (ImGui::CalcTextSize(Text.c_str()).x <= MaxWidth)
+		{
+			return Text;
+		}
+
+		const char* Ellipsis = "...";
+		if (ImGui::CalcTextSize(Ellipsis).x > MaxWidth)
+		{
+			return {};
+		}
+
+		// UTF-8 문자 경계를 따라 줄여 멀티바이트 이름이 깨지지 않게 한다.
+		size_t BestLen = 0;
+		for (size_t i = 1; i <= Text.size(); ++i)
+		{
+			if (i < Text.size() && (static_cast<unsigned char>(Text[i]) & 0xC0) == 0x80)
+			{
+				continue;
+			}
+			const FString Candidate = Text.substr(0, i) + Ellipsis;
+			if (ImGui::CalcTextSize(Candidate.c_str()).x <= MaxWidth)
+			{
+				BestLen = i;
+			}
+			else
+			{
+				break;
+			}
+		}
+		return BestLen > 0 ? Text.substr(0, BestLen) + Ellipsis : FString(Ellipsis);
+	}
+
+	void DrawComponentClassSuffix(
+		const FString& DisplayedLabel,
+		const FString& FullLabel,
+		const char* ClassRawName,
+		const ImVec2& RowStart,
+		float RowWidth,
+		bool bRowHovered)
+	{
+		if (!ClassRawName || !ClassRawName[0])
+		{
+			return;
+		}
+
+		const FString FullClass = std::format("({})", ClassRawName);
+		const float PadRight = ImGui::GetStyle().FramePadding.x;
+		const float MinGap = EditorStyle::Scale(8.0f);
+		const float RightEdge = RowStart.x + RowWidth - PadRight;
+		const float LabelEndX = RowStart.x + ImGui::GetTreeNodeToLabelSpacing()
+			+ ImGui::CalcTextSize(DisplayedLabel.c_str()).x;
+		const float FullClassWidth = ImGui::CalcTextSize(FullClass.c_str()).x;
+
+		// 기본은 우측 정렬이되 왼쪽 컴포넌트 이름과 겹치지 않게 시작 X를 민다.
+		const float TextX = (std::max)(RightEdge - FullClassWidth, LabelEndX + MinGap);
+		const float AvailableClassWidth = RightEdge - TextX;
+		FString DrawnClass = TruncateTextToWidth(FullClass, AvailableClassWidth);
+		if (DrawnClass == "...")
+		{
+			DrawnClass.clear();
+		}
+		if (!DrawnClass.empty())
+		{
+			ImGui::GetWindowDrawList()->AddText(
+				ImVec2(TextX, RowStart.y), IM_COL32(200, 200, 200, 255), DrawnClass.c_str());
+		}
+
+		if (bRowHovered && !ImGui::GetDragDropPayload() && (DisplayedLabel != FullLabel || DrawnClass != FullClass))
+		{
+			ImGui::SetTooltip("%s %s", FullLabel.c_str(), FullClass.c_str());
+		}
 	}
 
 	int32 ToIntBound(float Value)
@@ -1389,7 +1469,7 @@ namespace
 		}
 	}
 
-	void DrawActorHeader(AActor* Actor, UActorComponent*& OutSelectedComponent)
+	void DrawActorHeader(AActor* Actor, UActorComponent*& OutSelectedComponent, FEditorUndoHistory* UndoHistory)
 	{
 		if (!Actor) { return; }
 
@@ -1464,7 +1544,30 @@ namespace
                     if (strcmp(Category(Class), Group) != 0) continue;
                     if (ImGui::MenuItem(Class->Name.c_str()))
                     {
-                        OutSelectedComponent = Actor->AddComponent(Class, FString(ComponentNameInputBuf));
+                        UActorComponent* Added = Actor->AddComponent(Class, FString(ComponentNameInputBuf));
+                        OutSelectedComponent = Added;
+                        if (Added && UndoHistory && UndoHistory->CanRecord())
+                        {
+                            TArray<uint8> CompBytes;
+                            EditorUndoUtils::CaptureObjectBytes(Added, CompBytes);
+                            FName ParentCompName;
+                            if (USceneComponent* SceneComp = Cast<USceneComponent>(Added))
+                            {
+                                if (USceneComponent* Parent = SceneComp->GetAttachParent(); Parent && Parent->GetOwner() == Actor)
+                                {
+                                    ParentCompName = Parent->GetFName();
+                                }
+                            }
+                            UndoHistory->Push(EditorUndoUtils::MakeComponentAddRemoveCommand(
+                                "Add Component",
+                                Actor->GetFName(),
+                                Added->GetFName(),
+                                Class->Name,
+                                ParentCompName,
+                                {},
+                                std::move(CompBytes),
+                                true));
+                        }
                         ComponentNameInputBuf[0] = '\0';
                         ImGui::CloseCurrentPopup();
                     }
@@ -1576,11 +1679,70 @@ void FDetailsPanel::DrawShadowPreview()
 }
 
 
+void FDetailsPanel::CommitPendingObjectEdit()
+{
+	if (!bPendingEditCommit)
+	{
+		return;
+	}
+	bPendingEditCommit = false;
+
+	if (!UndoHistory || !UndoHistory->CanRecord() || !World)
+	{
+		PendingActorBeforeBytes.Empty();
+		PendingCompBeforeBytes.Empty();
+		return;
+	}
+
+	AActor* Actor = EditorUndoUtils::FindActorByName(World, TrackedActorName);
+	if (!Actor)
+	{
+		PendingActorBeforeBytes.Empty();
+		PendingCompBeforeBytes.Empty();
+		return;
+	}
+
+	TArray<uint8> AfterActorBytes;
+	if (!PendingActorBeforeBytes.IsEmpty() &&
+		EditorUndoUtils::CaptureObjectBytes(Actor, AfterActorBytes) &&
+		!(AfterActorBytes == PendingActorBeforeBytes))
+	{
+		UndoHistory->Push(EditorUndoUtils::MakeObjectBytesCommand(
+			"Edit Actor Property",
+			TrackedActorName,
+			FName(),
+			std::move(PendingActorBeforeBytes),
+			std::move(AfterActorBytes)));
+	}
+
+	if (!TrackedComponentName.IsNone() && !PendingCompBeforeBytes.IsEmpty())
+	{
+		if (UActorComponent* Comp = Actor->FindComponentByName(TrackedComponentName))
+		{
+			TArray<uint8> AfterCompBytes;
+			if (EditorUndoUtils::CaptureObjectBytes(Comp, AfterCompBytes) &&
+				!(AfterCompBytes == PendingCompBeforeBytes))
+			{
+				UndoHistory->Push(EditorUndoUtils::MakeObjectBytesCommand(
+					"Edit Component Property",
+					TrackedActorName,
+					TrackedComponentName,
+					std::move(PendingCompBeforeBytes),
+					std::move(AfterCompBytes)));
+			}
+		}
+	}
+
+	PendingActorBeforeBytes.Empty();
+	PendingCompBeforeBytes.Empty();
+}
+
 void FDetailsPanel::OnRender()
 {
 	ImGui::SetNextWindowSize(ImVec2(400, 200), ImGuiCond_FirstUseEver);
 
 	ImGui::Begin("Details", GetOpenFlag());
+	bFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
 	if (TargetActor)
 	{
@@ -1594,9 +1756,32 @@ void FDetailsPanel::OnRender()
 
 		UActorComponent* SelectCandidateComponent = TargetComponent;
 
-		DrawActorHeader(TargetActor, TargetComponent);
+		DrawActorHeader(TargetActor, TargetComponent, UndoHistory);
 		DrawCompoenetList(TargetActor, TargetComponent);
 		ImGui::Separator();
+
+		const FName CurrentActorName = TargetActor->GetFName();
+		const FName CurrentCompName = TargetComponent ? TargetComponent->GetFName() : FName();
+		if (bPendingEditCommit && (TrackedActorName != CurrentActorName || TrackedComponentName != CurrentCompName))
+		{
+			CommitPendingObjectEdit();
+		}
+
+		const bool bCanCaptureBefore = UndoHistory && UndoHistory->CanRecord() && TargetActor->GetWorld() == World &&
+			!bPendingEditCommit &&
+			(bFocused || ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) ||
+			 ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId));
+
+		TArray<uint8> FrameBeforeActorBytes;
+		TArray<uint8> FrameBeforeCompBytes;
+		if (bCanCaptureBefore)
+		{
+			EditorUndoUtils::CaptureObjectBytes(TargetActor, FrameBeforeActorBytes);
+			if (TargetComponent)
+			{
+				EditorUndoUtils::CaptureObjectBytes(TargetComponent, FrameBeforeCompBytes);
+			}
+		}
 
 		// 액터 -> 컴포넌트 순으로, 클래스별 프로퍼티 표시
 		ImGui::PushID(TargetActor);
@@ -1645,6 +1830,31 @@ void FDetailsPanel::OnRender()
 			ImGui::PopID();
 		}
 
+		if (bCanCaptureBefore)
+		{
+			TArray<uint8> FrameAfterActorBytes;
+			TArray<uint8> FrameAfterCompBytes;
+			EditorUndoUtils::CaptureObjectBytes(TargetActor, FrameAfterActorBytes);
+			if (TargetComponent)
+			{
+				EditorUndoUtils::CaptureObjectBytes(TargetComponent, FrameAfterCompBytes);
+			}
+
+			if (!(FrameAfterActorBytes == FrameBeforeActorBytes) || !(FrameAfterCompBytes == FrameBeforeCompBytes))
+			{
+				TrackedActorName = CurrentActorName;
+				TrackedComponentName = CurrentCompName;
+				PendingActorBeforeBytes = std::move(FrameBeforeActorBytes);
+				PendingCompBeforeBytes = std::move(FrameBeforeCompBytes);
+				bPendingEditCommit = true;
+			}
+		}
+
+		if (bPendingEditCommit && !ImGui::IsAnyItemActive())
+		{
+			CommitPendingObjectEdit();
+		}
+
 		if (PendingDeleteComponent)
 		{
 			if (DeleteCallback)
@@ -1654,6 +1864,10 @@ void FDetailsPanel::OnRender()
 
 			PendingDeleteComponent = nullptr;
 		}
+	}
+	else if (bPendingEditCommit)
+	{
+		CommitPendingObjectEdit();
 	}
 	ImGui::End();
 }
@@ -1694,8 +1908,20 @@ void FDetailsPanel::DrawCompoenetList(AActor* SelectedActor, UActorComponent*& O
     {
         USceneComponent* NewRoot = PendingRootComponent;
         PendingRootComponent = nullptr;
+        USceneComponent* OldRoot = SelectedActor->GetRootComponent();
+        USceneComponent* ExtParent = (OldRoot && OldRoot->GetAttachParent() && OldRoot->GetAttachParent()->GetOwner() != SelectedActor)
+            ? OldRoot->GetAttachParent() : nullptr;
+        const FName OldRootName = OldRoot ? OldRoot->GetFName() : FName();
+        const FName NewRootName = NewRoot ? NewRoot->GetFName() : FName();
+        const FName ExtParentActor = (ExtParent && ExtParent->GetOwner()) ? ExtParent->GetOwner()->GetFName() : FName();
+        const FName ExtParentComp = ExtParent ? ExtParent->GetFName() : FName();
         if (SelectedActor->MakeRootComponent(NewRoot))
         {
+            if (UndoHistory && UndoHistory->CanRecord())
+            {
+                UndoHistory->Push(EditorUndoUtils::MakeRootComponentCommand(
+                    SelectedActor->GetFName(), OldRootName, NewRootName, ExtParentActor, ExtParentComp));
+            }
             OutSelectedComponent = NewRoot;
             if (Callback) Callback(NewRoot);
         }
@@ -1758,15 +1984,19 @@ void FDetailsPanel::DrawCompoenetList(AActor* SelectedActor, UActorComponent*& O
 		FString Label = ActorComp->GetName();
 		const ImVec2 RowStart = ImGui::GetCursorScreenPos();
 		const float RowWidth = ImGui::GetContentRegionAvail().x;
+		const float MaxLabelWidth = RowWidth - ImGui::GetTreeNodeToLabelSpacing() - ImGui::GetStyle().FramePadding.x;
+		const FString DisplayedLabel = TruncateTextToWidth(Label, MaxLabelWidth);
+		const bool bEditingThis = (EditingNameComponent == ActorComp);
 
-		ImGui::TreeNodeEx("ActorComponentNode", Flags, "%s", Label.c_str());
+		ImGui::TreeNodeEx("ActorComponentNode", Flags, "%s", bEditingThis ? "" : DisplayedLabel.c_str());
+		const bool bRowHovered = ImGui::IsItemHovered();
 
 		if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
 		{
 			OutSelectedComponent = ActorComp;
 		}
 
-        bool Rename = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+        bool Rename = bRowHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
         if (ImGui::BeginPopupContextItem("Component Context"))
         {
             if (ImGui::MenuItem("Rename", "F2")) Rename = true;
@@ -1776,9 +2006,11 @@ void FDetailsPanel::DrawCompoenetList(AActor* SelectedActor, UActorComponent*& O
 		}
 
 		DrawComponentNameEditor(ActorComp, OutSelectedComponent, Rename);
-		const FString ClassName = std::format("({})", ActorComp->GetClass()->Name);
-		const float TextX = RowStart.x + RowWidth - ImGui::CalcTextSize(ClassName.c_str()).x;
-		ImGui::GetWindowDrawList()->AddText(ImVec2(TextX, RowStart.y), IM_COL32(200, 200, 200, 255), ClassName.c_str());
+		if (EditingNameComponent != ActorComp)
+		{
+			const char* ClassRawName = ActorComp->GetClass() ? ActorComp->GetClass()->Name.c_str() : "";
+			DrawComponentClassSuffix(DisplayedLabel, Label, ClassRawName, RowStart, RowWidth, bRowHovered);
+		}
 
 		ImGui::PopID();
 	}
@@ -1820,7 +2052,10 @@ void FDetailsPanel::DrawSceneComponentNode(USceneComponent* Component, USceneCom
 	ImGui::PushID(Component);
 	const ImVec2 RowStart = ImGui::GetCursorScreenPos();
 	const float RowWidth = ImGui::GetContentRegionAvail().x;
-	const bool bOpen = ImGui::TreeNodeEx("ComponentNode", Flags, "%s", bIsEditingName ? "" : Label.c_str());
+	const float MaxLabelWidth = RowWidth - ImGui::GetTreeNodeToLabelSpacing() - ImGui::GetStyle().FramePadding.x;
+	const FString DisplayedLabel = TruncateTextToWidth(Label, MaxLabelWidth);
+	const bool bOpen = ImGui::TreeNodeEx("ComponentNode", Flags, "%s", bIsEditingName ? "" : DisplayedLabel.c_str());
+	const bool bRowHovered = ImGui::IsItemHovered();
 
 	USceneComponent* DragComponent = Component;
 
@@ -1861,9 +2096,8 @@ void FDetailsPanel::DrawSceneComponentNode(USceneComponent* Component, USceneCom
     DrawComponentNameEditor(Component, OutSelectedComponent, Rename);
     if (EditingNameComponent != Component)
     {
-        const FString ClassName = std::format("({})", Component->GetClass()->Name);
-        const float TextX = RowStart.x + RowWidth - ImGui::CalcTextSize(ClassName.c_str()).x;
-        ImGui::GetWindowDrawList()->AddText(ImVec2(TextX, RowStart.y), IM_COL32(200, 200, 200, 255), ClassName.c_str());
+        const char* ClassRawName = Component->GetClass() ? Component->GetClass()->Name.c_str() : "";
+        DrawComponentClassSuffix(DisplayedLabel, Label, ClassRawName, RowStart, RowWidth, bRowHovered);
     }
 
 	if (bOpen && !bIsLeaf)
@@ -1899,7 +2133,19 @@ void FDetailsPanel::DrawComponentNameEditor(UActorComponent* Component, UActorCo
         {
             FName Name(ComponentNameEditBuffer);
             UActorComponent* Existing = Component->GetOwner()->FindComponentByName(Name);
-            if (!Existing || Existing == Component) Component->SetName(Name);
+            if (!Existing || Existing == Component)
+            {
+                const FName OldName = Component->GetFName();
+                if (OldName != Name)
+                {
+                    Component->SetName(Name);
+                    if (UndoHistory && UndoHistory->CanRecord() && Component->GetOwner())
+                    {
+                        UndoHistory->Push(EditorUndoUtils::MakeComponentRenameCommand(
+                            Component->GetOwner()->GetFName(), OldName, Name));
+                    }
+                }
+            }
             else HTR_LOG(Warning, "A component with this name already exists in this actor.");
         }
         EditingNameComponent = nullptr;
@@ -1908,7 +2154,29 @@ void FDetailsPanel::DrawComponentNameEditor(UActorComponent* Component, UActorCo
 
 void FDetailsPanel::TryReparent(USceneComponent* DroppedComponent, USceneComponent* DragComponent)
 {
-    EditorHierarchy::Attach(DroppedComponent, DragComponent);
+    if (!DroppedComponent)
+    {
+        return;
+    }
+    AActor* ChildActor = DroppedComponent->GetOwner();
+    USceneComponent* OldParent = DroppedComponent->GetAttachParent();
+    const FName ChildActorName = ChildActor ? ChildActor->GetFName() : FName();
+    const FName ChildCompName = DroppedComponent->GetFName();
+    const FName OldParentActorName = (OldParent && OldParent->GetOwner()) ? OldParent->GetOwner()->GetFName() : FName();
+    const FName OldParentCompName = OldParent ? OldParent->GetFName() : FName();
+
+    if (EditorHierarchy::Attach(DroppedComponent, DragComponent) &&
+        UndoHistory && UndoHistory->CanRecord() && !ChildActorName.IsNone())
+    {
+        USceneComponent* NewParent = DroppedComponent->GetAttachParent();
+        const FName NewParentActorName = (NewParent && NewParent->GetOwner()) ? NewParent->GetOwner()->GetFName() : FName();
+        const FName NewParentCompName = NewParent ? NewParent->GetFName() : FName();
+        UndoHistory->Push(EditorUndoUtils::MakeHierarchyAttachCommand(
+            "Reparent Component",
+            ChildActorName, ChildCompName,
+            OldParentActorName, OldParentCompName,
+            NewParentActorName, NewParentCompName));
+    }
 }
 
 

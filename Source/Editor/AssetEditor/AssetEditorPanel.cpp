@@ -30,6 +30,7 @@ void FAssetEditorPanelBase::OnRender()
 	{
 		ImGui::PopStyleVar();
 	}
+	bFocused = bVisible && ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 	if (bVisible)
 	{
 		DrawContent();

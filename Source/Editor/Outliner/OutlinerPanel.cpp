@@ -8,6 +8,7 @@
 #include "Components/PrimitiveComponent.h"
 #include "Editor/HitoriEd/EditorDragDrop.h"
 #include "Editor/HitoriEd/EditorHierarchy.h"
+#include "Editor/HitoriEd/EditorUndo.h"
 #include "Editor/EditorUI/EditorStyle.h"
 
 #include <cctype>
@@ -125,8 +126,39 @@ void FOutlinerPanel::OnRender()
     ImGui::End();
     if (PendingAttachChild)
     {
-        if (bPendingDetach) PendingAttachChild->DetachFromParent(EAttachmentRule::KeepWorld);
-        else EditorHierarchy::Attach(PendingAttachChild, PendingAttachParent);
+        AActor* ChildActor = PendingAttachChild->GetOwner();
+        USceneComponent* OldParent = PendingAttachChild->GetAttachParent();
+        const FName ChildActorName = ChildActor ? ChildActor->GetFName() : FName();
+        const FName ChildCompName = PendingAttachChild->GetFName();
+        const FName OldParentActorName = (OldParent && OldParent->GetOwner()) ? OldParent->GetOwner()->GetFName() : FName();
+        const FName OldParentCompName = OldParent ? OldParent->GetFName() : FName();
+
+        bool bChanged = false;
+        if (bPendingDetach)
+        {
+            if (OldParent)
+            {
+                PendingAttachChild->DetachFromParent(EAttachmentRule::KeepWorld);
+                bChanged = PendingAttachChild->GetAttachParent() != OldParent;
+            }
+        }
+        else
+        {
+            bChanged = EditorHierarchy::Attach(PendingAttachChild, PendingAttachParent);
+        }
+
+        if (bChanged && UndoHistory && UndoHistory->CanRecord() && !ChildActorName.IsNone())
+        {
+            USceneComponent* NewParent = PendingAttachChild->GetAttachParent();
+            const FName NewParentActorName = (NewParent && NewParent->GetOwner()) ? NewParent->GetOwner()->GetFName() : FName();
+            const FName NewParentCompName = NewParent ? NewParent->GetFName() : FName();
+            UndoHistory->Push(EditorUndoUtils::MakeHierarchyAttachCommand(
+                bPendingDetach ? "Detach Actor" : "Attach Actor",
+                ChildActorName, ChildCompName,
+                OldParentActorName, OldParentCompName,
+                NewParentActorName, NewParentCompName));
+        }
+
         PendingAttachChild = PendingAttachParent = nullptr; bPendingDetach = false;
     }
 
@@ -250,7 +282,18 @@ void FOutlinerPanel::DrawActorNode(AActor* Actor)
 			{
 				FName Name(RenameBuffer);
 				UObject* Existing = FindObjectFast<UObject>(Actor->GetOuter(), Name);
-				if (!Existing || Existing == Actor) Actor->SetName(Name);
+				if (!Existing || Existing == Actor)
+				{
+					const FName OldName = Actor->GetFName();
+					if (OldName != Name)
+					{
+						Actor->SetName(Name);
+						if (UndoHistory && UndoHistory->CanRecord())
+						{
+							UndoHistory->Push(EditorUndoUtils::MakeActorRenameCommand(OldName, Name));
+						}
+					}
+				}
 				else HTR_LOG(Warning, "An actor with this name already exists.");
 			}
 			RenamingActor = nullptr;

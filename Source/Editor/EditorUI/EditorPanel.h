@@ -41,6 +41,17 @@ namespace EditorDock
 		}
 		ImGui::EndMenu();
 	}
+
+	template <typename TPanels>
+	bool HasFocusedPanel(const TPanels& Panels)
+	{
+		for (const auto& Panel : Panels)
+		{
+			if (Panel && Panel->IsOpen() && Panel->IsFocused())
+				return true;
+		}
+		return false;
+	}
 }
 
 class IEditorPanel
@@ -50,6 +61,7 @@ public:
 	virtual bool Init() = 0;
 	virtual void Tick(float DeltaTime) = 0;
 	virtual void OnRender() = 0;
+	virtual bool IsFocused() const { return false; }
 
 	bool IsOpen() const { return bIsOpen; }
 	void SetOpen(bool bOpen) { bIsOpen = bOpen; }

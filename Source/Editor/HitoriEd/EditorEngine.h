@@ -28,6 +28,7 @@
 #include "Editor/LevelViewportLayout.h"
 #include "Editor/ContentDrawer/ContentDrawerPanel.h"
 #include "Editor/UIEditor/UIEditor.h"
+#include "Editor/HitoriEd/EditorUndo.h"
 
 #include "Editor/Rendering/Outline.h"
 #include "Editor/Rendering/OutLineRenderer.h"
@@ -67,6 +68,18 @@ public:
 	FUIRenderer* GetUIRenderer() const { return UIRenderer.get(); }
 	void DeleteActor(AActor* Actor);
 	void DeleteComponent(UActorComponent* Component);
+
+	void Undo();
+	void Redo();
+	bool CanUndo() const { return !IsPlaying() && UndoHistory.CanUndo(); }
+	bool CanRedo() const { return !IsPlaying() && UndoHistory.CanRedo(); }
+	const char* GetUndoDescription() const { return UndoHistory.GetUndoDescription(); }
+	const char* GetRedoDescription() const { return UndoHistory.GetRedoDescription(); }
+	FEditorUndoHistory& GetUndoHistory() { return UndoHistory; }
+	UWorld* GetEditorWorld() const { return EditorWorld; }
+	void SelectActorForUndo(AActor* Actor, UActorComponent* Component = nullptr);
+	void DeleteActorForUndo(AActor* Actor);
+	void DeleteComponentForUndo(UActorComponent* Component);
 
 	//Play 버튼을 눌렀을때 Play Session 실행을 요청한다.
 	inline void RequestPlaySession() { bPlaySessionRequested = true; bSimulateRequested = false; }
@@ -226,9 +239,18 @@ private:
 	bool bIsSimulatingInEditor = false;
 
 	void ResetSceneSelection();
+	void FinishGizmoDragUndo();
 	void CopySelectedActor();
 	void PasteActor();
 	TUniquePtr<AActor> ActorClipboard;
+
+	FEditorUndoHistory UndoHistory;
+	bool bTrackingGizmoDrag = false;
+	FName GizmoDragActorName;
+	FName GizmoDragCompName;
+	FTransform GizmoDragStartTransform;
+	bool bGizmoDragHasLightRadius = false;
+	float GizmoDragStartLightRadius = 0.0f;
 
 	void CreateNewScene();
 	void OpenScene();

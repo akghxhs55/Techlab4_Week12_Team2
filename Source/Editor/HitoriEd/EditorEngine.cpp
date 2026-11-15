@@ -27,6 +27,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Components/SpotLightComponent.h"
+#include "Components/LocalLightComponent.h"
 #include "Components/ExponentialHeightFogComponent.h"
 #include "Components/TextRenderComponent.h"
 
@@ -182,6 +183,14 @@ void UEditorEngine::InitLevelEditorTab()
 	LevelEditorTab->OnOpenScene.AddDynamic(this, &UEditorEngine::OpenScene);
 	LevelEditorTab->OnSaveScene.AddDynamic(this, &UEditorEngine::SaveCurrentScene);
 	LevelEditorTab->OnSaveSceneAs.AddDynamic(this, &UEditorEngine::SaveSceneAs);
+	LevelEditorTab->OnUndo.AddDynamic(this, &UEditorEngine::Undo);
+	LevelEditorTab->OnRedo.AddDynamic(this, &UEditorEngine::Redo);
+	LevelEditorTab->SetUndoQueries(
+		[this]() { return CanUndo(); },
+		[this]() { return CanRedo(); },
+		[this]() { return GetUndoDescription(); },
+		[this]() { return GetRedoDescription(); }
+	);
 	LevelEditorTab->OnImportFbx.Add([this](EFbxImportMode Mode) { FEditorFileUtils::ImportFbx(Mode); });
 	LevelEditorTab->OnPackageGame.Add([this]() { Packager.Start("Release"); });
 	LevelEditorTab->SetIsPackagingQuery([this]() { return Packager.IsRunning(); });
@@ -348,6 +357,9 @@ void UEditorEngine::InitPanels()
 		}
 	);
 
+	OutlinerPanel->SetUndoHistory(&UndoHistory);
+	DetailsPanel->SetUndoHistory(&UndoHistory);
+
 	OutlinerPanel->SetDeleteActorCallback(
 		[this](AActor* Actor)
 		{
@@ -367,7 +379,18 @@ void UEditorEngine::InitPanels()
 	ViewportsPanel->SetIsPlayingQuery([this]() { return IsPlaying(); });
 	ViewportsPanel->SetGizmo(Gizmo.get());
 	ViewportsPanel->SetEditorSettings(EditorSettings.get());
-	ViewportsPanel->SetActorSpawnedCallback([this](AActor* Actor) { OutlinerPanel->SelectActor(Actor); });
+	ViewportsPanel->SetActorSpawnedCallback([this](AActor* Actor)
+	{
+		OutlinerPanel->SelectActor(Actor);
+		if (Actor && !IsPlaying() && UndoHistory.CanRecord())
+		{
+			FActorUndoSnapshot Snapshot;
+			if (EditorUndoUtils::CaptureActorSnapshot(Actor, Snapshot))
+			{
+				UndoHistory.Push(EditorUndoUtils::MakeActorCreateDeleteCommand("Spawn Actor", std::move(Snapshot), true));
+			}
+		}
+	});
 
 	EditorSettings->SetViewportsPanel(ViewportsPanel);
 	ViewportsPanel->SetLayoutMode(ViewportLayoutMode, SingleViewportIndex);
@@ -672,7 +695,18 @@ void UEditorEngine::Tick(const float DeltaTime)
 				if (FInputSystem::IsKeyPressed(EKeyCode::V)) PasteActor();
 				if (FInputSystem::IsKeyPressed(EKeyCode::D))
 					if (AActor* Actor = OutlinerPanel->GetSelectedActor())
-						if (AActor* Duplicate = EditorWorld->DuplicateActor(Actor)) OutlinerPanel->SelectActor(Duplicate);
+						if (AActor* Duplicate = EditorWorld->DuplicateActor(Actor))
+						{
+							OutlinerPanel->SelectActor(Duplicate);
+							if (!IsPlaying() && UndoHistory.CanRecord())
+							{
+								FActorUndoSnapshot Snapshot;
+								if (EditorUndoUtils::CaptureActorSnapshot(Duplicate, Snapshot))
+								{
+									UndoHistory.Push(EditorUndoUtils::MakeActorCreateDeleteCommand("Duplicate Actor", std::move(Snapshot), true));
+								}
+							}
+						}
 			}
 			else if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt &&
 				CapturedViewportIndex == -1 && FInputSystem::IsKeyPressed(EKeyCode::F))
@@ -856,6 +890,25 @@ void UEditorEngine::Tick(const float DeltaTime)
 		// NewFrame과 패널 배치 이후의 입력/좌표를 사용해야 클릭과 기즈모 피킹이 일치한다.
 		UpdateGizmoAndPicking();
 
+		const ImGuiIO& IO = ImGui::GetIO();
+		if (!PlayWorld && EditorManager && EditorManager->GetFocusedTab() == LevelEditorTab && !IO.WantTextInput)
+		{
+			if (IO.KeyCtrl && !IO.KeyAlt)
+			{
+				if (ImGui::IsKeyPressed(ImGuiKey_Z, false))
+				{
+					if (IO.KeyShift)
+						Redo();
+					else
+						Undo();
+				}
+				else if (ImGui::IsKeyPressed(ImGuiKey_Y, false))
+				{
+					Redo();
+				}
+			}
+		}
+
 		ImGuiRenderer->End();
 	}
 
@@ -974,25 +1027,131 @@ void UEditorEngine::UpdateGizmoAndPicking()
 {
 	const int32 ViewIndex = ViewportsPanel ? ViewportsPanel->GetActiveViewIndex() : -1;
 	if (ViewIndex < 0 || ViewIndex >= 4 || !ViewportsPanel)
+	{
+		if (bTrackingGizmoDrag)
+		{
+			if (Gizmo) Gizmo->EndDrag();
+			FinishGizmoDragUndo();
+		}
 		return;
+	}
 	if (!ViewportsPanel->WasRenderedThisFrame())
 	{
-		Gizmo->EndDrag();
+		if (Gizmo) Gizmo->EndDrag();
+		FinishGizmoDragUndo();
 		return;
 	}
 	if (!ViewportsPanel->IsHovered() && !Gizmo->IsUsing())
+	{
+		if (bTrackingGizmoDrag && !Gizmo->IsUsing())
+			FinishGizmoDragUndo();
 		return;
+	}
 	if (IsPlayingView(ViewIndex))
+	{
+		if (bTrackingGizmoDrag && !Gizmo->IsUsing())
+			FinishGizmoDragUndo();
 		return;
+	}
 
 	FEditorViewportClient* ViewClient = ViewportsPanel->GetViewportClient(ViewIndex);
 	if (!ViewClient || !ViewClient->IsActive())
+	{
+		if (bTrackingGizmoDrag && !Gizmo->IsUsing())
+			FinishGizmoDragUndo();
 		return;
+	}
+
+	USceneComponent* PreDragTarget = (!bTrackingGizmoDrag && Gizmo) ? Gizmo->GetTarget() : nullptr;
+	const bool bWasUsingGizmo = Gizmo && Gizmo->IsUsing();
+	FTransform PreDragTransform;
+	bool bPreDragHasLightRadius = false;
+	float PreDragLightRadius = 0.0f;
+	if (PreDragTarget)
+	{
+		PreDragTransform = PreDragTarget->GetTransform();
+		if (ULocalLightComponent* Light = Cast<ULocalLightComponent>(PreDragTarget))
+		{
+			bPreDragHasLightRadius = true;
+			PreDragLightRadius = Light->GetAttenuationRadius();
+		}
+	}
 
 	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
 	ViewClient->UpdateGizmoAndPicking(Gizmo.get(), LocalMousePosition, [this](AActor* SelectedActor) {
 		OutlinerPanel->SelectActor(SelectedActor);
 		});
+
+	const bool bIsUsingNow = Gizmo && Gizmo->IsUsing();
+	if (!bTrackingGizmoDrag && !bWasUsingGizmo && bIsUsingNow && PreDragTarget && PreDragTarget->GetOwner() && !IsPlaying() && UndoHistory.CanRecord())
+	{
+		bTrackingGizmoDrag = true;
+		GizmoDragActorName = PreDragTarget->GetOwner()->GetFName();
+		GizmoDragCompName = PreDragTarget->GetFName();
+		GizmoDragStartTransform = PreDragTransform;
+		bGizmoDragHasLightRadius = bPreDragHasLightRadius;
+		GizmoDragStartLightRadius = PreDragLightRadius;
+	}
+	else if (bTrackingGizmoDrag && !bIsUsingNow)
+	{
+		FinishGizmoDragUndo();
+	}
+}
+
+void UEditorEngine::FinishGizmoDragUndo()
+{
+	if (!bTrackingGizmoDrag)
+	{
+		return;
+	}
+	bTrackingGizmoDrag = false;
+
+	if (IsPlaying() || !UndoHistory.CanRecord() || !EditorWorld)
+	{
+		return;
+	}
+
+	USceneComponent* Target = Cast<USceneComponent>(
+		EditorUndoUtils::FindComponentByNames(EditorWorld, GizmoDragActorName, GizmoDragCompName));
+	if (!Target || !Target->GetOwner())
+	{
+		return;
+	}
+
+	const FTransform& NewTransform = Target->GetTransform();
+	const bool bTransformChanged =
+		GizmoDragStartTransform.Location.X != NewTransform.Location.X ||
+		GizmoDragStartTransform.Location.Y != NewTransform.Location.Y ||
+		GizmoDragStartTransform.Location.Z != NewTransform.Location.Z ||
+		GizmoDragStartTransform.Scale.X != NewTransform.Scale.X ||
+		GizmoDragStartTransform.Scale.Y != NewTransform.Scale.Y ||
+		GizmoDragStartTransform.Scale.Z != NewTransform.Scale.Z ||
+		GizmoDragStartTransform.Rotation.X != NewTransform.Rotation.X ||
+		GizmoDragStartTransform.Rotation.Y != NewTransform.Rotation.Y ||
+		GizmoDragStartTransform.Rotation.Z != NewTransform.Rotation.Z ||
+		GizmoDragStartTransform.Rotation.W != NewTransform.Rotation.W;
+
+	float NewLightRadius = GizmoDragStartLightRadius;
+	bool bRadiusChanged = false;
+	if (bGizmoDragHasLightRadius)
+	{
+		if (ULocalLightComponent* Light = Cast<ULocalLightComponent>(Target))
+		{
+			NewLightRadius = Light->GetAttenuationRadius();
+			bRadiusChanged = (NewLightRadius != GizmoDragStartLightRadius);
+		}
+	}
+
+	if (bTransformChanged || bRadiusChanged)
+	{
+		UndoHistory.Push(EditorUndoUtils::MakeTransformCommand(
+			Target,
+			GizmoDragStartTransform,
+			NewTransform,
+			bGizmoDragHasLightRadius,
+			GizmoDragStartLightRadius,
+			NewLightRadius));
+	}
 }
 
 //void UEditorEngine::RenderSceneText(UWorld* TargetWorld, const FSceneView& SceneView)
@@ -1038,6 +1197,8 @@ void UEditorEngine::UpdateGizmoAndPicking()
 // ImGui를 정리한다. UObject 일괄 삭제와 공용 자원·Device 정리는 FEngineLoop가 이어서 한다.
 void UEditorEngine::PreExit()
 {
+	bTrackingGizmoDrag = false;
+	UndoHistory.Clear();
 	ActorClipboard.reset();
 	EndPlayMap();
 	// 시퀀서는 에디터 월드 액터를 가리키므로 월드보다 먼저 정리한다
@@ -1070,12 +1231,55 @@ void UEditorEngine::PreExit()
 }
 
 // 선택과 Gizmo 참조를 정리한 뒤 Actor를 삭제한다.
-void UEditorEngine::DeleteActor(AActor* Actor)
+void UEditorEngine::Undo()
+{
+	if (IsPlaying())
+		return;
+	if (bTrackingGizmoDrag)
+	{
+		if (Gizmo) Gizmo->EndDrag();
+		FinishGizmoDragUndo();
+	}
+	UndoHistory.Undo(*this);
+}
+
+void UEditorEngine::Redo()
+{
+	if (IsPlaying())
+		return;
+	if (bTrackingGizmoDrag)
+	{
+		if (Gizmo) Gizmo->EndDrag();
+		FinishGizmoDragUndo();
+	}
+	UndoHistory.Redo(*this);
+}
+
+void UEditorEngine::SelectActorForUndo(AActor* Actor, UActorComponent* Component)
+{
+	bTrackingGizmoDrag = false;
+	if (!Actor)
+	{
+		if (Gizmo) Gizmo->SetTarget(nullptr);
+		if (Outline) Outline->SetTarget(nullptr);
+		if (DetailsPanel) DetailsPanel->SelectComponent(nullptr);
+		if (OutlinerPanel) OutlinerPanel->SelectActor(nullptr);
+		return;
+	}
+
+	if (OutlinerPanel)
+	{
+		OutlinerPanel->SelectActor(Actor);
+	}
+	if (Component && DetailsPanel)
+	{
+		DetailsPanel->SelectComponent(Component);
+	}
+}
+
+void UEditorEngine::DeleteActorForUndo(AActor* Actor)
 {
 	if (!Actor)
-		return;
-	// 실행 중 삭제는 게임 로직이 들고 있는 참조를 깨뜨릴 수 있어 Pause 상태에서만 허용한다.
-	if (IsPlaying() && !bIsPaused && !IsSimulatingInEditor())
 		return;
 
 	OutlinerPanel->SelectActor(nullptr);
@@ -1084,19 +1288,91 @@ void UEditorEngine::DeleteActor(AActor* Actor)
 	Actor->Destroy();
 }
 
+void UEditorEngine::DeleteComponentForUndo(UActorComponent* Component)
+{
+	if (!Component)
+		return;
+
+	DetailsPanel->SelectComponent(nullptr);
+	Outline->SetTarget(nullptr);
+	Component->GetOwner()->DestroyComponent(Component);
+}
+
+void UEditorEngine::DeleteActor(AActor* Actor)
+{
+	if (!Actor)
+		return;
+	// 실행 중 삭제는 게임 로직이 들고 있는 참조를 깨뜨릴 수 있어 Pause 상태에서만 허용한다.
+	if (IsPlaying() && !bIsPaused && !IsSimulatingInEditor())
+		return;
+
+	FActorUndoSnapshot Snapshot;
+	const bool bRecordUndo = !IsPlaying() && UndoHistory.CanRecord()
+		&& EditorUndoUtils::CaptureActorSnapshot(Actor, Snapshot);
+
+	DeleteActorForUndo(Actor);
+
+	if (bRecordUndo)
+	{
+		UndoHistory.Push(EditorUndoUtils::MakeActorCreateDeleteCommand("Delete Actor", std::move(Snapshot), false));
+	}
+}
+
 void UEditorEngine::DeleteComponent(UActorComponent* Component)
 {
 	if (!Component)
 		return;
 	if (IsPlaying() && !bIsPaused && !IsSimulatingInEditor())
 		return;
-	DetailsPanel->SelectComponent(nullptr);
-	Outline->SetTarget(nullptr);
-	Component->GetOwner()->DestroyComponent(Component);
+
+	AActor* Owner = Component->GetOwner();
+	FName ActorName;
+	FName CompName;
+	FString ClassName;
+	FName ParentCompName;
+	TArray<FName> ChildCompNames;
+	TArray<uint8> CompBytes;
+	bool bRecordUndo = false;
+	if (!IsPlaying() && UndoHistory.CanRecord() && Owner && Component != Owner->GetRootComponent())
+	{
+		ActorName = Owner->GetFName();
+		CompName = Component->GetFName();
+		ClassName = Component->GetClass() ? Component->GetClass()->Name : "";
+		bRecordUndo = EditorUndoUtils::CaptureObjectBytes(Component, CompBytes);
+		if (USceneComponent* SceneComp = Cast<USceneComponent>(Component))
+		{
+			USceneComponent* Parent = SceneComp->GetAttachParent();
+			ParentCompName = (Parent && Parent->GetOwner() == Owner) ? Parent->GetFName() : FName();
+			for (USceneComponent* Child : SceneComp->GetAttachChildren())
+			{
+				if (Child && Child->GetOwner() == Owner)
+				{
+					ChildCompNames.Add(Child->GetFName());
+				}
+			}
+		}
+	}
+
+	DeleteComponentForUndo(Component);
+
+	if (bRecordUndo)
+	{
+		UndoHistory.Push(EditorUndoUtils::MakeComponentAddRemoveCommand(
+			"Delete Component",
+			ActorName,
+			CompName,
+			std::move(ClassName),
+			ParentCompName,
+			std::move(ChildCompNames),
+			std::move(CompBytes),
+			false));
+	}
 }
 
 void UEditorEngine::OnActiveWorldChanged()
 {
+	bTrackingGizmoDrag = false;
+	UndoHistory.SetRecordingEnabled(!PlayWorld);
 	ResetSceneSelection();
 	UWorld* ActiveWorld = GetActiveWorld();
 
@@ -1133,7 +1409,18 @@ void UEditorEngine::CopySelectedActor()
 void UEditorEngine::PasteActor()
 {
 	if (PlayWorld || !ActorClipboard) return;
-	if (AActor* Actor = EditorWorld->DuplicateActor(ActorClipboard.get())) OutlinerPanel->SelectActor(Actor);
+	if (AActor* Actor = EditorWorld->DuplicateActor(ActorClipboard.get()))
+	{
+		OutlinerPanel->SelectActor(Actor);
+		if (UndoHistory.CanRecord())
+		{
+			FActorUndoSnapshot Snapshot;
+			if (EditorUndoUtils::CaptureActorSnapshot(Actor, Snapshot))
+			{
+				UndoHistory.Push(EditorUndoUtils::MakeActorCreateDeleteCommand("Paste Actor", std::move(Snapshot), true));
+			}
+		}
+	}
 }
 
 void UEditorEngine::ResetSceneSelection()
@@ -1156,6 +1443,8 @@ void UEditorEngine::CreateNewScene()
 	if (!FEditorFileUtils::NewScene(EditorWorld))
 		return;
 
+	bTrackingGizmoDrag = false;
+	UndoHistory.Clear();
 	ResetSceneSelection();
 	LevelEditorTab->OnLevelLoaded.Broadcast(FEditorFileUtils::CurrentScenePath);
 }
@@ -1171,6 +1460,8 @@ void UEditorEngine::OpenScene()
 	if (!FEditorFileUtils::LoadScene(EditorWorld))
 		return;
 
+	bTrackingGizmoDrag = false;
+	UndoHistory.Clear();
 	ResetSceneSelection();
 
 	LevelEditorTab->OnLevelLoaded.Broadcast(FEditorFileUtils::CurrentScenePath);
@@ -1187,6 +1478,8 @@ void UEditorEngine::OpenSceneFromPath(const FString& Path)
 	if (!FEditorFileUtils::LoadScene(EditorWorld, Path))
 		return;
 
+	bTrackingGizmoDrag = false;
+	UndoHistory.Clear();
 	ResetSceneSelection();
 
 	LevelEditorTab->OnLevelLoaded.Broadcast(FEditorFileUtils::CurrentScenePath);

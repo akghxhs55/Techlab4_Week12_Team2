@@ -48,6 +48,25 @@ void FLevelEditorTab::DrawMenuBar()
 
 
 	////////////////////////////////////////////////////////////
+	// Edit 탭
+	////////////////////////////////////////////////////////////
+
+	if (ImGui::BeginMenu("Edit"))
+	{
+		const bool bCanUndo = CanUndoQuery && CanUndoQuery();
+		const bool bCanRedo = CanRedoQuery && CanRedoQuery();
+		const char* UndoAction = (bCanUndo && GetUndoLabelQuery) ? GetUndoLabelQuery() : "";
+		const char* RedoAction = (bCanRedo && GetRedoLabelQuery) ? GetRedoLabelQuery() : "";
+		const FString UndoLabel = (UndoAction && UndoAction[0]) ? std::format("Undo {}", UndoAction) : FString("Undo");
+		const FString RedoLabel = (RedoAction && RedoAction[0]) ? std::format("Redo {}", RedoAction) : FString("Redo");
+		if (ImGui::MenuItem(UndoLabel.c_str(), "Ctrl+Z", false, bCanUndo)) { OnUndo.Broadcast(); }
+		if (ImGui::MenuItem(RedoLabel.c_str(), "Ctrl+Y", false, bCanRedo)) { OnRedo.Broadcast(); }
+		ImGui::EndMenu();
+	}
+
+
+
+	////////////////////////////////////////////////////////////
 	// Window 탭
 	////////////////////////////////////////////////////////////
 

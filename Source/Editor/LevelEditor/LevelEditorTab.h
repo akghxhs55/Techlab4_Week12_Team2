@@ -12,17 +12,28 @@ public:
 
 	const char* GetTabName() const override { return TabName.c_str(); }
 	bool CanDetach() const override { return false; }
+	bool HasFocusedSubWindow() const override { return EditorDock::HasFocusedPanel(Panels); }
 	void DrawMenuBar() override;
 
 	TDelegate<> OnNewScene;
 	TDelegate<> OnOpenScene;
 	TDelegate<> OnSaveScene;
 	TDelegate<> OnSaveSceneAs;
+	TDelegate<> OnUndo;
+	TDelegate<> OnRedo;
 	TDelegate<EFbxImportMode> OnImportFbx;
 	TDelegate<> OnPackageGame;
 	TDelegate<const FString&> OnLevelLoaded;
 
 	void SetIsPackagingQuery(std::function<bool()> InQuery) { IsPackaging = std::move(InQuery); }
+	void SetUndoQueries(std::function<bool()> InCanUndo, std::function<bool()> InCanRedo,
+		std::function<const char*()> InUndoLabel = {}, std::function<const char*()> InRedoLabel = {})
+	{
+		CanUndoQuery = std::move(InCanUndo);
+		CanRedoQuery = std::move(InCanRedo);
+		GetUndoLabelQuery = std::move(InUndoLabel);
+		GetRedoLabelQuery = std::move(InRedoLabel);
+	}
 
 	FLevelEditorToolbar* GetToolbar() { return &Toolbar; }
 	TArray<TUniquePtr<IEditorPanel>>& GetPanels() { return Panels; }
@@ -47,6 +58,10 @@ public:
 
 private:
 	std::function<bool()> IsPackaging;
+	std::function<bool()> CanUndoQuery;
+	std::function<bool()> CanRedoQuery;
+	std::function<const char*()> GetUndoLabelQuery;
+	std::function<const char*()> GetRedoLabelQuery;
 	FLevelEditorToolbar Toolbar;
 	TArray<TUniquePtr<IEditorPanel>> Panels;
 	bool bUseDockSpace = true;

@@ -10,6 +10,7 @@ class AActor;
 class UActorComponent;
 class UPrimitiveComponent;
 class USceneComponent;
+class FEditorUndoHistory;
 
 using SelectionCallback = std::function<void(USceneComponent*)>;
 using DeleteActorCallback = std::function<void(AActor*)>;
@@ -22,6 +23,7 @@ public:
 
     void SetSelectionCallback(SelectionCallback InCallback) { Callback = InCallback; }
     void SetDeleteActorCallback(DeleteActorCallback InCallback) { DeleteCallback = InCallback;}
+    void SetUndoHistory(FEditorUndoHistory* InHistory) { UndoHistory = InHistory; }
 
 public:
     bool Init() override;
@@ -45,6 +47,7 @@ private:
 
     SelectionCallback Callback;
     DeleteActorCallback DeleteCallback;
+    FEditorUndoHistory* UndoHistory = nullptr;
     AActor* PendingDeleteActor = nullptr;
 	bool bFocused = false;
 	AActor* RenamingActor = nullptr;

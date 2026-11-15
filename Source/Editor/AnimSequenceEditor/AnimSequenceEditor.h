@@ -42,6 +42,7 @@ public:
     // 저장하지 않은 Notify/트랙 편집이 있는지.
     // 편집한 곳은 MarkNotifiesDirty를 부르고, 마우스를 놓은 뒤 CommitNotifyUndo가 실행 취소 단계 하나로 묶는다.
     void MarkNotifiesDirty() { bNotifiesDirty = true; bUndoCommitPending = true; }
+    void MarkRootMotionDirty() { bUndoCommitPending = true; }
     bool HasUnsavedNotifyChanges() const { return bNotifiesDirty; }
     // Notify 또는 Root Motion 설정(Enable / Root Lock / Force)이 저장된 값과 다르면 dirty (Unreal은 에셋 프로퍼티를 바꾸면 dirty)
     bool IsDirty() const override { return bNotifiesDirty || HasUnsavedRootMotionChanges(); }
@@ -127,6 +128,9 @@ private:
     // ---- 실행 취소 ----
     void ResetNotifyHistory();          // 스택을 비우고 지금 상태를 저장된 상태로 본다
     void ApplyNotifySnapshot(const TArray<uint8>& Snapshot);
+    bool CaptureSequenceSnapshot(TArray<uint8>& OutBytes) const;
+    bool RestoreSequenceSnapshot(const TArray<uint8>& Bytes);
+    bool AreNotifiesEqualToSaved(const TArray<uint8>& Snapshot) const;
     TArray<TArray<uint8>> UndoStack;
     TArray<TArray<uint8>> RedoStack;
     TArray<uint8> CommittedSnapshot;    // 마지막으로 확정된 상태
