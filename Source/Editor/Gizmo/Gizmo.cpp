@@ -5,6 +5,26 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Actor/LightActorBase.h"
+#include <cmath>
+
+namespace
+{
+	float SnapValue(float Value, float SnapStep)
+	{
+		if (SnapStep <= 0.0f) return Value;
+		const float Snapped = std::roundf(Value / SnapStep) * SnapStep;
+		return Snapped == 0.0f ? 0.0f : Snapped;
+	}
+
+	FVector SnapVector(const FVector& Value, float SnapStep)
+	{
+		return {
+			SnapValue(Value.X, SnapStep),
+			SnapValue(Value.Y, SnapStep),
+			SnapValue(Value.Z, SnapStep)
+		};
+	}
+}
 
 static const FVector AxisDirs[3] = {
 	FVector(1, 0, 0),
@@ -305,15 +325,42 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 	FVector current = MouseRay.Origin + MouseRay.Direction * t;
 	if (Mode == EGizmoMode::Location && DraggingAxis >= AXIS_PLANE_YZ && DraggingAxis <= AXIS_PLANE_XY)
 	{
-		const FVector Delta = current - DragStartPoint;
-		Target->SetWorldLocation(DragStartLocation + Delta - DragPlaneNormal * Delta.Dot(DragPlaneNormal), false);
+		const FVector RawDelta = current - DragStartPoint;
+		const FVector PlanarDelta = RawDelta - DragPlaneNormal * RawDelta.Dot(DragPlaneNormal);
+		FVector NewLocation = DragStartLocation + PlanarDelta;
+		if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+		{
+			const int PlaneNormalAxis = DraggingAxis - AXIS_PLANE_YZ;
+			if (Space == EGizmoSpace::World)
+			{
+				if (PlaneNormalAxis != 0) NewLocation.X = SnapValue(NewLocation.X, LocationSnapSize);
+				if (PlaneNormalAxis != 1) NewLocation.Y = SnapValue(NewLocation.Y, LocationSnapSize);
+				if (PlaneNormalAxis != 2) NewLocation.Z = SnapValue(NewLocation.Z, LocationSnapSize);
+			}
+			else
+			{
+				const FVector Axis1 = GetAxisDirection((PlaneNormalAxis + 1) % 3);
+				const FVector Axis2 = GetAxisDirection((PlaneNormalAxis + 2) % 3);
+				NewLocation = DragStartLocation
+					+ Axis1 * SnapValue(PlanarDelta.Dot(Axis1), LocationSnapSize)
+					+ Axis2 * SnapValue(PlanarDelta.Dot(Axis2), LocationSnapSize);
+			}
+		}
+		Target->SetWorldLocation(NewLocation, false);
 		return;
 	}
 
 	if (DraggingAxis == AXIS_SCREEN && Mode != EGizmoMode::Rotation)
 	{
 		if (Mode == EGizmoMode::Location)
-			Target->SetWorldLocation(DragStartLocation + (current - DragStartPoint), false);
+		{
+			FVector NewLocation = DragStartLocation + (current - DragStartPoint);
+			if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+			{
+				NewLocation = SnapVector(NewLocation, LocationSnapSize);
+			}
+			Target->SetWorldLocation(NewLocation, false);
+		}
 		else
 		{
 			float dx = MousePos.X - DragStartMousePos.X;
@@ -347,7 +394,23 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 	float amount = delta.Dot(DragAxisDirection);
 
 	if (Mode == EGizmoMode::Location)
-		Target->SetWorldLocation(DragStartLocation + DragAxisDirection * amount, false);
+	{
+		FVector NewLocation = DragStartLocation + DragAxisDirection * amount;
+		if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+		{
+			if (Space == EGizmoSpace::World)
+			{
+				if (DraggingAxis == 0)      NewLocation.X = SnapValue(NewLocation.X, LocationSnapSize);
+				else if (DraggingAxis == 1) NewLocation.Y = SnapValue(NewLocation.Y, LocationSnapSize);
+				else if (DraggingAxis == 2) NewLocation.Z = SnapValue(NewLocation.Z, LocationSnapSize);
+			}
+			else
+			{
+				NewLocation = DragStartLocation + DragAxisDirection * SnapValue(amount, LocationSnapSize);
+			}
+		}
+		Target->SetWorldLocation(NewLocation, false);
+	}
 	else   // Scale
 	{
 		float factor = 1.0f + amount;

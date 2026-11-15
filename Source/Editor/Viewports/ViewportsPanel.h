@@ -75,6 +75,9 @@ public:
 	void DrawSpawnMenuForActiveView();
 	void DrawGridMenu();
 	int32 GetGridSpacing() const;
+	bool IsLocationSnapEnabled() const;
+	void SetLocationSnapEnabled(bool bEnabled);
+	float GetLocationSnapSize() const;
 	void SetActorSpawnedCallback(std::function<void(AActor*)> Callback) { OnActorSpawned = std::move(Callback); }
 	void SetIsPlayingQuery(std::function<bool()> Query) { IsPlayingQuery = std::move(Query); }
 

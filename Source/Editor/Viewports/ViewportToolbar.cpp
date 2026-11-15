@@ -455,10 +455,43 @@ int32 FViewportsPanel::GetGridSpacing() const
     return EditorSettings ? EditorSettings->GetSettings().GridSpacing : 1;
 }
 
+bool FViewportsPanel::IsLocationSnapEnabled() const
+{
+    return EditorSettings ? EditorSettings->GetSettings().bLocationSnap : false;
+}
+
+void FViewportsPanel::SetLocationSnapEnabled(bool bEnabled)
+{
+    if (EditorSettings)
+        EditorSettings->GetMutableSettings().bLocationSnap = bEnabled;
+}
+
+float FViewportsPanel::GetLocationSnapSize() const
+{
+    return EditorSettings ? EditorSettings->GetSettings().LocationSnapSize : 1.0f;
+}
+
 void FViewportsPanel::DrawGridMenu()
 {
     if (!EditorSettings) return;
-    int32& Spacing = EditorSettings->GetMutableSettings().GridSpacing;
+    FEditorSettings& Settings = EditorSettings->GetMutableSettings();
+
+    ImGui::SeparatorText("Location snap");
+    ImGui::Checkbox("Enable snap", &Settings.bLocationSnap);
+    for (const float Preset : { 0.1f, 0.25f, 0.5f, 1.0f, 5.0f, 10.0f, 50.0f })
+    {
+        char Label[24];
+        std::snprintf(Label, sizeof(Label), "%g##SnapPreset", Preset);
+        const bool bSelected = std::fabs(Settings.LocationSnapSize - Preset) < 1e-4f;
+        if (ImGui::MenuItem(Label, nullptr, bSelected))
+            Settings.LocationSnapSize = Preset;
+    }
+    ImGui::SetNextItemWidth(EditorStyle::Scale(120.0f));
+    if (ImGui::DragFloat("Snap size", &Settings.LocationSnapSize, 0.05f, 0.01f, 1000.0f, "%.2g"))
+        Settings.LocationSnapSize = FMath::Clamp(Settings.LocationSnapSize, 0.01f, 1000.0f);
+
+    ImGui::Separator();
+    int32& Spacing = Settings.GridSpacing;
     ImGui::SeparatorText("Grid spacing");
     for (const int32 Preset : { 1, 5, 10, 50, 100 })
     {

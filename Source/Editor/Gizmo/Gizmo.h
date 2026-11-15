@@ -48,6 +48,14 @@ public:
 	void SetSpace(EGizmoSpace InSpace) { if (Space != InSpace) EndDrag(); Space = InSpace; }
 	EGizmoSpace GetSpace() const { return Space; }
 
+	void SetLocationSnap(bool bEnabled, float Step)
+	{
+		bLocationSnapEnabled = bEnabled;
+		LocationSnapSize = Step > 0.0f ? Step : 1.0f;
+	}
+	bool IsLocationSnapEnabled() const { return bLocationSnapEnabled; }
+	float GetLocationSnapSize() const { return LocationSnapSize; }
+
 	// Active View의 Ray와 행렬만 사용해 Hover·Drag 상태를 갱신한다.
 	void Update(const FRay& MouseRay, const FVector2& MousePos,
 		const FMatrix& ViewProj, int ScreenW, int ScreenH,
@@ -82,6 +90,8 @@ public:
 private:
 	EGizmoMode Mode = EGizmoMode::Location;
 	EGizmoSpace Space = EGizmoSpace::Local;
+	bool bLocationSnapEnabled = false;
+	float LocationSnapSize = 1.0f;
 	FTransform Transform = FTransform();
 	USceneComponent* Target = nullptr;
 	bool bUseActorBounds = false;

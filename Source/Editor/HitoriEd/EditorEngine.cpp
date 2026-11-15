@@ -523,6 +523,10 @@ void UEditorEngine::InitCommands()
 		[this]() { if (ViewportsPanel) ViewportsPanel->DrawSpawnMenuForActiveView(); },
 		[this]() { if (ViewportsPanel) ViewportsPanel->DrawGridMenu(); },
 		[this]() { return ViewportsPanel ? ViewportsPanel->GetGridSpacing() : 1; });
+	LevelEditorToolbar.SetLocationSnapBinding(
+		[this]() { return ViewportsPanel ? ViewportsPanel->IsLocationSnapEnabled() : false; },
+		[this](bool bEnabled) { if (ViewportsPanel) ViewportsPanel->SetLocationSnapEnabled(bEnabled); },
+		[this]() { return ViewportsPanel ? ViewportsPanel->GetLocationSnapSize() : 1.0f; });
 	LevelEditorToolbar.SetPlayModeBinding(
 		[this]() { return PlayMode; },
 		[this](EPlayModeType Mode) { PlayMode = Mode; },
@@ -800,6 +804,14 @@ void UEditorEngine::Tick(const float DeltaTime)
 					}
 				}
 			}
+		}
+
+		if (!PlayWorld && EditorManager->GetFocusedTab() == LevelEditorTab && !ImGui::GetIO().WantTextInput &&
+			CapturedViewportIndex == -1 && !ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt && !ImGui::GetIO().KeyShift &&
+			FInputSystem::IsKeyPressed(EKeyCode::G) && EditorSettings)
+		{
+			bool& bSnap = EditorSettings->GetMutableSettings().bLocationSnap;
+			bSnap = !bSnap;
 		}
 
 		// 활성 뷰포트 시점 동기화
@@ -1212,6 +1224,12 @@ void UEditorEngine::UpdateGizmoAndPicking()
 		}
 	}
 
+	if (Gizmo && EditorSettings)
+	{
+		const FEditorSettings& Settings = EditorSettings->GetSettings();
+		Gizmo->SetLocationSnap(Settings.bLocationSnap, Settings.LocationSnapSize);
+	}
+
 	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
 	ViewClient->UpdateGizmoAndPicking(Gizmo.get(), LocalMousePosition, [this](AActor* SelectedActor, bool bCtrlToggle) {
 		OutlinerPanel->SelectActor(SelectedActor, bCtrlToggle);
@@ -1419,7 +1437,7 @@ void UEditorEngine::PreExit()
 {
 	bTrackingGizmoDrag = false;
 	UndoHistory.Clear();
-	ActorClipboard.reset();
+	ActorClipboard.Reset();
 	EndPlayMap();
 	// 시퀀서는 에디터 월드 액터를 가리키므로 월드보다 먼저 정리한다
 	EditorWorld->ClearWorld();
@@ -1679,33 +1697,113 @@ void UEditorEngine::OnActiveWorldChanged()
 // 씬 변경으로 무효화된 에디터의 선택 참조를 모두 해제한다.
 void UEditorEngine::CopySelectedActor()
 {
-	AActor* Actor = OutlinerPanel->GetSelectedActor();
-	if (!Actor || PlayWorld) return;
-	FObjectDuplicationParameters Params(Actor, nullptr);
-	Params.DestName = MakeUniqueObjectName(nullptr, Actor->GetClass(), Actor->GetFName());
-	ActorClipboard.reset(Cast<AActor>(StaticDuplicateObjectEx(Params)));
+	if (PlayWorld || !OutlinerPanel) return;
+	TArray<AActor*> SourceActors;
+	for (AActor* Selected : OutlinerPanel->GetSelectedActors())
+	{
+		if (Selected && SourceActors.Find(Selected) == INDEX_NONE)
+		{
+			SourceActors.Add(Selected);
+		}
+	}
+	if (SourceActors.IsEmpty()) return;
+
+	ActorClipboard.Reset();
+	TArray<AActor*> CopiedSourceActors;
+	for (AActor* Actor : SourceActors)
+	{
+		FObjectDuplicationParameters Params(Actor, nullptr);
+		Params.DestName = MakeUniqueObjectName(nullptr, Actor->GetClass(), Actor->GetFName());
+		TUniquePtr<AActor> Copy(Cast<AActor>(StaticDuplicateObjectEx(Params)));
+		if (!Copy) continue;
+
+		// Preserve each actor's world transform cleanly without keeping dangling attach pointers to live world actors.
+		if (USceneComponent* SrcRoot = Actor->GetRootComponent())
+		{
+			if (USceneComponent* CopyRoot = Copy->GetRootComponent())
+			{
+				if (CopyRoot->GetAttachParent())
+				{
+					CopyRoot->DetachFromParent(EAttachmentRule::KeepRelative);
+				}
+				CopyRoot->SetRelativeLocation(SrcRoot->GetWorldLocation());
+				CopyRoot->SetRelativeRotation(SrcRoot->GetWorldRotation());
+				CopyRoot->SetRelativeScale3D(SrcRoot->GetWorldScale3D());
+			}
+		}
+
+		FClipboardActorEntry Entry;
+		Entry.Actor = std::move(Copy);
+		ActorClipboard.Add(std::move(Entry));
+		CopiedSourceActors.Add(Actor);
+	}
+
+	for (int32 i = 0; i < ActorClipboard.Num(); ++i)
+	{
+		if (AActor* ParentActor = EditorHierarchy::GetParentActor(CopiedSourceActors[i]))
+		{
+			ActorClipboard[i].ParentIndex = CopiedSourceActors.Find(ParentActor);
+		}
+	}
 }
 
 void UEditorEngine::PasteActor()
 {
-	if (PlayWorld || !ActorClipboard) return;
-	if (AActor* Actor = EditorWorld->DuplicateActor(ActorClipboard.get()))
+	if (PlayWorld || ActorClipboard.IsEmpty() || !EditorWorld || !OutlinerPanel) return;
+
+	TArray<AActor*> PastedActors;
+	PastedActors.Reserve(ActorClipboard.Num());
+	for (const FClipboardActorEntry& Entry : ActorClipboard)
 	{
-		OutlinerPanel->SelectActor(Actor);
-		if (UndoHistory.CanRecord())
+		PastedActors.Add(Entry.Actor ? EditorWorld->DuplicateActor(Entry.Actor.get()) : nullptr);
+	}
+
+	// Restore parent-child hierarchy for actors whose parent was also in the copied selection.
+	for (int32 i = 0; i < PastedActors.Num(); ++i)
+	{
+		const int32 ParentIdx = ActorClipboard[i].ParentIndex;
+		if (ParentIdx != INDEX_NONE && ParentIdx < PastedActors.Num() && PastedActors[i] && PastedActors[ParentIdx])
+		{
+			EditorHierarchy::Attach(PastedActors[i]->GetRootComponent(), PastedActors[ParentIdx]->GetRootComponent());
+		}
+	}
+
+	TArray<AActor*> ValidPasted;
+	for (AActor* Pasted : PastedActors)
+	{
+		if (Pasted) ValidPasted.Add(Pasted);
+	}
+	if (ValidPasted.IsEmpty()) return;
+
+	OutlinerPanel->SelectActors(ValidPasted);
+
+	if (UndoHistory.CanRecord())
+	{
+		TArray<TUniquePtr<IEditorUndoCommand>> Cmds;
+		TArray<FName> PastedNames;
+		for (AActor* Pasted : ValidPasted)
 		{
 			FActorUndoSnapshot Snapshot;
-			if (EditorUndoUtils::CaptureActorSnapshot(Actor, Snapshot))
+			if (EditorUndoUtils::CaptureActorSnapshot(Pasted, Snapshot))
 			{
-				UndoHistory.Push(EditorUndoUtils::MakeActorCreateDeleteCommand("Paste Actor", std::move(Snapshot), true));
+				PastedNames.Add(Pasted->GetFName());
+				Cmds.Add(EditorUndoUtils::MakeActorCreateDeleteCommand("Paste Actor", std::move(Snapshot), true));
 			}
+		}
+		if (Cmds.Num() == 1)
+		{
+			UndoHistory.Push(std::move(Cmds[0]));
+		}
+		else if (Cmds.Num() > 1)
+		{
+			UndoHistory.Push(EditorUndoUtils::MakeCompositeCommand("Paste Actors", std::move(Cmds), {}, PastedNames));
 		}
 	}
 }
 
 void UEditorEngine::ResetSceneSelection()
 {
-	ActorClipboard.reset();
+	ActorClipboard.Reset();
 	Gizmo->SetTarget(nullptr, false);
 	Outline->SetTarget(nullptr);
 	DetailsPanel->SetTarget(nullptr);

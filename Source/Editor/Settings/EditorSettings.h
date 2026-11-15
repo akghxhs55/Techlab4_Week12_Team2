@@ -40,6 +40,8 @@ struct FEditorSettings
 	float CameraSpeed = 1.0f;
 	float MouseSensitivity = 1.0f;
 	int32 GridSpacing = 1;
+	bool bLocationSnap = true;
+	float LocationSnapSize = 1.0f;
 	float MultipleViewportsHorizontal = 0.5f;
 	float MultipleViewportsVertical = 0.5f;
 	int32 ViewportLayout = 1; // ELayoutMode. 기본은 2x2(QuadSplit)

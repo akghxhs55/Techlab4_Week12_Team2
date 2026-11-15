@@ -243,9 +243,14 @@ private:
 	void ResetSceneSelection();
 	void ApplyMultiActorGizmoDelta();
 	void FinishGizmoDragUndo();
+	struct FClipboardActorEntry
+	{
+		TUniquePtr<AActor> Actor;
+		int32 ParentIndex = INDEX_NONE;
+	};
 	void CopySelectedActor();
 	void PasteActor();
-	TUniquePtr<AActor> ActorClipboard;
+	TArray<FClipboardActorEntry> ActorClipboard;
 
 	struct FGizmoDragEntry
 	{

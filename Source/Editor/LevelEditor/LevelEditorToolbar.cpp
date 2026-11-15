@@ -90,13 +90,35 @@ void FLevelEditorToolbar::DrawPlacementGroup()
 		ImGui::SetTooltip("Quickly add to the project");
 
 	ImGui::SameLine();
+	if (GetLocationSnap && SetLocationSnap)
+	{
+		const bool bSnapOn = GetLocationSnap();
+		const float SnapSize = GetLocationSnapSize ? GetLocationSnapSize() : 1.0f;
+		char SnapText[24];
+		if (bSnapOn)
+			std::snprintf(SnapText, sizeof(SnapText), "Snap %g", SnapSize);
+		else
+			std::snprintf(SnapText, sizeof(SnapText), "Snap Off");
+
+		const float BtnHeight = EditorCommandUI::GetToolbarButtonSize().y;
+		if (bSnapOn)
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.45f, 0.78f, 1.0f));
+		if (ImGui::Button(SnapText, { 0.0f, BtnHeight }))
+			SetLocationSnap(!bSnapOn);
+		if (bSnapOn)
+			ImGui::PopStyleColor();
+		if (ImGui::IsItemHovered())
+			ImGui::SetTooltip(bSnapOn ? "Location snap: ON (G)" : "Location snap: OFF (G)");
+		ImGui::SameLine();
+	}
+
 	char GridLabel[16];
 	std::snprintf(GridLabel, sizeof(GridLabel), "%d", GetGridSpacing ? GetGridSpacing() : 1);
 	if (DropdownButton("##GridSnap", "Grid", GridLabel))
 		ImGui::OpenPopup("LevelGridPopup");
 	GridAnchor = EditorStyle::LastItemAnchor();
 	if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("LevelGridPopup"))
-		ImGui::SetTooltip("Grid spacing");
+		ImGui::SetTooltip("Grid spacing & snap settings");
 
 	EndToolbarGroup();
 

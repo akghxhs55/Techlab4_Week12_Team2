@@ -28,6 +28,14 @@ public:
 		DrawGridMenu = std::move(InDrawGridMenu);
 		GetGridSpacing = std::move(InGetGridSpacing);
 	}
+	void SetLocationSnapBinding(std::function<bool()> InGetLocationSnap,
+		std::function<void(bool)> InSetLocationSnap,
+		std::function<float()> InGetLocationSnapSize)
+	{
+		GetLocationSnap = std::move(InGetLocationSnap);
+		SetLocationSnap = std::move(InSetLocationSnap);
+		GetLocationSnapSize = std::move(InGetLocationSnapSize);
+	}
 	void Draw();
 
 	static constexpr float Height = 40.0f;
@@ -45,6 +53,9 @@ private:
 	std::function<void()> DrawAddMenu;
 	std::function<void()> DrawGridMenu;
 	std::function<int32()> GetGridSpacing;
+	std::function<bool()> GetLocationSnap;
+	std::function<void(bool)> SetLocationSnap;
+	std::function<float()> GetLocationSnapSize;
 
 
 };
