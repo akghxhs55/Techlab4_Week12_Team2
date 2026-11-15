@@ -62,8 +62,8 @@ namespace EditorStyle
     {
         if (!bSelected) return;
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_CheckboxSelectedBg));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.12f, 0.48f, 0.85f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.04f, 0.26f, 0.52f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.75f, 0.27f, 0.23f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.13f, 0.11f, 1.0f));
     }
 
     inline void PopSelectedButton(bool bSelected) { if (bSelected) ImGui::PopStyleColor(3); }
@@ -103,10 +103,10 @@ namespace EditorStyle
         ImGuiStyle& style = ImGui::GetStyle();
         ImVec4* colors = style.Colors;
 
-        // Accent
-        const ImVec4 Accent = ImVec4(0.06f, 0.37f, 0.70f, 1.00f);
-        const ImVec4 AccentHover = ImVec4(0.12f, 0.48f, 0.85f, 1.00f);
-        const ImVec4 AccentActive = ImVec4(0.04f, 0.26f, 0.52f, 1.00f);
+        // Accent (마키세 크리스 적갈색)
+        const ImVec4 Accent = ImVec4(0.62f, 0.20f, 0.17f, 1.00f);
+        const ImVec4 AccentHover = ImVec4(0.75f, 0.27f, 0.23f, 1.00f);
+        const ImVec4 AccentActive = ImVec4(0.45f, 0.13f, 0.11f, 1.00f);
 
         // Text
         colors[ImGuiCol_Text] =
@@ -117,55 +117,55 @@ namespace EditorStyle
         colors[ImGuiCol_TextSelectedBg] =
             ImVec4(1.00f, 1.00f, 1.00f, 0.156f);
 
-        // Window Background
+        // Window Background (딥 블랙 계층)
         colors[ImGuiCol_WindowBg] =
-            ImVec4(0.180f, 0.180f, 0.180f, 1.00f);
+            ImVec4(0.065f, 0.065f, 0.072f, 1.00f);
         colors[ImGuiCol_ChildBg] =
-            ImVec4(0.280f, 0.280f, 0.280f, 0.00f);
+            ImVec4(0.080f, 0.080f, 0.088f, 0.00f);
         colors[ImGuiCol_PopupBg] =
-            ImVec4(0.313f, 0.313f, 0.313f, 1.00f);
+            ImVec4(0.110f, 0.110f, 0.120f, 1.00f);
         colors[ImGuiCol_DockingEmptyBg] =
             colors[ImGuiCol_WindowBg];
 
         // Borders
         colors[ImGuiCol_Border] =
-            ImVec4(0.266f, 0.266f, 0.266f, 1.00f);
+            ImVec4(0.180f, 0.170f, 0.175f, 1.00f);
         colors[ImGuiCol_BorderShadow] =
             ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
 
         // Input Frames
         colors[ImGuiCol_FrameBg] =
-            ImVec4(0.160f, 0.160f, 0.160f, 1.00f);
+            ImVec4(0.100f, 0.100f, 0.110f, 1.00f);
         colors[ImGuiCol_FrameBgHovered] =
-            ImVec4(0.200f, 0.200f, 0.200f, 1.00f);
+            ImVec4(0.145f, 0.145f, 0.155f, 1.00f);
         colors[ImGuiCol_FrameBgActive] =
-            ImVec4(0.280f, 0.280f, 0.280f, 1.00f);
+            ImVec4(0.200f, 0.175f, 0.178f, 1.00f);
         colors[ImGuiCol_InputTextCursor] =
             ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
 
         // Title & Menu
         colors[ImGuiCol_TitleBg] =
-            ImVec4(0.148f, 0.148f, 0.148f, 1.00f);
+            ImVec4(0.050f, 0.050f, 0.056f, 1.00f);
         colors[ImGuiCol_TitleBgActive] =
-            ImVec4(0.148f, 0.148f, 0.148f, 1.00f);
+            ImVec4(0.050f, 0.050f, 0.056f, 1.00f);
         colors[ImGuiCol_TitleBgCollapsed] =
-            ImVec4(0.148f, 0.148f, 0.148f, 1.00f);
+            ImVec4(0.050f, 0.050f, 0.056f, 1.00f);
         colors[ImGuiCol_MenuBarBg] =
-            ImVec4(0.195f, 0.195f, 0.195f, 1.00f);
+            ImVec4(0.075f, 0.075f, 0.082f, 1.00f);
 
         // Scrollbar
         colors[ImGuiCol_ScrollbarBg] =
-            ImVec4(0.160f, 0.160f, 0.160f, 1.00f);
+            ImVec4(0.055f, 0.055f, 0.060f, 1.00f);
         colors[ImGuiCol_ScrollbarGrab] =
-            ImVec4(0.277f, 0.277f, 0.277f, 1.00f);
+            ImVec4(0.200f, 0.200f, 0.210f, 1.00f);
         colors[ImGuiCol_ScrollbarGrabHovered] =
-            ImVec4(0.360f, 0.360f, 0.360f, 1.00f);
+            ImVec4(0.300f, 0.280f, 0.285f, 1.00f);
         colors[ImGuiCol_ScrollbarGrabActive] = AccentActive;
 
         // Checkbox
-        // 선택된 박스는 파랑, 체크 표시는 흰색
+        // 선택된 박스는 적갈색, 체크 표시는 흰색
         colors[ImGuiCol_CheckboxSelectedBg] =
-            ImVec4(Accent.x, Accent.y, Accent.z, 0.80f);
+            ImVec4(Accent.x, Accent.y, Accent.z, 0.85f);
         colors[ImGuiCol_CheckMark] =
             ImVec4(1.00f, 1.00f, 1.00f, 1.00f);
 
@@ -175,17 +175,17 @@ namespace EditorStyle
         colors[ImGuiCol_SliderGrabActive] = AccentHover;
 
         // Button
-        colors[ImGuiCol_Button] = ImVec4(0.22f, 0.22f, 0.22f, 1.0f);
-        colors[ImGuiCol_ButtonHovered] = ImVec4(0.34f, 0.34f, 0.34f, 1.0f);
+        colors[ImGuiCol_Button] = ImVec4(0.140f, 0.140f, 0.150f, 1.0f);
+        colors[ImGuiCol_ButtonHovered] = ImVec4(0.215f, 0.205f, 0.210f, 1.0f);
         colors[ImGuiCol_ButtonActive] = AccentActive;
 
         // Header, TreeNode, Selectable
         colors[ImGuiCol_Header] =
-            ImVec4(0.313f, 0.313f, 0.313f, 1.00f);
+            ImVec4(0.145f, 0.145f, 0.155f, 1.00f);
         colors[ImGuiCol_HeaderHovered] =
-            ImVec4(0.400f, 0.400f, 0.400f, 1.00f);
+            ImVec4(0.220f, 0.185f, 0.185f, 1.00f);
         colors[ImGuiCol_HeaderActive] =
-            ImVec4(0.469f, 0.469f, 0.469f, 1.00f);
+            ImVec4(0.300f, 0.170f, 0.165f, 1.00f);
 
         // Separator
         colors[ImGuiCol_Separator] = colors[ImGuiCol_Border];
@@ -202,18 +202,18 @@ namespace EditorStyle
 
         // Tabs
         colors[ImGuiCol_Tab] =
-            ImVec4(0.098f, 0.098f, 0.098f, 1.00f);
+            ImVec4(0.055f, 0.055f, 0.060f, 1.00f);
         colors[ImGuiCol_TabHovered] =
-            ImVec4(0.352f, 0.352f, 0.352f, 1.00f);
+            ImVec4(0.185f, 0.160f, 0.165f, 1.00f);
         colors[ImGuiCol_TabSelected] =
-            ImVec4(0.250f, 0.250f, 0.250f, 1.00f);
+            ImVec4(0.130f, 0.130f, 0.140f, 1.00f);
         colors[ImGuiCol_TabDimmed] =
-            ImVec4(0.098f, 0.098f, 0.098f, 1.00f);
+            ImVec4(0.050f, 0.050f, 0.055f, 1.00f);
         colors[ImGuiCol_TabDimmedSelected] =
-            ImVec4(0.195f, 0.195f, 0.195f, 1.00f);
+            ImVec4(0.105f, 0.105f, 0.115f, 1.00f);
         colors[ImGuiCol_TabSelectedOverline] = Accent;
         colors[ImGuiCol_TabDimmedSelectedOverline] =
-            ImVec4(0.08f, 0.29f, 0.48f, 1.00f);
+            ImVec4(0.42f, 0.14f, 0.12f, 1.00f);
 
         // Docking
         colors[ImGuiCol_DockingPreview] =
@@ -229,11 +229,11 @@ namespace EditorStyle
 
         // Tables
         colors[ImGuiCol_TableHeaderBg] =
-            ImVec4(0.240f, 0.240f, 0.240f, 1.00f);
+            ImVec4(0.115f, 0.115f, 0.125f, 1.00f);
         colors[ImGuiCol_TableBorderStrong] =
             colors[ImGuiCol_Border];
         colors[ImGuiCol_TableBorderLight] =
-            ImVec4(0.220f, 0.220f, 0.220f, 1.00f);
+            ImVec4(0.145f, 0.145f, 0.155f, 1.00f);
         colors[ImGuiCol_TableRowBg] =
             ImVec4(0.00f, 0.00f, 0.00f, 0.00f);
         colors[ImGuiCol_TableRowBgAlt] =

@@ -421,7 +421,7 @@ bool UEditorEngine::CreatePIEWindow()
 	constexpr int32 DefaultHeight = 720;
 
 	TUniquePtr<FWindow> NewWindow = MakeUnique<FWindow>();
-	if (!NewWindow->Create(::GetModuleHandleW(nullptr), DefaultWidth, DefaultHeight, L"Hitori Engine - PIE"))
+	if (!NewWindow->Create(::GetModuleHandleW(nullptr), DefaultWidth, DefaultHeight, L"크리스 엔진 - PIE"))
 	{
 		HTR_LOG(Error, "Failed to create PIE window. Falling back to the selected viewport.");
 		return false;

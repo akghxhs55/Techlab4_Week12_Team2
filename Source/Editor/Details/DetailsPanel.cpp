@@ -1395,7 +1395,7 @@ namespace
 
 		static char ComponentNameInputBuf[256] = {};
 
-		// UE 디테일 패널 머리: 왼쪽에 액터 이름, 오른쪽 끝에 초록 + 가 붙은 "Add" 버튼
+		// UE 디테일 패널 머리: 왼쪽에 액터 이름, 오른쪽 끝에 적색 + 가 붙은 "Add" 버튼
 		ImGui::AlignTextToFramePadding();
 		ImGui::TextUnformatted(Actor->GetName().c_str());
 		if (ImGui::IsItemHovered()) ImGui::SetTooltip("UUID: %u", Actor->GetUUID());
@@ -1407,8 +1407,8 @@ namespace
 		const float AddWidth = FramePadding.x * 2.0f + PlusSize + PlusGap + ImGui::CalcTextSize(AddLabel).x + EditorStyle::Scale(4.0f);
 		ImGui::SameLine();
 		ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - AddWidth));
-		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(52, 52, 52, 255));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(68, 68, 68, 255));
+		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(34, 34, 38, 255));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(54, 46, 48, 255));
 		const bool bAddClicked = ImGui::Button("##AddComponent", { AddWidth, ImGui::GetFrameHeight() });
 		ImGui::PopStyleColor(2);
 		{
@@ -1416,10 +1416,10 @@ namespace
 			const float CenterY = (Min.y + Max.y) * 0.5f;
 			const float PlusX = Min.x + FramePadding.x + PlusSize * 0.5f;
 			const float Thick = std::max(2.0f, EditorStyle::Scale(2.0f));
-			const ImU32 Green = IM_COL32(110, 200, 70, 255);
+			const ImU32 Crimson = IM_COL32(218, 64, 56, 255);
 			ImDrawList* DrawList = ImGui::GetWindowDrawList();
-			DrawList->AddRectFilled({ PlusX - PlusSize * 0.5f, CenterY - Thick * 0.5f }, { PlusX + PlusSize * 0.5f, CenterY + Thick * 0.5f }, Green);
-			DrawList->AddRectFilled({ PlusX - Thick * 0.5f, CenterY - PlusSize * 0.5f }, { PlusX + Thick * 0.5f, CenterY + PlusSize * 0.5f }, Green);
+			DrawList->AddRectFilled({ PlusX - PlusSize * 0.5f, CenterY - Thick * 0.5f }, { PlusX + PlusSize * 0.5f, CenterY + Thick * 0.5f }, Crimson);
+			DrawList->AddRectFilled({ PlusX - Thick * 0.5f, CenterY - PlusSize * 0.5f }, { PlusX + Thick * 0.5f, CenterY + PlusSize * 0.5f }, Crimson);
 			DrawList->AddText({ PlusX + PlusSize * 0.5f + PlusGap, CenterY - ImGui::GetTextLineHeight() * 0.5f },
 				ImGui::GetColorU32(ImGuiCol_Text), AddLabel);
 		}
@@ -1708,7 +1708,7 @@ void FDetailsPanel::DrawCompoenetList(AActor* SelectedActor, UActorComponent*& O
         if (Component && !Component->IsHiddenInDetails()) ++RowCount;
     const float RowHeight = ImGui::GetFrameHeight();
     const float BoxHeight = std::clamp(static_cast<float>(RowCount), 3.0f, 10.0f) * RowHeight + ImGui::GetStyle().WindowPadding.y * 2.0f;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(21, 21, 21, 255));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(14, 14, 17, 255));
     const bool bBoxVisible = ImGui::BeginChild("##ComponentTree", { 0.0f, BoxHeight },
         ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY);
     ImGui::PopStyleColor();

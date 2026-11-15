@@ -215,7 +215,7 @@ void EditorTitleBar::Draw()
 		if (TextX + TextSize.x <= ButtonsMinX - Spacing)
 		{
 			const float TextY = ImFloor(Bar.Min.y + (Height - TextSize.y) * 0.5f);
-			Window->DrawList->AddText(ImVec2(TextX, TextY), ImGui::GetColorU32(ImGuiCol_TextDisabled), GTitle.c_str());
+			Window->DrawList->AddText(ImVec2(TextX, TextY), IM_COL32(195, 192, 194, 255), GTitle.c_str());
 		}
 	}
 
@@ -229,6 +229,12 @@ void EditorTitleBar::Draw()
 	if (CaptionButton("Close", ECaptionButton::Close, ImVec2(ButtonsMinX + ButtonSize.x * 2.0f, Bar.Min.y), ButtonSize, bMaximized))
 		PostMessageW(GHwnd, WM_SYSCOMMAND, SC_CLOSE, 0);
 	ImGui::PopID();
+
+	// 스플래시 구분선과 같은 톤의 1px 하단 적갈색 경계선 (2줄 로고 영역은 건너뛴다)
+	{
+		const float LineStartX = (bLogoSpansRows && GLogo != ImTextureID_Invalid) ? GLogoColumnMaxX : Bar.Min.x;
+		Window->DrawList->AddLine(ImVec2(LineStartX, Bar.Max.y - 1.0f), ImVec2(Bar.Max.x, Bar.Max.y - 1.0f), IM_COL32(96, 32, 28, 220));
+	}
 	ImGui::PopClipRect();
 
 	// 로고 칸과, 메뉴 끝부터 버튼 앞까지의 빈 곳으로 창을 끈다.

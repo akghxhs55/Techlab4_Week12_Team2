@@ -52,7 +52,7 @@ FGameSettings FGameSettings::Load(const FString& Path)
 			return (Value > 0 || (bAllowZero && Value == 0)) ? static_cast<uint32>(Value) : Default;
 		};
 
-	Settings.WindowTitle = Utf8ToWide(Config.GetString("Window", "Title", "Hitori"));
+	Settings.WindowTitle = Utf8ToWide(Config.GetString("Window", "Title", "크리스 엔진"));
 	Settings.Width = GetUInt("Window", "ResolutionSizeX", Settings.Width, true);
 	Settings.Height = GetUInt("Window", "ResolutionSizeY", Settings.Height, true);
 	Settings.bBorderless = Config.GetBool("Window", "Borderless", Settings.bBorderless);

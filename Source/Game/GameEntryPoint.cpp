@@ -26,6 +26,6 @@ std::filesystem::path ResolveProjectFile(HINSTANCE hInstance, const std::filesys
 		Found = FPaths::FindProjectFileIn(FPaths::EngineDir() / "DefaultProject");
 	if (Found.empty())
 		MessageBoxW(nullptr, L"No .hproject file found. Pass one on the command line: HitoriGame.exe Path/To/Game.hproject",
-			L"Hitori", MB_OK | MB_ICONERROR);
+			L"크리스 엔진", MB_OK | MB_ICONERROR);
 	return Found;
 }

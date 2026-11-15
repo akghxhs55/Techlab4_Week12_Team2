@@ -23,7 +23,7 @@ namespace
 
 		ImDrawList* DL = ImGui::GetWindowDrawList();
 		DL->ChannelsSetCurrent(0);
-		DL->AddRectFilled({ Min.x - EditorStyle::Scale(4.0f), Min.y - EditorStyle::Scale(2.0f) }, { Max.x + EditorStyle::Scale(4.0f), Max.y + EditorStyle::Scale(2.0f) }, IM_COL32(45, 45, 45, 255), 4.0f);
+		DL->AddRectFilled({ Min.x - EditorStyle::Scale(4.0f), Min.y - EditorStyle::Scale(2.0f) }, { Max.x + EditorStyle::Scale(4.0f), Max.y + EditorStyle::Scale(2.0f) }, IM_COL32(24, 24, 27, 255), 4.0f);
 		DL->ChannelsMerge();
 	}
 

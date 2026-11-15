@@ -65,6 +65,17 @@ bool FImGuiRenderer::Init(HWND WindowHandle, ID3D11Device* Device, ID3D11DeviceC
 	MigrateEditorSettings(SettingsDir);
 	GImGuiSettingsPath = FPaths::ToUtf8(SettingsDir / "imgui.ini");
 	io.IniFilename = GImGuiSettingsPath.c_str();
+	{
+		std::error_code FontError;
+		const auto FontPath = FPaths::EngineFile(L"EngineResources/Fonts/NanumSquareR.ttf");
+		if (std::filesystem::exists(FontPath, FontError))
+		{
+			io.Fonts->AddFontDefault();
+			ImFontConfig MergeConfig;
+			MergeConfig.MergeMode = true;
+			io.Fonts->AddFontFromFileTTF(FPaths::ToUtf8(FontPath).c_str(), 0.0f, &MergeConfig, io.Fonts->GetGlyphRangesKorean());
+		}
+	}
 	io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
 	io.ConfigFlags |= ImGuiConfigFlags_DockingEnable;
 	io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;

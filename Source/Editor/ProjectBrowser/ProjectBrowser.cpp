@@ -225,7 +225,7 @@ namespace
 	// 엔진 콘텐츠의 로고 이미지를 텍스처로 만든다. 파일이 없거나 읽지 못하면 nullptr이고, 제목 표시줄은 빈 칸으로 남는다.
 	ComPtr<ID3D11ShaderResourceView> CreateLogoTexture(ID3D11Device* Device)
 	{
-		const FImageData Image = ImageLoader::Load(FPaths::ResolveContentPath("Engine/Icons/Logo.png"));
+		const FImageData Image = ImageLoader::Load(FPaths::ResolveContentPath("Engine/Icons/KrisLogo.png"));
 		if (!Image.IsValid()) return nullptr;
 
 		D3D11_TEXTURE2D_DESC Desc{};
@@ -292,7 +292,7 @@ namespace
 		else
 		{
 			Options |= FOS_FILEMUSTEXIST;
-			const COMDLG_FILTERSPEC Filter[] = { { L"Hitori Project (*.hproject)", L"*.hproject" } };
+			const COMDLG_FILTERSPEC Filter[] = { { L"Kris Project (*.hproject)", L"*.hproject" } };
 			Dialog->SetFileTypes(1, Filter);
 			Dialog->SetTitle(L"Open Project");
 		}
@@ -322,7 +322,7 @@ namespace
 		PWSTR Documents = nullptr;
 		fs::path Result;
 		if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &Documents)))
-			Result = fs::path(Documents) / L"HitoriProjects";
+			Result = fs::path(Documents) / L"KrisProjects";
 		CoTaskMemFree(Documents);
 		return Result;
 	}
@@ -346,8 +346,16 @@ namespace
 	// 창 안의 화면 상태와 그리기.
 	struct FBrowserUI
 	{
+		enum class EPage
+		{
+			Home,
+			NewProject
+		};
+
 		TArray<fs::path> Recent;
 		int32 SelectedRecent = -1;
+		EPage ActivePage = EPage::Home;
+		ImTextureID LogoTexture = ImTextureID_Invalid;
 		char NameBuffer[64] = {};
 		char LocationBuffer[1024] = {};
 		FString Error;
@@ -374,42 +382,186 @@ namespace
 			Chosen = ProjectFile;
 		}
 
-		void DrawRecent(HWND Hwnd, float Height)
+		static void PushAccentButtonColors()
 		{
-			ImGui::BeginChild("Recent", ImVec2(ImGui::GetContentRegionAvail().x * 0.5f, Height), ImGuiChildFlags_Borders);
-			ImGui::SeparatorText("Recent Projects");
+			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.62f, 0.20f, 0.17f, 1.00f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.75f, 0.27f, 0.23f, 1.00f));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.13f, 0.11f, 1.00f));
+		}
 
-			const float ButtonRow = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y;
-			ImGui::BeginChild("RecentList", ImVec2(0, -ButtonRow));
-			if (Recent.IsEmpty())
-				ImGui::TextDisabled("No recent projects.");
+		bool DrawSidebarTab(const char* Label, bool bSelected, float Width)
+		{
+			const float Height = EditorStyle::Scale(32.0f);
+			const ImVec2 Pos = ImGui::GetCursorScreenPos();
+			const bool bClicked = ImGui::InvisibleButton(Label, ImVec2(Width, Height));
+			const bool bHovered = ImGui::IsItemHovered();
 
-			for (int32 i = 0; i < Recent.Num(); ++i)
+			ImDrawList* DL = ImGui::GetWindowDrawList();
+			if (bSelected || bHovered)
 			{
-				ImGui::PushID(i);
-				const FString Name = FPaths::ToUtf8(Recent[i].stem());
-				const FString Path = FPaths::ToUtf8(Recent[i].parent_path().make_preferred());
-				const float RowHeight = ImGui::GetTextLineHeight() * 2.0f + ImGui::GetStyle().ItemSpacing.y;
-				// Selectable은 칸 사이 간격을 메우려고 사각형을 왼쪽으로 넓힌다.
-				// GetItemRectMin()에서 글자를 그리면 첫 글자가 잘리므로 그리기 전 커서 위치를 쓴다.
-				const ImVec2 RowStart = ImGui::GetCursorScreenPos();
-				if (ImGui::Selectable("##row", SelectedRecent == i, ImGuiSelectableFlags_AllowDoubleClick, ImVec2(0, RowHeight)))
-				{
-					SelectedRecent = i;
-					if (ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left)) TryOpen(Recent[i]);
-				}
-				ImGui::SetCursorScreenPos(RowStart);
-				ImGui::TextUnformatted(Name.c_str());
-				ImGui::TextDisabled("%s", Path.c_str());
-				ImGui::PopID();
+				const ImU32 Bg = bSelected ? IM_COL32(46, 26, 26, 255) : IM_COL32(34, 34, 38, 255);
+				DL->AddRectFilled(Pos, { Pos.x + Width, Pos.y + Height }, Bg, EditorStyle::Scale(4.0f));
 			}
+			if (bSelected)
+			{
+				const float BarW = EditorStyle::Scale(3.0f);
+				DL->AddRectFilled(Pos, { Pos.x + BarW, Pos.y + Height }, IM_COL32(184, 58, 48, 255), EditorStyle::Scale(2.0f));
+			}
+
+			const ImU32 TextCol = bSelected ? IM_COL32(246, 242, 242, 255) : IM_COL32(190, 190, 196, 255);
+			const float TextY = Pos.y + (Height - ImGui::GetTextLineHeight()) * 0.5f;
+			DL->AddText({ Pos.x + EditorStyle::Scale(14.0f), TextY }, TextCol, Label);
+			return bClicked;
+		}
+
+		void DrawSidebar(HWND Hwnd)
+		{
+			const float SidebarW = EditorStyle::Scale(220.0f);
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(20, 20, 24, 255));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(16.0f), EditorStyle::Scale(18.0f)));
+			ImGui::BeginChild("##BrowserSidebar", ImVec2(SidebarW, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
+
+			const float InnerW = ImGui::GetContentRegionAvail().x;
+			if (LogoTexture != ImTextureID_Invalid)
+			{
+				const float LogoSize = EditorStyle::Scale(72.0f);
+				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (InnerW - LogoSize) * 0.5f);
+				ImGui::Image(LogoTexture, ImVec2(LogoSize, LogoSize));
+				ImGui::Spacing();
+			}
+
+			auto CenteredText = [InnerW](const char* Text, ImVec4 Color)
+			{
+				const float TextW = ImGui::CalcTextSize(Text).x;
+				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (InnerW - TextW) * 0.5f));
+				ImGui::TextColored(Color, "%s", Text);
+			};
+			CenteredText("KRIS ENGINE", ImVec4(0.96f, 0.94f, 0.94f, 1.0f));
+			CenteredText("크리스 엔진 1.0", ImVec4(0.68f, 0.44f, 0.41f, 1.0f));
+
+			ImGui::Dummy(ImVec2(0.0f, EditorStyle::Scale(10.0f)));
+
+			const float ButtonH = EditorStyle::Scale(32.0f);
+			PushAccentButtonColors();
+			if (ImGui::Button("+ 새 프로젝트", ImVec2(InnerW, ButtonH)))
+			{
+				ActivePage = EPage::NewProject;
+			}
+			ImGui::PopStyleColor(3);
+
+			ImGui::Spacing();
+			if (ImGui::Button("내 프로젝트 열기", ImVec2(InnerW, ButtonH)))
+			{
+				const fs::path File = ShowOpenDialog(Hwnd, false, {});
+				if (!File.empty()) TryOpen(File);
+			}
+
+			ImGui::Dummy(ImVec2(0.0f, EditorStyle::Scale(12.0f)));
+			ImGui::Separator();
+			ImGui::Dummy(ImVec2(0.0f, EditorStyle::Scale(8.0f)));
+
+			if (DrawSidebarTab("최근 프로젝트", ActivePage == EPage::Home, InnerW))
+			{
+				ActivePage = EPage::Home;
+			}
+			ImGui::Spacing();
+			if (DrawSidebarTab("새 프로젝트 생성", ActivePage == EPage::NewProject, InnerW))
+			{
+				ActivePage = EPage::NewProject;
+			}
+
+			const float BottomHeight = ImGui::GetTextLineHeightWithSpacing() * 2.0f + EditorStyle::Scale(8.0f);
+			if (ImGui::GetContentRegionAvail().y > BottomHeight)
+			{
+				ImGui::SetCursorPosY(ImGui::GetWindowHeight() - BottomHeight);
+			}
+			ImGui::Separator();
+			ImGui::Spacing();
+			ImGui::TextDisabled("Kris Engine 1.0");
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Engine: %s", FPaths::ToUtf8(FPaths::EngineDir()).c_str());
+			}
+
 			ImGui::EndChild();
+			ImGui::PopStyleVar();
+			ImGui::PopStyleColor();
+		}
+
+		bool DrawProjectCard(int32 Index, const fs::path& ProjectPath, float CardW, float CardH, bool bSelected)
+		{
+			const ImVec2 Pos = ImGui::GetCursorScreenPos();
+			const bool bClicked = ImGui::InvisibleButton("##Card", ImVec2(CardW, CardH));
+			const bool bDoubleClicked = ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left);
+			const bool bHovered = ImGui::IsItemHovered();
+
+			const FString Name = FPaths::ToUtf8(ProjectPath.stem());
+			const FString Folder = FPaths::ToUtf8(fs::path(ProjectPath.parent_path()).make_preferred());
+			if (bHovered)
+			{
+				ImGui::SetTooltip("%s", FPaths::ToUtf8(fs::path(ProjectPath).make_preferred()).c_str());
+			}
+
+			ImDrawList* DL = ImGui::GetWindowDrawList();
+			const float Radius = EditorStyle::Scale(6.0f);
+			const float ThumbH = EditorStyle::Scale(132.0f);
+			const ImVec2 Max = { Pos.x + CardW, Pos.y + CardH };
+
+			// 상단 썸네일 영역
+			DL->AddRectFilledMultiColor(
+				Pos, { Max.x, Pos.y + ThumbH },
+				IM_COL32(28, 26, 28, 255), IM_COL32(22, 22, 25, 255),
+				IM_COL32(14, 14, 16, 255), IM_COL32(18, 16, 18, 255));
+
+			if (LogoTexture != ImTextureID_Invalid)
+			{
+				const float MarkSize = EditorStyle::Scale(56.0f);
+				const ImVec2 Center = { Pos.x + CardW * 0.5f, Pos.y + ThumbH * 0.5f };
+				const ImU32 Tint = bSelected ? IM_COL32(255, 235, 235, 210) : IM_COL32(255, 255, 255, 85);
+				DL->AddImage(LogoTexture,
+					{ Center.x - MarkSize * 0.5f, Center.y - MarkSize * 0.5f },
+					{ Center.x + MarkSize * 0.5f, Center.y + MarkSize * 0.5f },
+					{ 0, 0 }, { 1, 1 }, Tint);
+			}
+
+			// 하단 정보 밴드 (선택 시 마키세 크리스 적갈색 강조)
+			const ImU32 FooterCol = bSelected
+				? IM_COL32(158, 51, 43, 255)
+				: (bHovered ? IM_COL32(44, 34, 34, 255) : IM_COL32(30, 30, 34, 255));
+			DL->AddRectFilled({ Pos.x, Pos.y + ThumbH }, Max, FooterCol, Radius, ImDrawFlags_RoundCornersBottom);
+
+			const float Pad = EditorStyle::Scale(10.0f);
+			DL->PushClipRect({ Pos.x + Pad, Pos.y + ThumbH }, { Max.x - Pad, Max.y }, true);
+			DL->AddText({ Pos.x + Pad, Pos.y + ThumbH + EditorStyle::Scale(8.0f) },
+				IM_COL32(246, 244, 244, 255), Name.c_str());
+			const ImU32 SubCol = bSelected ? IM_COL32(240, 210, 206, 255) : IM_COL32(150, 150, 156, 255);
+			DL->AddText({ Pos.x + Pad, Pos.y + ThumbH + EditorStyle::Scale(30.0f) },
+				SubCol, Folder.c_str());
+			DL->PopClipRect();
+
+			const ImU32 BorderCol = bSelected
+				? IM_COL32(215, 86, 74, 255)
+				: (bHovered ? IM_COL32(110, 62, 58, 255) : IM_COL32(46, 46, 52, 255));
+			DL->AddRect(Pos, Max, BorderCol, Radius, 0, bSelected ? EditorStyle::Scale(1.8f) : 1.0f);
+
+			if (bClicked) SelectedRecent = Index;
+			return bDoubleClicked;
+		}
+
+		void DrawHomePage(HWND Hwnd, float BodyHeight)
+		{
+			ImGui::TextUnformatted("최근 프로젝트");
+			ImGui::SameLine();
+
+			const float RemoveW = ImGui::CalcTextSize("목록에서 제거").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+			const float BrowseW = ImGui::CalcTextSize("찾아보기...").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+			const float RightGap = ImGui::GetStyle().ItemSpacing.x;
+			const float ActionsW = RemoveW + RightGap + BrowseW;
+			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ActionsW));
 
 			const bool bHasSelection = SelectedRecent >= 0 && SelectedRecent < Recent.Num();
 			ImGui::BeginDisabled(!bHasSelection);
-			if (ImGui::Button("Open")) TryOpen(Recent[SelectedRecent]);
-			ImGui::SameLine();
-			if (ImGui::Button("Remove from List"))
+			if (ImGui::Button("목록에서 제거", ImVec2(RemoveW, 0)))
 			{
 				RecentProjects::Remove(Recent[SelectedRecent]);
 				Recent = RecentProjects::Load();
@@ -417,25 +569,141 @@ namespace
 			}
 			ImGui::EndDisabled();
 			ImGui::SameLine();
-			if (ImGui::Button("Browse..."))
+			if (ImGui::Button("찾아보기...", ImVec2(BrowseW, 0)))
 			{
 				const fs::path File = ShowOpenDialog(Hwnd, false, {});
 				if (!File.empty()) TryOpen(File);
 			}
+
+			ImGui::Spacing();
+
+			const float FooterH = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 2.0f;
+			const float GridH = std::max(EditorStyle::Scale(180.0f), BodyHeight - ImGui::GetFrameHeightWithSpacing() - FooterH - EditorStyle::Scale(8.0f));
+
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(18, 18, 21, 255));
+			ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(40, 38, 42, 255));
+			ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(6.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(18.0f), EditorStyle::Scale(18.0f)));
+			ImGui::BeginChild("##RecentCardsPanel", ImVec2(0.0f, GridH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+
+			if (Recent.IsEmpty())
+			{
+				ImGui::TextDisabled("최근에 연 프로젝트가 없습니다.");
+				ImGui::Spacing();
+				PushAccentButtonColors();
+				if (ImGui::Button("새 프로젝트 만들기"))
+				{
+					ActivePage = EPage::NewProject;
+				}
+				ImGui::PopStyleColor(3);
+			}
+			else
+			{
+				const float CardW = EditorStyle::Scale(148.0f);
+				const float CardH = EditorStyle::Scale(196.0f);
+				const float Gap = EditorStyle::Scale(14.0f);
+				const float AvailW = ImGui::GetContentRegionAvail().x;
+				const int32 Columns = std::max(1, static_cast<int32>((AvailW + Gap) / (CardW + Gap)));
+
+				for (int32 i = 0; i < Recent.Num(); ++i)
+				{
+					if (i > 0 && (i % Columns) != 0)
+					{
+						ImGui::SameLine(0.0f, Gap);
+					}
+					else if (i > 0)
+					{
+						ImGui::Dummy(ImVec2(0.0f, Gap - ImGui::GetStyle().ItemSpacing.y));
+					}
+
+					ImGui::PushID(i);
+					if (DrawProjectCard(i, Recent[i], CardW, CardH, SelectedRecent == i))
+					{
+						TryOpen(Recent[i]);
+					}
+					ImGui::PopID();
+				}
+			}
+
 			ImGui::EndChild();
+			ImGui::PopStyleVar(2);
+			ImGui::PopStyleColor(2);
+
+			ImGui::Spacing();
+
+			const float OpenW = EditorStyle::Scale(116.0f);
+			if (bHasSelection)
+			{
+				const float PathMaxW = std::max(60.0f, ImGui::GetContentRegionAvail().x - OpenW - EditorStyle::Scale(12.0f));
+				ImGui::AlignTextToFramePadding();
+				ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + PathMaxW);
+				ImGui::TextDisabled("%s", FPaths::ToUtf8(fs::path(Recent[SelectedRecent]).make_preferred()).c_str());
+				ImGui::PopTextWrapPos();
+				ImGui::SameLine();
+			}
+			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - OpenW));
+			ImGui::BeginDisabled(!bHasSelection);
+			PushAccentButtonColors();
+			if (ImGui::Button("열기", ImVec2(OpenW, 0)) && bHasSelection)
+			{
+				TryOpen(Recent[SelectedRecent]);
+			}
+			ImGui::PopStyleColor(3);
+			ImGui::EndDisabled();
 		}
 
-		void DrawCreate(HWND Hwnd, float Height)
+		void DrawNewProjectPage(HWND Hwnd, float BodyHeight)
 		{
-			ImGui::BeginChild("Create", ImVec2(0, Height), ImGuiChildFlags_Borders);
-			ImGui::SeparatorText("New Project");
+			ImGui::TextUnformatted("새 프로젝트");
+			ImGui::SameLine();
+			const float BackW = ImGui::CalcTextSize("최근 프로젝트로").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - BackW));
+			if (ImGui::Button("최근 프로젝트로", ImVec2(BackW, 0)))
+			{
+				ActivePage = EPage::Home;
+			}
 
-			ImGui::TextUnformatted("Name");
+			ImGui::Spacing();
+
+			const float FooterH = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 2.0f;
+			const float PanelH = std::max(EditorStyle::Scale(220.0f), BodyHeight - ImGui::GetFrameHeightWithSpacing() - FooterH - EditorStyle::Scale(8.0f));
+
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(18, 18, 21, 255));
+			ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(40, 38, 42, 255));
+			ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(6.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(20.0f), EditorStyle::Scale(18.0f)));
+			ImGui::BeginChild("##CreateProjectPanel", ImVec2(0.0f, PanelH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+
+			// 템플릿 배너 카드
+			{
+				const ImVec2 BannerMin = ImGui::GetCursorScreenPos();
+				const float BannerW = ImGui::GetContentRegionAvail().x;
+				const float BannerH = EditorStyle::Scale(74.0f);
+				ImDrawList* DL = ImGui::GetWindowDrawList();
+				DL->AddRectFilled(BannerMin, { BannerMin.x + BannerW, BannerMin.y + BannerH }, IM_COL32(28, 22, 24, 255), EditorStyle::Scale(6.0f));
+				DL->AddRectFilled(BannerMin, { BannerMin.x + EditorStyle::Scale(4.0f), BannerMin.y + BannerH }, IM_COL32(168, 52, 42, 255), EditorStyle::Scale(2.0f));
+				DL->AddRect(BannerMin, { BannerMin.x + BannerW, BannerMin.y + BannerH }, IM_COL32(95, 42, 38, 255), EditorStyle::Scale(6.0f));
+
+				float TextX = BannerMin.x + EditorStyle::Scale(18.0f);
+				if (LogoTexture != ImTextureID_Invalid)
+				{
+					const float IconSize = EditorStyle::Scale(44.0f);
+					const float IconY = BannerMin.y + (BannerH - IconSize) * 0.5f;
+					DL->AddImage(LogoTexture, { TextX, IconY }, { TextX + IconSize, IconY + IconSize });
+					TextX += IconSize + EditorStyle::Scale(14.0f);
+				}
+				DL->AddText({ TextX, BannerMin.y + EditorStyle::Scale(16.0f) }, IM_COL32(246, 244, 244, 255), "기본 프로젝트 (Blank)");
+				DL->AddText({ TextX, BannerMin.y + EditorStyle::Scale(38.0f) }, IM_COL32(175, 170, 172, 255), "기본 씬과 설정이 포함된 새 크리스 엔진 프로젝트를 생성합니다.");
+				ImGui::Dummy(ImVec2(BannerW, BannerH));
+			}
+
+			ImGui::Dummy(ImVec2(0.0f, EditorStyle::Scale(10.0f)));
+			ImGui::TextUnformatted("프로젝트 이름");
 			ImGui::SetNextItemWidth(-FLT_MIN);
 			ImGui::InputText("##Name", NameBuffer, sizeof(NameBuffer));
 
 			ImGui::Spacing();
-			ImGui::TextUnformatted("Location");
+			ImGui::TextUnformatted("저장 위치");
 			const float BrowseWidth = ImGui::CalcTextSize("...").x + ImGui::GetStyle().FramePadding.x * 4.0f;
 			ImGui::SetNextItemWidth(-(BrowseWidth + ImGui::GetStyle().ItemSpacing.x));
 			ImGui::InputText("##Location", LocationBuffer, sizeof(LocationBuffer));
@@ -451,7 +719,7 @@ namespace
 			const FString NameError = ProjectCreator::ValidateName(Name);
 
 			ImGui::Spacing();
-			ImGui::TextDisabled("Project file");
+			ImGui::TextDisabled("생성될 프로젝트 파일");
 			if (NameError.empty())
 			{
 				fs::path Preview = Location / FPaths::FromUtf8(Name) / (FPaths::FromUtf8(Name).native() + FPaths::ProjectExtension);
@@ -459,15 +727,22 @@ namespace
 			}
 			else
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.7f, 0.3f, 1.0f), "%s", NameError.c_str());
+				ImGui::TextColored(ImVec4(0.95f, 0.48f, 0.36f, 1.0f), "%s", NameError.c_str());
 			}
 
 			ImGui::Spacing();
-			ImGui::TextDisabled("Creates Content and Config folders.\nEngine icons and fonts are shared from the engine folder.");
+			ImGui::TextDisabled("Content 및 Config 폴더를 생성하며, 엔진 아이콘과 폰트는 엔진 리소스를 공유합니다.");
 
-			ImGui::SetCursorPosY(ImGui::GetWindowHeight() - ImGui::GetFrameHeightWithSpacing() - ImGui::GetStyle().WindowPadding.y);
+			ImGui::EndChild();
+			ImGui::PopStyleVar(2);
+			ImGui::PopStyleColor(2);
+
+			ImGui::Spacing();
+			const float CreateW = EditorStyle::Scale(132.0f);
+			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - CreateW));
 			ImGui::BeginDisabled(!NameError.empty() || Location.empty());
-			if (ImGui::Button("Create Project", ImVec2(-FLT_MIN, 0)))
+			PushAccentButtonColors();
+			if (ImGui::Button("프로젝트 생성", ImVec2(CreateW, 0)))
 			{
 				std::error_code Ec;
 				fs::create_directories(Location, Ec);
@@ -478,8 +753,8 @@ namespace
 				else
 					Error = CreateError;
 			}
+			ImGui::PopStyleColor(3);
 			ImGui::EndDisabled();
-			ImGui::EndChild();
 		}
 
 		void Draw(HWND Hwnd)
@@ -490,24 +765,38 @@ namespace
 			const ImGuiViewport* Viewport = ImGui::GetMainViewport();
 			ImGui::SetNextWindowPos(Viewport->WorkPos);
 			ImGui::SetNextWindowSize(Viewport->WorkSize);
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+			ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(13, 13, 16, 255));
 			ImGui::Begin("Project Browser", nullptr,
 				ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
+			ImGui::PopStyleColor();
+			ImGui::PopStyleVar(2);
 
-			ImGui::TextDisabled("Engine: %s", FPaths::ToUtf8(FPaths::EngineDir()).c_str());
-			ImGui::Spacing();
-
-			const float ErrorHeight = Error.empty() ? 0.0f : ImGui::GetTextLineHeightWithSpacing() * 2.0f;
-			const float Height = ImGui::GetContentRegionAvail().y - ErrorHeight;
-			DrawRecent(Hwnd, Height);
+			DrawSidebar(Hwnd);
 			ImGui::SameLine();
-			DrawCreate(Hwnd, Height);
+
+			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(22.0f), EditorStyle::Scale(18.0f)));
+			ImGui::BeginChild("##BrowserMain", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
+
+			const float ErrorHeight = Error.empty() ? 0.0f : (ImGui::GetTextLineHeightWithSpacing() * 2.0f);
+			const float BodyHeight = ImGui::GetContentRegionAvail().y - ErrorHeight;
+
+			if (ActivePage == EPage::Home)
+				DrawHomePage(Hwnd, BodyHeight);
+			else
+				DrawNewProjectPage(Hwnd, BodyHeight);
 
 			if (!Error.empty())
 			{
-				ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", Error.c_str());
+				ImGui::Spacing();
+				ImGui::TextColored(ImVec4(0.95f, 0.38f, 0.34f, 1.0f), "%s", Error.c_str());
 				ImGui::SameLine();
-				if (ImGui::SmallButton("Dismiss")) Error.clear();
+				if (ImGui::SmallButton("닫기")) Error.clear();
 			}
+
+			ImGui::EndChild();
+			ImGui::PopStyleVar();
 			ImGui::End();
 		}
 	};
@@ -528,13 +817,13 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 
 	// 주 모니터 DPI에 맞춰 창 크기와 글자 크기를 키운다.
 	const float Scale = static_cast<float>(GetDpiForSystem()) / 96.0f;
-	const int32 Width = static_cast<int32>(1000 * Scale);
-	const int32 Height = static_cast<int32>(600 * Scale);
+	const int32 Width = static_cast<int32>(1080 * Scale);
+	const int32 Height = static_cast<int32>(660 * Scale);
 
 	// 에디터 메인 창과 같은 FWindow를 쓴다. 기본 제목 표시줄 제거와 히트 테스트도 그대로 가져온다.
 	FWindow MainWindow;
 	FBrowserWindow Window;
-	if (MainWindow.Create(hInstance, Width, Height, L"Hitori Project Browser"))
+	if (MainWindow.Create(hInstance, Width, Height, L"크리스 엔진"))
 	{
 		Window.Hwnd = MainWindow.GetHandle();
 		// 닫기는 앱 종료(WM_QUIT)가 아니라 요청만 남긴다. WM_QUIT이 엔진 메인 루프까지 남으면 안 된다.
@@ -582,6 +871,7 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 		MainWindow.Show();
 
 		FBrowserUI UI;
+		if (Logo) UI.LogoTexture = (ImTextureID)Logo.Get();
 		UI.Init();
 
 		bool bRunning = true;
@@ -609,7 +899,7 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 			UI.Draw(Window.Hwnd);
 			ImGui::Render();
 
-			const float Clear[4] = { 0.08f, 0.08f, 0.09f, 1.0f };
+			const float Clear[4] = { 0.050f, 0.050f, 0.056f, 1.0f };
 			ID3D11RenderTargetView* Target = Window.RenderTarget.Get();
 			Window.Context->OMSetRenderTargets(1, &Target, nullptr);
 			Window.Context->ClearRenderTargetView(Target, Clear);
@@ -628,7 +918,7 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 	}
 	else
 	{
-		MessageBoxW(nullptr, L"Cannot create the project browser window.", L"Hitori", MB_OK | MB_ICONERROR);
+		MessageBoxW(nullptr, L"Cannot create the project browser window.", L"크리스 엔진", MB_OK | MB_ICONERROR);
 	}
 
 	Window.RenderTarget.Reset();

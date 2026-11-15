@@ -87,8 +87,8 @@ void FOutlinerPanel::OnRender()
     ImGui::InputTextWithHint("##OutlinerSearch", "Search...", SearchBuffer, sizeof(SearchBuffer));
 
     // 아이템 라벨 / 타입 두 열. 줄마다 배경색을 번갈아 칠한다.
-    ImGui::PushStyleColor(ImGuiCol_TableRowBg, IM_COL32(26, 26, 26, 255));
-    ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, IM_COL32(36, 36, 36, 255));
+    ImGui::PushStyleColor(ImGuiCol_TableRowBg, IM_COL32(16, 16, 19, 255));
+    ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, IM_COL32(23, 23, 27, 255));
     // PadOuterX + 셀 여백: 헤더 글자와 첫 열이 창 왼쪽 끝에 붙지 않게 한다.
     const ImGuiTableFlags TableFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
         ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX;

@@ -121,7 +121,7 @@ FEngineConfig UEditorEngine::GetConfig() const
 	FEngineConfig Desc;
 	// 창 제목에 연 프로젝트 이름을 붙인다. Title은 포인터만 넘기므로 문자열을 static으로 둔다.
 	static std::wstring Title;
-	Title = L"Hitori Engine";
+	Title = L"크리스 엔진";
 	if (FPaths::HasProject())
 		Title += L" - " + FPaths::ProjectFilePath().stem().wstring();
 	Desc.Title = Title.c_str();
@@ -133,7 +133,7 @@ FEngineConfig UEditorEngine::GetConfig() const
 	Desc.bCreateDepthBuffer = false;
 	Desc.bExitOnEscape = false;
 	// 파일이 없으면 검은 배경에 상태 텍스트만 표시된다.
-	Desc.SplashImage = "Engine/Splash/Splash.png";
+	Desc.SplashImage = "Engine/Splash/KrisSplash.png";
 	return Desc;
 }
 
@@ -199,6 +199,9 @@ void UEditorEngine::InitLevelEditorTab()
 // ImGui를 초기화하고 메인 메뉴 바를 창의 제목 표시줄로 쓴다.
 void UEditorEngine::InitImGui()
 {
+	FSplashScreen::SetText(L"Initializing Editor UI...");
+	FSplashScreen::SetProgress(0.90f);
+
 	FRenderDevice* RenderDevice = GetEngineLoop().GetRenderDevice();
 
 	HTR_LOG(Info, "Initialize ImGui...");
@@ -213,7 +216,7 @@ void UEditorEngine::InitImGui()
 	EditorTitleBar::Install(*MainWindow);
 	// 엔진 콘텐츠에 로고 이미지가 있으면 제목 표시줄 왼쪽 위 칸에 그린다. 없으면 빈 칸으로 둔다.
 	{
-		const FString LogoPath = "Engine/Icons/Logo.png";
+		const FString LogoPath = "Engine/Icons/KrisLogo.png";
 		std::error_code Ec;
 		if (std::filesystem::exists(FPaths::FromUtf8(FPaths::ResolveContentPath(LogoPath)), Ec))
 		{
@@ -384,7 +387,7 @@ void UEditorEngine::InitPanels()
 void UEditorEngine::InitCommands()
 {
 	const ImVec4 White = { 1, 1, 1, 1 };
-	const ImVec4 Green = { 0.40f, 0.80f, 0.30f, 1.0f };
+	const ImVec4 Crimson = { 0.86f, 0.25f, 0.22f, 1.0f };
 
 	Save = { "Save",   "Save Current Scene",UAssetManager::GetAssetByPath<UTexture2D>("Engine/Icons/Toolbar/Save.png"),  White, { EKeyCode::S, true } };
 
@@ -408,7 +411,7 @@ void UEditorEngine::InitCommands()
 	OpenSceneCommand.CanExecute = [this]()->bool {return !PlayWorld; };
 	OpenSceneCommand.Execute = [this]() { OpenScene(); };
 
-	Play = { "Play",   "Play World",        UAssetManager::GetAssetByPath<UTexture2D>("Engine/Icons/Toolbar/Play.png"),  Green, { EKeyCode::P, false, true } };
+	Play = { "Play",   "Play World",        UAssetManager::GetAssetByPath<UTexture2D>("Engine/Icons/Toolbar/Play.png"),  Crimson, { EKeyCode::P, false, true } };
 
 	Play.CanExecute = [this]()->bool {return !PlayWorld; };
 	Play.Execute = [this]() { RequestPlaySession(); };
@@ -457,7 +460,7 @@ void UEditorEngine::InitCommands()
 	Play.IsVisible = [this]()->bool { return !PlayWorld; };
 	Pause.IsVisible = [this]()->bool { return PlayWorld && !bIsPaused; };
 	Resume.IsVisible = [this]()->bool { return PlayWorld && bIsPaused; };
-	Resume.IconTint = Green;
+	Resume.IconTint = Crimson;
 
 	FLevelEditorToolbar& LevelEditorToolbar = *LevelEditorTab->GetToolbar();
 	LevelEditorToolbar.SetCommands({ Play, Pause, Resume, StepFrame, Stop, Simulate, Eject, Possess });

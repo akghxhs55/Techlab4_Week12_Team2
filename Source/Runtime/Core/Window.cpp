@@ -58,17 +58,73 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 	return DefWindowProc(hWnd, msg, wParam, lParam);   // return 0 대신
 }
 
+namespace
+{
+	const wchar_t* FindKrisIconPath(wchar_t* OutPath, DWORD MaxLen)
+	{
+		const DWORD Len = GetModuleFileNameW(nullptr, OutPath, MaxLen);
+		if (Len == 0 || Len >= MaxLen) return nullptr;
+
+		wchar_t Current[512]{};
+		wcscpy_s(Current, OutPath);
+
+		for (int Depth = 0; Depth < 6; ++Depth)
+		{
+			wchar_t* LastSlash = wcsrchr(Current, L'\\');
+			if (!LastSlash) LastSlash = wcsrchr(Current, L'/');
+			if (!LastSlash) break;
+			*LastSlash = L'\0';
+
+			wchar_t Candidate[512]{};
+			swprintf_s(Candidate, L"%s\\EngineResources\\Icons\\Kris.ico", Current);
+			if (GetFileAttributesW(Candidate) != INVALID_FILE_ATTRIBUTES)
+			{
+				wcscpy_s(OutPath, MaxLen, Candidate);
+				return OutPath;
+			}
+		}
+		return nullptr;
+	}
+
+	void GetKrisWindowIcons(HICON& OutBigIcon, HICON& OutSmallIcon)
+	{
+		static bool bLoaded = false;
+		static HICON CachedBigIcon = nullptr;
+		static HICON CachedSmallIcon = nullptr;
+
+		if (!bLoaded)
+		{
+			bLoaded = true;
+			wchar_t IconPath[512]{};
+			if (FindKrisIconPath(IconPath, 512))
+			{
+				const int SmallW = GetSystemMetrics(SM_CXSMICON);
+				const int SmallH = GetSystemMetrics(SM_CYSMICON);
+				CachedBigIcon = static_cast<HICON>(LoadImageW(nullptr, IconPath, IMAGE_ICON, 64, 64, LR_LOADFROMFILE));
+				CachedSmallIcon = static_cast<HICON>(LoadImageW(nullptr, IconPath, IMAGE_ICON, SmallW, SmallH, LR_LOADFROMFILE));
+			}
+		}
+
+		OutBigIcon = CachedBigIcon;
+		OutSmallIcon = CachedSmallIcon;
+	}
+}
+
 bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar_t* Title, bool bBorderless)
 {
 	Width = InWidth;
 	Height = InHeight;
 	const wchar_t CLASS_NAME[] = L"EngineWindowClass";
 
+	HICON BigIcon = nullptr;
+	HICON SmallIcon = nullptr;
+	GetKrisWindowIcons(BigIcon, SmallIcon);
+
 	WNDCLASS wc = {};
 	wc.lpfnWndProc = WndProc;
 	wc.hInstance = hInstance;
 	wc.lpszClassName = CLASS_NAME;
-	wc.hIcon = LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON2));
+	wc.hIcon = BigIcon ? BigIcon : LoadIcon(hInstance, MAKEINTRESOURCE(IDI_ICON2));
 	RegisterClassW(&wc);
 
 	DWORD style = bBorderless ? WS_POPUP : WS_OVERLAPPEDWINDOW;
@@ -88,6 +144,17 @@ bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar
 
 	if (hWnd == nullptr)
 		return false;
+
+	if (BigIcon)
+	{
+		SetClassLongPtrW(hWnd, GCLP_HICON, reinterpret_cast<LONG_PTR>(BigIcon));
+		SendMessageW(hWnd, WM_SETICON, ICON_BIG, reinterpret_cast<LPARAM>(BigIcon));
+	}
+	if (SmallIcon)
+	{
+		SetClassLongPtrW(hWnd, GCLP_HICONSM, reinterpret_cast<LONG_PTR>(SmallIcon));
+		SendMessageW(hWnd, WM_SETICON, ICON_SMALL, reinterpret_cast<LPARAM>(SmallIcon));
+	}
 
 	// 초기화(스플래시)가 끝난 뒤 Show()로 띄운다.
 	return true;

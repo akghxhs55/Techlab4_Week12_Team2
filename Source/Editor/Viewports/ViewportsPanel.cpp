@@ -23,14 +23,14 @@
 
 namespace {
 constexpr float SplitterThickness = 6.0f;
-constexpr ImU32 SplitterColor = IM_COL32(55, 55, 55, 230);
-constexpr ImU32 SplitterHoverColor = IM_COL32(255, 192, 0, 255);
+constexpr ImU32 SplitterColor = IM_COL32(24, 24, 28, 240);
+constexpr ImU32 SplitterHoverColor = IM_COL32(192, 68, 58, 255);
 
 // Stat Overlay
 constexpr float StatOverlayMargin = 8.0f;
 constexpr float StatOverlayPadding = 6.0f;
 constexpr ImU32 StatOverlayBackgroundColor = IM_COL32(0, 0, 0, 140);
-constexpr ImU32 TitleColor = IM_COL32(255, 210, 60, 255);
+constexpr ImU32 TitleColor = IM_COL32(235, 128, 86, 255);
 constexpr ImU32 ValueColor = IM_COL32(235, 235, 235, 255);
 } // namespace
 

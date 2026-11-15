@@ -86,7 +86,7 @@ namespace ViewportToolbarWidgets
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { Pad, Pad });
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { Pad, Pad });
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(2.0f));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(24, 26, 30, 235));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(16, 16, 18, 238));
         return ImGui::BeginChild(Id, Size, ImGuiChildFlags_AlwaysUseWindowPadding,
             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     }
