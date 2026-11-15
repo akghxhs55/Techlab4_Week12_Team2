@@ -189,7 +189,73 @@ namespace
 		DrawList->AddLine(ImVec2(Center.x + HalfW, Center.y), ImVec2(Center.x - HalfW, Center.y + HalfH), Color, Stroke);
 	}
 
-	bool DrawFolderTreeNode(const char* HiddenId, const char* Label, ImTextureID FolderTex, ImGuiTreeNodeFlags Flags)
+	void DrawTrashIcon(ImDrawList* DrawList, ImVec2 TopLeft, float Size, ImU32 Color)
+	{
+		const float Stroke = EditorStyle::Scale(1.25f);
+		const float cx = TopLeft.x + Size * 0.5f;
+		// 뚜껑 손잡이
+		DrawList->AddLine(
+			ImVec2(cx - Size * 0.16f, TopLeft.y + Size * 0.10f),
+			ImVec2(cx + Size * 0.16f, TopLeft.y + Size * 0.10f),
+			Color, Stroke);
+		// 뚜껑 가로 막대
+		DrawList->AddLine(
+			ImVec2(cx - Size * 0.38f, TopLeft.y + Size * 0.24f),
+			ImVec2(cx + Size * 0.38f, TopLeft.y + Size * 0.24f),
+			Color, Stroke);
+		// 통 몸체
+		const ImVec2 BodyPts[4] = {
+			ImVec2(cx - Size * 0.28f, TopLeft.y + Size * 0.28f),
+			ImVec2(cx + Size * 0.28f, TopLeft.y + Size * 0.28f),
+			ImVec2(cx + Size * 0.22f, TopLeft.y + Size * 0.88f),
+			ImVec2(cx - Size * 0.22f, TopLeft.y + Size * 0.88f)
+		};
+		DrawList->AddPolyline(BodyPts, 4, Color, ImDrawFlags_Closed, Stroke);
+		// 내부 세로 줄 2개
+		DrawList->AddLine(
+			ImVec2(cx - Size * 0.09f, TopLeft.y + Size * 0.42f),
+			ImVec2(cx - Size * 0.07f, TopLeft.y + Size * 0.76f),
+			Color, Stroke);
+		DrawList->AddLine(
+			ImVec2(cx + Size * 0.09f, TopLeft.y + Size * 0.42f),
+			ImVec2(cx + Size * 0.07f, TopLeft.y + Size * 0.76f),
+			Color, Stroke);
+	}
+
+	bool DrawDeleteMenuItem()
+	{
+		const float ItemW = ImMax(ImGui::GetContentRegionAvail().x, EditorStyle::Scale(125.0f));
+		const float ItemH = ImGui::GetFrameHeight();
+		const bool bClicked = ImGui::InvisibleButton("##DeleteMenuItem", ImVec2(ItemW, ItemH));
+		const bool bHovered = ImGui::IsItemHovered();
+
+		const ImVec2 Min = ImGui::GetItemRectMin();
+		const ImVec2 Max = ImGui::GetItemRectMax();
+		ImDrawList* DrawList = ImGui::GetWindowDrawList();
+
+		const ImU32 BgCol = bHovered ? IM_COL32(190, 42, 42, 255) : IM_COL32(142, 30, 30, 235);
+		DrawList->AddRectFilled(Min, Max, BgCol, EditorStyle::Scale(3.0f));
+
+		const float IconSize = EditorStyle::Scale(13.0f);
+		const float PadX = EditorStyle::Scale(6.0f);
+		const float CenterY = (Min.y + Max.y) * 0.5f;
+		const ImU32 WhiteCol = IM_COL32(255, 255, 255, 245);
+
+		DrawTrashIcon(DrawList, ImVec2(Min.x + PadX, CenterY - IconSize * 0.5f), IconSize, WhiteCol);
+
+		const float TextX = Min.x + PadX + IconSize + EditorStyle::Scale(6.0f);
+		const float TextY = CenterY - ImGui::GetFontSize() * 0.5f;
+		DrawList->AddText(ImVec2(TextX, TextY), WhiteCol, "Delete");
+
+		if (bClicked)
+		{
+			ImGui::CloseCurrentPopup();
+			return true;
+		}
+		return false;
+	}
+
+	bool DrawFolderTreeNode(const char* HiddenId, const char* Label, ImTextureID FolderTex, ImGuiTreeNodeFlags Flags, float* OutTextStartX = nullptr)
 	{
 		const float NodeStartX = ImGui::GetCursorScreenPos().x;
 		const bool bIsOpen = ImGui::TreeNodeEx(HiddenId, Flags);
@@ -214,10 +280,18 @@ namespace
 			CursorX += IconSize + EditorStyle::Scale(5.0f);
 		}
 
-		DrawList->AddText(
-			ImVec2(CursorX, RowCenterY - FontSize * 0.5f),
-			ImGui::GetColorU32(ImGuiCol_Text),
-			Label);
+		if (OutTextStartX)
+		{
+			*OutTextStartX = CursorX;
+		}
+
+		if (Label && Label[0] != '\0')
+		{
+			DrawList->AddText(
+				ImVec2(CursorX, RowCenterY - FontSize * 0.5f),
+				ImGui::GetColorU32(ImGuiCol_Text),
+				Label);
+		}
 
 		DrawList->PopClipRect();
 		return bIsOpen;
@@ -329,6 +403,23 @@ void FContentDrawerPanel::RenderContents()
 		else if (ImGui::IsMouseClicked(static_cast<ImGuiMouseButton>(4)) && CanNavigateForward())
 		{
 			NavigateForward();
+		}
+	}
+
+	// F2 단축키로 선택된 항목 인라인 이름 변경 시작
+	if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows)
+		&& !ImGui::GetIO().WantTextInput
+		&& InlineRenameTarget.empty()
+		&& ImGui::IsKeyPressed(ImGuiKey_F2))
+	{
+		std::error_code SelErr;
+		if (!SelectedAssetPath.empty() && fs::exists(SelectedAssetPath, SelErr) && SelectedAssetPath.parent_path() == CurrentPath)
+		{
+			RequestRenameItem(SelectedAssetPath, bSelectedAssetIsDirectory, false);
+		}
+		else if (CurrentPath != AssetRootPath && fs::is_directory(CurrentPath, SelErr))
+		{
+			RequestRenameItem(CurrentPath, true, true);
 		}
 	}
 
@@ -463,6 +554,12 @@ void FContentDrawerPanel::RenderContents()
 			}
 		}
 		ImGui::EndChild();
+
+		if (bPendingCommitInlineRename)
+		{
+			bPendingCommitInlineRename = false;
+			TryCommitInlineRename();
+		}
 	}
 	ImGui::EndChild();
 
@@ -706,6 +803,33 @@ void FContentDrawerPanel::RenderContents()
 				}
 
 				const float ItemImgSize = ComputeItemImgSize();
+				const bool bIsSelected = (SelectedAssetPath == Path);
+				const bool bRenamingThis = (!bInlineRenameInTree && InlineRenameTarget == Path);
+
+				// UE5 스타일 파란색 선택 카드 하이라이트 (썸네일 + 아래 이름/입력창 포함)
+				if (bIsSelected)
+				{
+					const ImVec2 TileStart = ImGui::GetCursorScreenPos();
+					const float CardW = ItemImgSize + framePadX * 2.0f;
+					const float ButtonH = ItemImgSize + framePadY * 2.0f;
+					const bool bTwoLines = !bRenamingThis && (ImGui::CalcTextSize(FilenameString.c_str()).x > thumbnailSize);
+					const float LabelH = bRenamingThis
+						? ImGui::GetFrameHeight()
+						: (ImGui::GetTextLineHeight() * (bTwoLines ? 2.0f : 1.0f) + (bTwoLines ? GridStyle.ItemSpacing.y : 0.0f));
+					const float CardBottomY = TileStart.y + ButtonH + GridStyle.ItemSpacing.y + LabelH + EditorStyle::Scale(3.0f);
+					ImGui::GetWindowDrawList()->AddRectFilled(
+						ImVec2(TileStart.x - EditorStyle::Scale(2.0f), TileStart.y - EditorStyle::Scale(2.0f)),
+						ImVec2(TileStart.x + CardW + EditorStyle::Scale(2.0f), CardBottomY),
+						IM_COL32(14, 92, 214, 230),
+						EditorStyle::Scale(4.0f));
+				}
+
+				if (bIsSelected)
+				{
+					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.08f, 0.36f, 0.80f, 0.65f));
+					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.44f, 0.90f, 0.85f));
+				}
+
 				if (Thumbnail)
 				{
 					ImGui::ImageButton(PathString.c_str(), (ImTextureID)Thumbnail->GetResource()->GetSRV(), { ItemImgSize, ItemImgSize });
@@ -713,6 +837,17 @@ void FContentDrawerPanel::RenderContents()
 				else
 				{
 					ImGui::Button("##FallbackAssetButton", { ItemImgSize + framePadX * 2.0f, ItemImgSize + framePadY * 2.0f });
+				}
+
+				if (bIsSelected)
+				{
+					ImGui::PopStyleColor(2);
+				}
+
+				if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+				{
+					SelectedAssetPath = Path;
+					bSelectedAssetIsDirectory = bIsDirectory;
 				}
 
 				if (ImGui::BeginPopupContextItem("##AssetContext"))
@@ -730,11 +865,11 @@ void FContentDrawerPanel::RenderContents()
 						}
 					}
 
-					if (ImGui::MenuItem("Rename"))
+					if (ImGui::MenuItem("Rename", "F2"))
 					{
-						RequestRenameItem(Path, bIsDirectory);
+						RequestRenameItem(Path, bIsDirectory, false);
 					}
-					if (ImGui::MenuItem("Delete"))
+					if (DrawDeleteMenuItem())
 					{
 						RequestDeleteItem(Path, bIsDirectory);
 					}
@@ -791,12 +926,61 @@ void FContentDrawerPanel::RenderContents()
 					}
 
 				}
-				// 파일 이름 표시 (최대 두 줄, 넘치면 "...")
-				DrawTruncatedName(FilenameString, thumbnailSize);
+				// 이름 표시 또는 폴더/파일 아래 인라인 이름 수정 입력창
+				if (bRenamingThis)
+				{
+					ImGui::SetNextItemWidth(ItemImgSize + framePadX * 2.0f);
+					if (bFocusInlineRename)
+					{
+						ImGui::SetKeyboardFocusHere();
+						bFocusInlineRename = false;
+					}
+					ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.05f, 0.06f, 0.08f, 1.0f));
+					ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.35f, 0.62f, 0.98f, 0.95f));
+					ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+					ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, EditorStyle::Scale(3.0f));
+					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(4.0f), EditorStyle::Scale(2.0f)));
+					const bool bEnter = ImGui::InputText("##InlineRename", RenameBuffer, sizeof(RenameBuffer),
+						ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+					ImGui::PopStyleVar(3);
+					ImGui::PopStyleColor(2);
+
+					if (ImGui::IsItemActive())
+					{
+						bInlineRenameWasActive = true;
+					}
+					if (bEnter)
+					{
+						bPendingCommitInlineRename = true;
+					}
+					else if (bInlineRenameWasActive && ImGui::IsKeyPressed(ImGuiKey_Escape))
+					{
+						CancelInlineRename();
+					}
+					else if (bInlineRenameWasActive && !ImGui::IsItemActive())
+					{
+						bPendingCommitInlineRename = true;
+					}
+				}
+				else
+				{
+					DrawTruncatedName(FilenameString, thumbnailSize);
+				}
 
 				ImGui::PopID();
 			}
 			ImGui::EndTable();
+
+			if (ImGui::IsWindowHovered() && !ImGui::IsAnyItemHovered() && ImGui::IsMouseClicked(ImGuiMouseButton_Left))
+			{
+				SelectedAssetPath.clear();
+			}
+
+			if (bPendingCommitInlineRename)
+			{
+				bPendingCommitInlineRename = false;
+				TryCommitInlineRename();
+			}
 
 			if (bGoToParent)
 			{
@@ -961,6 +1145,8 @@ void FContentDrawerPanel::NavigateTo(const fs::path& NewPath)
 	}
 	PathHistoryIndex = PathHistory.size() - 1;
 	CurrentPath = NewPath;
+	SelectedAssetPath.clear();
+	CancelInlineRename();
 }
 
 bool FContentDrawerPanel::CanNavigateBack() const
@@ -988,6 +1174,8 @@ void FContentDrawerPanel::NavigateBack()
 		{
 			PathHistoryIndex = Candidate;
 			CurrentPath = PathHistory[Candidate];
+			SelectedAssetPath.clear();
+			CancelInlineRename();
 			return;
 		}
 		if (Candidate == 0)
@@ -1013,6 +1201,8 @@ void FContentDrawerPanel::NavigateForward()
 		{
 			PathHistoryIndex = Candidate;
 			CurrentPath = PathHistory[Candidate];
+			SelectedAssetPath.clear();
+			CancelInlineRename();
 			return;
 		}
 		++Candidate;
@@ -1091,24 +1281,72 @@ void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& Selec
 
 		const std::string NodeHiddenId = "##TreeFolder_" + Entry.generic_string();
 		const ImTextureID FolderTex = GetFolderIconTextureId(FolderIconPath);
-		const bool bIsOpen =
-			DrawFolderTreeNode(NodeHiddenId.c_str(), FilenameString.c_str(), FolderTex, Flags);
+		const bool bRenamingInTree = (bInlineRenameInTree && InlineRenameTarget == Entry);
+		float NodeTextX = 0.0f;
+		const bool bIsOpen = DrawFolderTreeNode(
+			NodeHiddenId.c_str(),
+			bRenamingInTree ? "" : FilenameString.c_str(),
+			FolderTex,
+			Flags,
+			&NodeTextX);
+
+		const ImVec2 NodeRectMin = ImGui::GetItemRectMin();
+		const ImVec2 NodeRectMax = ImGui::GetItemRectMax();
 
 		if (ImGui::BeginPopupContextItem())
 		{
-			if (ImGui::MenuItem("Rename"))
+			if (ImGui::MenuItem("Rename", "F2"))
 			{
-				RequestRenameItem(Entry, true);
+				RequestRenameItem(Entry, true, true);
 			}
-			if (ImGui::MenuItem("Delete"))
+			if (DrawDeleteMenuItem())
 			{
 				RequestDeleteItem(Entry, true);
 			}
 			ImGui::EndPopup();
 		}
 
-		if (ImGui::IsItemClicked())
+		if (ImGui::IsItemClicked() && !bRenamingInTree)
 			SelectedPath = Entry;
+
+		if (bRenamingInTree)
+		{
+			const ImVec2 BackupCursor = ImGui::GetCursorScreenPos();
+			ImGui::SetCursorScreenPos(ImVec2(NodeTextX, NodeRectMin.y));
+			const float InputW = ImMax(EditorStyle::Scale(64.0f), NodeRectMax.x - NodeTextX - EditorStyle::Scale(4.0f));
+			ImGui::SetNextItemWidth(InputW);
+			if (bFocusInlineRename)
+			{
+				ImGui::SetKeyboardFocusHere();
+				bFocusInlineRename = false;
+			}
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.08f, 0.09f, 0.11f, 1.0f));
+			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.35f, 0.62f, 0.98f, 0.95f));
+			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
+			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(3.0f), 0.0f));
+			const bool bEnter = ImGui::InputText("##TreeInlineRename", RenameBuffer, sizeof(RenameBuffer),
+				ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+			ImGui::PopStyleVar(2);
+			ImGui::PopStyleColor(2);
+
+			if (ImGui::IsItemActive())
+			{
+				bInlineRenameWasActive = true;
+			}
+			if (bEnter)
+			{
+				bPendingCommitInlineRename = true;
+			}
+			else if (bInlineRenameWasActive && ImGui::IsKeyPressed(ImGuiKey_Escape))
+			{
+				CancelInlineRename();
+			}
+			else if (bInlineRenameWasActive && !ImGui::IsItemActive())
+			{
+				bPendingCommitInlineRename = true;
+			}
+			ImGui::SetCursorScreenPos(BackupCursor);
+		}
 
 		if (bIsOpen)
 		{
@@ -1123,18 +1361,78 @@ void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& Selec
 	}
 }
 
-void FContentDrawerPanel::RequestRenameItem(const fs::path& TargetPath, bool bIsDirectory)
+void FContentDrawerPanel::RequestRenameItem(const fs::path& TargetPath, bool bIsDirectory, bool bInTree)
 {
-	PendingItemTarget = TargetPath;
-	PendingItemIsDirectory = bIsDirectory;
+	InlineRenameTarget = TargetPath;
+	bInlineRenameIsDirectory = bIsDirectory;
+	bInlineRenameInTree = bInTree;
+	bFocusInlineRename = true;
+	bInlineRenameWasActive = false;
+	bPendingCommitInlineRename = false;
 	FileOpErrorMessage.clear();
 	const std::string CurrentName = FPaths::ToUtf8(TargetPath.filename());
 	strcpy_s(RenameBuffer, CurrentName.c_str());
-	bOpenRenameModal = true;
+}
+
+void FContentDrawerPanel::CancelInlineRename()
+{
+	InlineRenameTarget.clear();
+	bFocusInlineRename = false;
+	bInlineRenameWasActive = false;
+	bPendingCommitInlineRename = false;
+}
+
+void FContentDrawerPanel::TryCommitInlineRename()
+{
+	if (InlineRenameTarget.empty())
+	{
+		return;
+	}
+
+	const std::string_view NewNameView(RenameBuffer);
+	const bool bInvalidName = !IsValidEntryName(NewNameView);
+	const fs::path TargetPath = InlineRenameTarget.parent_path() / FPaths::FromUtf8(RenameBuffer);
+	std::error_code ExistsError;
+	const bool bSameName = (TargetPath == InlineRenameTarget);
+	const bool bExists = !bInvalidName && !bSameName && fs::exists(TargetPath, ExistsError);
+
+	if (!bInvalidName && !bSameName && !bExists)
+	{
+		std::error_code RenameError;
+		fs::rename(InlineRenameTarget, TargetPath, RenameError);
+		if (!RenameError)
+		{
+			if (SelectedAssetPath == InlineRenameTarget)
+			{
+				SelectedAssetPath = TargetPath;
+			}
+			if (bInlineRenameIsDirectory)
+			{
+				if (IsPathOrDescendant(CurrentPath, InlineRenameTarget))
+				{
+					CurrentPath = RebasePathPrefix(CurrentPath, InlineRenameTarget, TargetPath);
+				}
+				for (fs::path& HistoryEntry : PathHistory)
+				{
+					if (IsPathOrDescendant(HistoryEntry, InlineRenameTarget))
+					{
+						HistoryEntry = RebasePathPrefix(HistoryEntry, InlineRenameTarget, TargetPath);
+					}
+				}
+			}
+		}
+		else
+		{
+			HTR_LOG(Warning, "Failed to rename {} -> {} : {}", FPaths::ToUtf8(InlineRenameTarget), FPaths::ToUtf8(TargetPath), RenameError.message());
+		}
+	}
+
+	CancelInlineRename();
 }
 
 void FContentDrawerPanel::RequestDeleteItem(const fs::path& TargetPath, bool bIsDirectory)
 {
+	CancelInlineRename();
 	PendingItemTarget = TargetPath;
 	PendingItemIsDirectory = bIsDirectory;
 	FileOpErrorMessage.clear();
@@ -1143,85 +1441,10 @@ void FContentDrawerPanel::RequestDeleteItem(const fs::path& TargetPath, bool bIs
 
 void FContentDrawerPanel::RenderAssetModals()
 {
-	if (bOpenRenameModal)
-	{
-		ImGui::OpenPopup("Rename");
-		bOpenRenameModal = false;
-	}
 	if (bOpenDeleteModal)
 	{
 		ImGui::OpenPopup("Delete");
 		bOpenDeleteModal = false;
-	}
-
-	if (ImGui::BeginPopupModal("Rename", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
-	{
-		if (ImGui::IsWindowAppearing())
-		{
-			ImGui::SetKeyboardFocusHere();
-		}
-
-		const bool bEnter = ImGui::InputText("New Name", RenameBuffer, sizeof(RenameBuffer),
-			ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
-
-		const std::string_view NewNameView(RenameBuffer);
-		const bool bInvalidName = !IsValidEntryName(NewNameView);
-		const fs::path TargetPath = PendingItemTarget.parent_path() / FPaths::FromUtf8(RenameBuffer);
-		const bool bSameName = (!bInvalidName && TargetPath == PendingItemTarget);
-		std::error_code ExistsError;
-		const bool bExists = !bInvalidName && !bSameName && fs::exists(TargetPath, ExistsError);
-
-		if (bExists)
-		{
-			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "A file or folder with this name already exists.");
-		}
-		else if (bInvalidName && !NewNameView.empty())
-		{
-			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid name.");
-		}
-		else if (!FileOpErrorMessage.empty())
-		{
-			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", FileOpErrorMessage.c_str());
-		}
-
-		const bool bCanConfirm = !bInvalidName && !bSameName && !bExists;
-		ImGui::BeginDisabled(!bCanConfirm);
-		if (ImGui::Button("Rename") || (bEnter && bCanConfirm))
-		{
-			std::error_code RenameError;
-			fs::rename(PendingItemTarget, TargetPath, RenameError);
-			if (!RenameError)
-			{
-				if (PendingItemIsDirectory)
-				{
-					if (IsPathOrDescendant(CurrentPath, PendingItemTarget))
-					{
-						CurrentPath = RebasePathPrefix(CurrentPath, PendingItemTarget, TargetPath);
-					}
-					for (fs::path& HistoryEntry : PathHistory)
-					{
-						if (IsPathOrDescendant(HistoryEntry, PendingItemTarget))
-						{
-							HistoryEntry = RebasePathPrefix(HistoryEntry, PendingItemTarget, TargetPath);
-						}
-					}
-				}
-				ImGui::CloseCurrentPopup();
-			}
-			else
-			{
-				FileOpErrorMessage = RenameError.message();
-				HTR_LOG(Warning, "Failed to rename {} -> {} : {}", FPaths::ToUtf8(PendingItemTarget), FPaths::ToUtf8(TargetPath), FileOpErrorMessage);
-			}
-		}
-		ImGui::EndDisabled();
-
-		ImGui::SameLine();
-		if (ImGui::Button("Cancel"))
-		{
-			ImGui::CloseCurrentPopup();
-		}
-		ImGui::EndPopup();
 	}
 
 	if (ImGui::BeginPopupModal("Delete", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
@@ -1250,6 +1473,10 @@ void FContentDrawerPanel::RenderAssetModals()
 			fs::remove_all(PendingItemTarget, RemoveError);
 			if (!RemoveError)
 			{
+				if (!SelectedAssetPath.empty() && IsPathOrDescendant(SelectedAssetPath, PendingItemTarget))
+				{
+					SelectedAssetPath.clear();
+				}
 				if (IsPathOrDescendant(CurrentPath, PendingItemTarget))
 				{
 					fs::path Fallback = PendingItemTarget.parent_path();
