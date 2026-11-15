@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #define STB_IMAGE_IMPLEMENTATION   // 이미 다른 곳에 있으면 여기선 빼세요
+#define STBI_WINDOWS_UTF8          // 프로젝트 폴더의 한글 경로도 UTF-8로 읽는다.
 #include "stb_image.h"
 
 FImageData ImageLoader::Load(const FString& Path)

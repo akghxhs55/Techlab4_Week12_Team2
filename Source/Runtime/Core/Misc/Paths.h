@@ -14,6 +14,7 @@ class FPaths
 {
 public:
 	static constexpr const wchar_t* ProjectExtension = L".kproject";
+	static constexpr const wchar_t* ProjectThumbnailRelativePath = L"Saved/ProjectThumbnail.png";
 
 	// exe 위치에서 위로 올라가며 EngineResources/Shaders가 있는 폴더를 찾아 엔진 폴더로 정한다.
 	static bool InitEngineDir();

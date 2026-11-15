@@ -279,7 +279,8 @@ void FEditorTabContainer::DrawTabMenu(IEditorTab& Tab)
 	{
 		ImGui::PushID(&Tab);
 		{
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
+			// 세로 여백은 메뉴 바를 소유한 창(메인 제목 표시줄 또는 분리된 탭)이 정한다.
+			ImGui::PushStyleVarX(ImGuiStyleVar_FramePadding, EditorStyle::Scale(8.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
 			Tab.DrawMenuBar();
 			DrawEditorTabsMenu();

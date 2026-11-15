@@ -278,6 +278,9 @@ private:
 	void OpenSceneFromPath(const FString& Path);
 	void SaveCurrentScene();
 	void SaveSceneAs();
+	void QueueProjectThumbnail(bool bOnlyIfMissing = false);
+	void SaveProjectThumbnail();
+	FString PendingThumbnailScene;
 
 	bool bGameMouseCaptured = false;
 	// PIE 시작 / SIE → 게임 복귀 시 다음 입력 틱에서 자동 캡처 (UE bCaptureMouseOnLaunch)

@@ -54,6 +54,7 @@
 #include "Core/SplashScreen.h"
 #include "Core/Misc/Paths.h"
 #include "Editor/EditorUI/EditorTitleBar.h"
+#include <imgui_internal.h>
 
 // UEditorEngine의 PIE(Play In Editor) 부분. UE도 같은 클래스의 PIE 함수들을 PlayLevel.cpp에 둔다.
 // 세션 시작과 종료, PIE 입력과 마우스 캡처, 별도 PIE 창을 다룬다.
@@ -173,7 +174,11 @@ void UEditorEngine::TickPIEInput(float DeltaTime)
 	if (FInputSystem::IsKeyPressed(EKeyCode::F8))
 		ToggleBetweenPIEandSIE();
 	if (FInputSystem::IsKeyPressed(EKeyCode::Escape))
+	{
+		// 다음 ImGui::NewFrame에서 같은 ESC가 부모 패널로 포커스를 옮기지 않게 소비한다.
+		ImGui::SetKeyOwner(ImGuiKey_Escape, ImGuiKeyOwner_Any, ImGuiInputFlags_LockUntilRelease);
 		GameViewport.InputKey(nullptr, static_cast<int32>(EKeyCode::Escape), true);
+	}
 	if (GameViewport.ConsumeExitRequest())
 	{
 		RequestEndPlayMap();
@@ -314,6 +319,9 @@ void UEditorEngine::StartQueuedPlaySessionRequest()
 
 void UEditorEngine::StartPlayInEditorSession(bool bSimulate)
 {
+	// 에디터와 게임이 동시에 커서를 고정하거나 NoMouse를 서로 해제하지 않게 한다.
+	EndViewportNavCapture();
+	LeftPressViewIndex = -1;
 	// 별도 창 모드면 패널 View는 모두 에디터 월드로 두고 창 하나에만 PIE 월드를 그린다.
 	// 창을 만들지 못하면 선택한 View에서 실행한다.
 	// Simulate는 UE처럼 항상 레벨 에디터 뷰포트 안에서 돈다. (F8로 게임 화면과 오가려면 바꿔 끼울 View가 필요하다)

@@ -17,7 +17,8 @@ namespace RecentProjects
 }
 
 // 새 프로젝트 폴더를 만든다.
-// <ParentDir>/<Name>/ 아래에 Assets, Scenes, Scripts, Config와 <Name>.kproject를 만든다.
+// <ParentDir>/<Name>/ 아래에 Content/Scenes, Content/Scripts, Config와 <Name>.kproject를 만든다.
+// Config에는 DefaultGame.ini와 엔진 기본 editor.ini, imgui.ini를 넣는다.
 // 엔진 코드가 직접 참조하는 아이콘, 폰트 등은 엔진 콘텐츠(EngineContent)에서 읽으므로 복사하지 않는다.
 namespace ProjectCreator
 {

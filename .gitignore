@@ -440,6 +440,8 @@ FodyWeavers.xsd
 # ImGui
 imgui.ini
 editor.ini
+!EngineResources/Config/imgui.ini
+!EngineResources/Config/editor.ini
 
 # 3D .obj 파일은 커밋 허용
 !Content/**/*.obj
