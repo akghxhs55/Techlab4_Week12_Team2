@@ -310,55 +310,207 @@ namespace
 	}
 
 	// [Begin, End) 중 Width 안에 들어가는 가장 긴 앞부분의 끝을 찾는다. 최소 한 글자는 넣는다.
-	const char* FitPrefix(const char* Begin, const char* End, float Width)
+	const char* FitPrefixForSize(const char* Begin, const char* End, float Width, ImFont* Font, float FontSize)
 	{
 		const char* Fit = Begin;
 		const char* Cursor = Begin;
 		while (Cursor < End)
 		{
 			const char* Next = std::min(End, Cursor + Utf8CharLength(static_cast<unsigned char>(*Cursor)));
-			if (ImGui::CalcTextSize(Begin, Next).x > Width && Fit != Begin) break;
+			if (Font->CalcTextSizeA(FontSize, FLT_MAX, 0.0f, Begin, Next).x > Width && Fit != Begin) break;
 			Fit = Cursor = Next;
 		}
 		return Fit;
 	}
 
-	// UE 콘텐츠 브라우저처럼 이름을 칸 폭에 맞춰 최대 두 줄로 보여 주고, 넘치면 "..."으로 줄인다.
-	// 이름 대부분이 밑줄로 이어져 공백이 없으므로 단어가 아니라 글자 단위로 줄을 바꾼다.
-	void DrawTruncatedName(const std::string& Name, float Width)
+	const char* FitPrefix(const char* Begin, const char* End, float Width)
 	{
-		const char* Begin = Name.c_str();
-		const char* End = Begin + Name.size();
-		if (Width <= 1.0f || ImGui::CalcTextSize(Begin, End).x <= Width)
+		return FitPrefixForSize(Begin, End, Width, ImGui::GetFont(), ImGui::GetFontSize());
+	}
+
+	struct FAssetCardStyle
+	{
+		const char* TypeLabel;
+		ImU32 AccentColor;
+		bool bHasAccentStripe;
+	};
+
+	FAssetCardStyle ClassifyAssetCard(const fs::path& Path, const std::string& PathString, bool bIsDirectory)
+	{
+		if (bIsDirectory)
 		{
-			ImGui::TextUnformatted(Begin, End);
+			return { "Folder", IM_COL32(56, 60, 68, 255), false };
+		}
+
+		if (AnimSequenceFile::IsAnimSequencePath(PathString))
+		{
+			return { "Animation Sequence", IM_COL32(98, 184, 86, 255), true };
+		}
+		if (AnimBlueprintFile::IsAnimBlueprintPath(PathString))
+		{
+			return { "Anim Blueprint", IM_COL32(66, 134, 240, 255), true };
+		}
+		if (BlendSpaceFile::IsBlendSpacePath(PathString))
+		{
+			return { "Blend Space", IM_COL32(138, 198, 72, 255), true };
+		}
+		if (FFbxMeshBake::IsBakedPath(PathString))
+		{
+			const std::string LowerPath = ToLowerAscii(PathString);
+			if (LowerPath.size() >= 15 && LowerPath.compare(LowerPath.size() - 15, 15, "_static.fbx.bin") == 0)
+			{
+				return { "Static Mesh", IM_COL32(72, 178, 255, 255), true };
+			}
+			return { "Skeletal Mesh", IM_COL32(228, 130, 232, 255), true };
+		}
+
+		const std::string Ext = ToLowerAscii(FPaths::ToUtf8(Path.extension()));
+		if (Ext == ".obj")
+		{
+			return { "Static Mesh", IM_COL32(72, 178, 255, 255), true };
+		}
+		if (Ext == ".png" || Ext == ".dds")
+		{
+			return { "Texture", IM_COL32(204, 62, 62, 255), true };
+		}
+		if (Ext == ".scene")
+		{
+			return { "Scene", IM_COL32(225, 165, 52, 255), true };
+		}
+		if (Ext == ".widget")
+		{
+			return { "Widget", IM_COL32(84, 152, 230, 255), true };
+		}
+		if (Ext == ".lua")
+		{
+			return { "Lua Script", IM_COL32(156, 112, 232, 255), true };
+		}
+		if (Ext == ".mtl")
+		{
+			return { "Material", IM_COL32(76, 185, 128, 255), true };
+		}
+		if (Ext == ".json" || Ext == ".ttf" || Ext == ".otf")
+		{
+			return { "Font", IM_COL32(90, 190, 185, 255), true };
+		}
+		if (Ext == ".fbx")
+		{
+			return { "FBX", IM_COL32(110, 145, 190, 255), true };
+		}
+		return { "File", IM_COL32(130, 134, 142, 255), true };
+	}
+
+	void DrawCheckerboardRect(ImDrawList* DL, const ImVec2& Min, const ImVec2& Max, float CellSize, float Rounding)
+	{
+		DL->AddRectFilled(Min, Max, IM_COL32(14, 15, 17, 255), Rounding, ImDrawFlags_RoundCornersTop);
+		if (CellSize <= 1.0f)
+		{
 			return;
 		}
-		const char* LineBreak = FitPrefix(Begin, End, Width);
-		ImGui::TextUnformatted(Begin, LineBreak);
+		DL->PushClipRect(Min, Max, true);
+		const int Cols = static_cast<int>((Max.x - Min.x) / CellSize) + 1;
+		const int Rows = static_cast<int>((Max.y - Min.y) / CellSize) + 1;
+		const ImU32 LightCellCol = IM_COL32(25, 27, 30, 255);
+		for (int r = 0; r < Rows; ++r)
+		{
+			for (int c = 0; c < Cols; ++c)
+			{
+				if (((r + c) & 1) == 0)
+				{
+					continue;
+				}
+				const float X0 = Min.x + c * CellSize;
+				const float Y0 = Min.y + r * CellSize;
+				const float X1 = (std::min)(Max.x, X0 + CellSize);
+				const float Y1 = (std::min)(Max.y, Y0 + CellSize);
+				DL->AddRectFilled(ImVec2(X0, Y0), ImVec2(X1, Y1), LightCellCol);
+			}
+		}
+		DL->PopClipRect();
+	}
 
-		bool bTruncated = false;
+	// 이름을 카드 폭에 맞춰 최대 두 줄로 그리고, 넘치면 "..."으로 줄인다.
+	void DrawCardNameLines(
+		ImDrawList* DL,
+		const std::string& Name,
+		const ImVec2& Pos,
+		float Width,
+		ImU32 Color,
+		bool bCenterSingleLine,
+		bool& bOutTruncated)
+	{
+		bOutTruncated = false;
+		const char* Begin = Name.c_str();
+		const char* End = Begin + Name.size();
+		const float FullWidth = ImGui::CalcTextSize(Begin, End).x;
+		if (Width <= 1.0f || FullWidth <= Width)
+		{
+			const float DrawX = bCenterSingleLine ? (Pos.x + (std::max)(0.0f, (Width - FullWidth) * 0.5f)) : Pos.x;
+			DL->AddText(ImVec2(DrawX, Pos.y), Color, Begin, End);
+			return;
+		}
+
+		const char* LineBreak = FitPrefix(Begin, End, Width);
+		DL->AddText(Pos, Color, Begin, LineBreak);
+
+		const float SecondLineY = Pos.y + ImGui::GetTextLineHeight();
 		if (ImGui::CalcTextSize(LineBreak, End).x <= Width)
 		{
-			ImGui::TextUnformatted(LineBreak, End);
+			DL->AddText(ImVec2(Pos.x, SecondLineY), Color, LineBreak, End);
 		}
 		else
 		{
 			const float EllipsisWidth = ImGui::CalcTextSize("...").x;
-			const char* SecondEnd = FitPrefix(LineBreak, End, std::max(1.0f, Width - EllipsisWidth));
+			const char* SecondEnd = FitPrefix(LineBreak, End, (std::max)(1.0f, Width - EllipsisWidth));
 			const std::string SecondLine = std::string(LineBreak, SecondEnd) + "...";
-			ImGui::TextUnformatted(SecondLine.c_str());
-			bTruncated = true;
+			DL->AddText(ImVec2(Pos.x, SecondLineY), Color, SecondLine.c_str());
+			bOutTruncated = true;
 		}
-		// 잘린 이름은 마우스를 올리면 전체를 보여 준다.
-		if (bTruncated && ImGui::IsItemHovered())
-			ImGui::SetTooltip("%s", Name.c_str());
+	}
+
+	void DrawTruncatedSingleLine(
+		ImDrawList* DL,
+		const char* Text,
+		const ImVec2& Pos,
+		float Width,
+		ImFont* Font,
+		float FontSize,
+		ImU32 Color,
+		bool& bOutTruncated)
+	{
+		bOutTruncated = false;
+		if (!Text || Text[0] == '\0')
+		{
+			return;
+		}
+		const char* End = Text + std::strlen(Text);
+		if (Width <= 1.0f || Font->CalcTextSizeA(FontSize, FLT_MAX, 0.0f, Text, End).x <= Width)
+		{
+			DL->AddText(Font, FontSize, Pos, Color, Text, End);
+			return;
+		}
+
+		const float EllipsisWidth = Font->CalcTextSizeA(FontSize, FLT_MAX, 0.0f, "...", nullptr).x;
+		const char* FitEnd = FitPrefixForSize(Text, End, (std::max)(1.0f, Width - EllipsisWidth), Font, FontSize);
+		const std::string Truncated = std::string(Text, FitEnd) + "...";
+		DL->AddText(Font, FontSize, Pos, Color, Truncated.c_str());
+		bOutTruncated = true;
 	}
 }
 
 bool FContentDrawerPanel::Init()
 {
 	return false;
+}
+
+void FContentDrawerPanel::Shutdown()
+{
+	MeshThumbnailRenderer.Release();
+}
+
+void FContentDrawerPanel::RenderPendingThumbnails(UEditorEngine& Engine, FRenderer* Renderer)
+{
+	MeshThumbnailRenderer.RenderPending(Engine, Renderer);
 }
 
 void FContentDrawerPanel::Tick(float DeltaTime)
@@ -440,7 +592,6 @@ void FContentDrawerPanel::RenderContents()
 	ImGui::PopStyleColor();
 	ImGui::PopStyleVar(2);
 	{
-		// UE5 스타일 회색 헤더 바 (프로젝트 이름 + 경로 검색 토글)
 		const float HeaderHeight = ImGui::GetFrameHeight() + EditorStyle::Scale(6.0f);
 		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(3.0f)));
 		ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
@@ -708,18 +859,26 @@ void FContentDrawerPanel::RenderContents()
 			ImGui::EndPopup();
 		}
 
-		// 그리드 레이아웃 계산 (FramePadding과 CellPadding을 포함해 오른쪽 테두리가 잘리지 않도록 계산)
-		const ImGuiStyle& GridStyle = ImGui::GetStyle();
-		const float padding = EditorStyle::Scale(12.0f);
-		const float thumbnailSize = EditorStyle::Scale(80.0f);
-		const float framePadX = GridStyle.FramePadding.x;
-		const float framePadY = GridStyle.FramePadding.y;
-		const float cellSize = thumbnailSize + framePadX * 2.0f + GridStyle.CellPadding.x * 2.0f + padding;
+		const float ThumbSize = EditorStyle::Scale(106.0f);
+		const float CardW = ThumbSize;
+		const float StripeH = EditorStyle::Scale(3.0f);
+		const float TextPadX = EditorStyle::Scale(6.0f);
+		const float TextPadY = EditorStyle::Scale(5.0f);
+		const float LineH = ImGui::GetTextLineHeight();
+		const float TypeFontSize = ImGui::GetFontSize() * 0.82f;
+		const float FooterH = TextPadY + LineH * 2.0f + EditorStyle::Scale(4.0f) + TypeFontSize + TextPadY;
+		const float CardH = ThumbSize + StripeH + FooterH;
+		const float CardRounding = EditorStyle::Scale(4.0f);
+		const float CellPadX = EditorStyle::Scale(4.0f);
+		const float CellPadY = EditorStyle::Scale(5.0f);
+
 		const float panelWidth = ImGui::GetContentRegionAvail().x;
-		int ColumnCount = static_cast<int>(panelWidth / cellSize);
+		const float cellStep = CardW + CellPadX * 2.0f;
+		int ColumnCount = static_cast<int>(panelWidth / cellStep);
 		if (ColumnCount < 1) ColumnCount = 1;
 
 		// 테이블 기반 그리드 시작
+		ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(CellPadX, CellPadY));
 		if (ImGui::BeginTable("AssetGridTable", ColumnCount))
 		{
 			std::error_code IterateError;
@@ -729,10 +888,114 @@ void FContentDrawerPanel::RenderContents()
 			// 폴더를 열 때 멈추지 않도록 썸네일은 프레임당 하나씩 로드한다. 그동안은 파일 아이콘을 보여 준다.
 			bool bLoadedThumbnail = false;
 
-			auto ComputeItemImgSize = [thumbnailSize, framePadX]() -> float
+			auto DrawCardVisuals = [&](
+				const ImVec2& CardMin,
+				bool bHovered,
+				bool bIsSelected,
+				bool bIsDirectory,
+				bool bIsRenderedMeshThumb,
+				bool bIsFullImageThumb,
+				ImTextureID TileTextureId,
+				const FAssetCardStyle& CardStyle,
+				const std::string& DisplayName,
+				bool bDrawNameText,
+				bool& bOutNameTruncated,
+				bool& bOutTypeTruncated)
 			{
-				const float MaxImg = ImGui::GetContentRegionAvail().x - framePadX * 2.0f - EditorStyle::Scale(2.0f);
-				return ImMin(thumbnailSize, ImMax(EditorStyle::Scale(24.0f), MaxImg));
+				bOutNameTruncated = false;
+				bOutTypeTruncated = false;
+				ImDrawList* DL = ImGui::GetWindowDrawList();
+				const ImVec2 CardMax(CardMin.x + CardW, CardMin.y + CardH);
+				const ImVec2 ThumbMin = CardMin;
+				const ImVec2 ThumbMax(CardMax.x, CardMin.y + ThumbSize);
+
+				if (bIsDirectory)
+				{
+					// 폴더는 회색 푸터/격자 배경 없이 아이콘과 이름만 노출하고 선택·호버 시에만 강조한다.
+					if (bIsSelected)
+					{
+						DL->AddRectFilled(CardMin, CardMax, IM_COL32(20, 92, 198, 175), CardRounding);
+						DL->AddRect(CardMin, CardMax, IM_COL32(62, 148, 255, 255), CardRounding, 0, EditorStyle::Scale(1.6f));
+					}
+					else if (bHovered)
+					{
+						DL->AddRectFilled(CardMin, CardMax, IM_COL32(255, 255, 255, 16), CardRounding);
+					}
+
+					if (TileTextureId != ImTextureID_Invalid)
+					{
+						const float IconPad = EditorStyle::Scale(12.0f);
+						DL->AddImage(TileTextureId,
+							ImVec2(ThumbMin.x + IconPad, ThumbMin.y + IconPad),
+							ImVec2(ThumbMax.x - IconPad, ThumbMax.y - IconPad));
+					}
+
+					if (bDrawNameText)
+					{
+						const ImU32 NameCol = IM_COL32(228, 230, 235, 255);
+						DrawCardNameLines(DL, DisplayName,
+							ImVec2(CardMin.x + TextPadX, ThumbMax.y + EditorStyle::Scale(4.0f)),
+							CardW - TextPadX * 2.0f, NameCol, true, bOutNameTruncated);
+					}
+					return;
+				}
+
+				const ImVec2 StripeMin(CardMin.x, ThumbMax.y);
+				const ImVec2 StripeMax(CardMax.x, StripeMin.y + StripeH);
+				const ImVec2 FooterMin(CardMin.x, StripeMax.y);
+				const ImVec2 FooterMax = CardMax;
+
+				if (bIsRenderedMeshThumb && TileTextureId != ImTextureID_Invalid)
+				{
+					DL->AddImageRounded(TileTextureId, ThumbMin, ThumbMax, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+						IM_COL32_WHITE, CardRounding, ImDrawFlags_RoundCornersTop);
+				}
+				else
+				{
+					DrawCheckerboardRect(DL, ThumbMin, ThumbMax, EditorStyle::Scale(12.0f), CardRounding);
+					if (TileTextureId != ImTextureID_Invalid)
+					{
+						if (bIsFullImageThumb)
+						{
+							DL->AddImageRounded(TileTextureId, ThumbMin, ThumbMax, ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f),
+								IM_COL32_WHITE, CardRounding, ImDrawFlags_RoundCornersTop);
+						}
+						else
+						{
+							const float IconPad = EditorStyle::Scale(18.0f);
+							DL->AddImage(TileTextureId,
+								ImVec2(ThumbMin.x + IconPad, ThumbMin.y + IconPad),
+								ImVec2(ThumbMax.x - IconPad, ThumbMax.y - IconPad));
+						}
+					}
+				}
+
+				DL->AddRectFilled(StripeMin, StripeMax, CardStyle.AccentColor);
+
+				const ImU32 FooterCol = bIsSelected
+					? IM_COL32(20, 92, 198, 255)
+					: (bHovered ? IM_COL32(55, 58, 65, 255) : IM_COL32(42, 44, 48, 255));
+				DL->AddRectFilled(FooterMin, FooterMax, FooterCol, CardRounding, ImDrawFlags_RoundCornersBottom);
+
+				DL->PushClipRect(FooterMin, FooterMax, true);
+				if (bDrawNameText)
+				{
+					const ImU32 NameCol = IM_COL32(232, 234, 238, 255);
+					DrawCardNameLines(DL, DisplayName,
+						ImVec2(FooterMin.x + TextPadX, FooterMin.y + TextPadY),
+						CardW - TextPadX * 2.0f, NameCol, false, bOutNameTruncated);
+				}
+
+				const ImU32 TypeCol = bIsSelected ? IM_COL32(215, 228, 248, 255) : IM_COL32(142, 146, 155, 255);
+				DrawTruncatedSingleLine(DL, CardStyle.TypeLabel,
+					ImVec2(FooterMin.x + TextPadX, FooterMax.y - TextPadY - TypeFontSize),
+					CardW - TextPadX * 2.0f, ImGui::GetFont(), TypeFontSize, TypeCol, bOutTypeTruncated);
+				DL->PopClipRect();
+
+				const ImU32 BorderCol = bIsSelected
+					? IM_COL32(62, 148, 255, 255)
+					: (bHovered ? IM_COL32(115, 120, 130, 255) : IM_COL32(26, 28, 32, 255));
+				DL->AddRect(CardMin, CardMax, BorderCol, CardRounding, 0, bIsSelected ? EditorStyle::Scale(1.8f) : 1.0f);
 			};
 
 			// 맨 앞 칸: ".." 를 더블클릭하면 상위 폴더로 간다. 루트에서는 보이지 않는다.
@@ -741,20 +1004,23 @@ void FContentDrawerPanel::RenderContents()
 			{
 				ImGui::TableNextColumn();
 				ImGui::PushID("##ParentFolder");
-				const float ItemImgSize = ComputeItemImgSize();
-				if (UTexture2D* FolderIcon = UAssetManager::GetAssetByPath<UTexture2D>(FolderIconPath))
-				{
-					ImGui::ImageButton("##ParentFolderButton", (ImTextureID)FolderIcon->GetResource()->GetSRV(), { ItemImgSize, ItemImgSize });
-				}
-				else
-				{
-					ImGui::Button("##ParentFolderButton", { ItemImgSize + framePadX * 2.0f, ItemImgSize + framePadY * 2.0f });
-				}
-				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+				const ImVec2 CardMin = ImGui::GetCursorScreenPos();
+				ImGui::InvisibleButton("##ParentFolderButton", ImVec2(CardW, CardH));
+				const bool bHovered = ImGui::IsItemHovered();
+				if (bHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 				{
 					bGoToParent = true;   // 순회 중인 폴더를 바꾸지 않도록 루프가 끝난 뒤 이동한다
 				}
-				ImGui::TextWrapped("..");
+
+				UTexture2D* FolderIcon = UAssetManager::GetAssetByPath<UTexture2D>(FolderIconPath);
+				const ImTextureID FolderTexId = (FolderIcon && FolderIcon->GetResource())
+					? reinterpret_cast<ImTextureID>(FolderIcon->GetResource()->GetSRV())
+					: ImTextureID_Invalid;
+				bool bDummyNameTrunc = false;
+				bool bDummyTypeTrunc = false;
+				DrawCardVisuals(CardMin, bHovered, false, true, false, false,
+					FolderTexId, { "Folder", IM_COL32(56, 60, 68, 255), false },
+					"..", true, bDummyNameTrunc, bDummyTypeTrunc);
 				ImGui::PopID();
 			}
 
@@ -770,7 +1036,7 @@ void FContentDrawerPanel::RenderContents()
 				if (TypeError)
 					continue;
 
-				std::string PathString = Path.generic_string();
+				std::string PathString = FPaths::ToUtf8(Path);
 				std::string FilenameString = FPaths::ToUtf8(Path.filename());
 
 				if (!ContainsCaseInsensitive(FilenameString, AssetSearchLower))
@@ -780,6 +1046,7 @@ void FContentDrawerPanel::RenderContents()
 
 				ImGui::PushID(PathString.c_str()); // 각 위젯에 고유 ID 부여
 				UTexture2D* Thumbnail = nullptr;
+				ImTextureID MeshThumbId = ImTextureID_Invalid;
 
 				// 실제 에셋일 때만 채워진다.
 				// 폴더/파일 아이콘은 끌 수 없어야 하므로 썸네일과 구분해서 들고 있는다.
@@ -793,10 +1060,17 @@ void FContentDrawerPanel::RenderContents()
 				}
 				else // 파일인 경우
 				{
+					if (FMeshThumbnailRenderer::IsSupportedMeshFile(Path, PathString))
+					{
+						std::error_code TimeError;
+						const fs::file_time_type WriteTime = It->last_write_time(TimeError);
+						MeshThumbId = MeshThumbnailRenderer.GetOrRequestThumbnail(Path, PathString, WriteTime);
+					}
+
 					URenderAsset* Asset = UAssetManager::FindLoadedAsset(PathString);
 					if (!Asset && !bLoadedThumbnail)
 					{
-						// 메시는 썸네일로 쓰지 않으므로 드로어를 연 것만으로 로드하지 않는다
+						// 메시는 전용 3D 썸네일 렌더러에서 프레임당 1개씩 비동기로 생성한다
 						const EAssetType UnloadedType = UAssetManager::GetUnloadedAssetType(PathString);
 						if (UnloadedType == EAssetType::Texture || UnloadedType == EAssetType::Font)
 						{
@@ -818,140 +1092,150 @@ void FContentDrawerPanel::RenderContents()
 						Thumbnail = FontAsset->AtlasTexture;
 					}
 
-					if (Thumbnail == nullptr)
+					if (MeshThumbId == ImTextureID_Invalid && Thumbnail == nullptr)
 					{
 						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(FileIconPath);
 					}
 				}
 
-				const float ItemImgSize = ComputeItemImgSize();
 				const bool bIsSelected = (SelectedAssetPath == Path);
 				const bool bRenamingThis = (!bInlineRenameInTree && InlineRenameTarget == Path);
+				const FAssetCardStyle CardStyle = ClassifyAssetCard(Path, PathString, bIsDirectory);
 
-				// UE5 스타일 파란색 선택 카드 하이라이트 (썸네일 + 아래 이름/입력창 포함)
-				if (bIsSelected)
-				{
-					const ImVec2 TileStart = ImGui::GetCursorScreenPos();
-					const float CardW = ItemImgSize + framePadX * 2.0f;
-					const float ButtonH = ItemImgSize + framePadY * 2.0f;
-					const bool bTwoLines = !bRenamingThis && (ImGui::CalcTextSize(FilenameString.c_str()).x > thumbnailSize);
-					const float LabelH = bRenamingThis
-						? ImGui::GetFrameHeight()
-						: (ImGui::GetTextLineHeight() * (bTwoLines ? 2.0f : 1.0f) + (bTwoLines ? GridStyle.ItemSpacing.y : 0.0f));
-					const float CardBottomY = TileStart.y + ButtonH + GridStyle.ItemSpacing.y + LabelH + EditorStyle::Scale(3.0f);
-					ImGui::GetWindowDrawList()->AddRectFilled(
-						ImVec2(TileStart.x - EditorStyle::Scale(2.0f), TileStart.y - EditorStyle::Scale(2.0f)),
-						ImVec2(TileStart.x + CardW + EditorStyle::Scale(2.0f), CardBottomY),
-						IM_COL32(14, 92, 214, 230),
-						EditorStyle::Scale(4.0f));
-				}
+				const ImTextureID TileTextureId = (MeshThumbId != ImTextureID_Invalid)
+					? MeshThumbId
+					: ((Thumbnail && Thumbnail->GetResource())
+						? reinterpret_cast<ImTextureID>(Thumbnail->GetResource()->GetSRV())
+						: ImTextureID_Invalid);
+				const bool bIsRenderedMeshThumb = (MeshThumbId != ImTextureID_Invalid);
+				const bool bIsFullImageThumb = (!bIsRenderedMeshThumb && (TextureAsset != nullptr || FontAsset != nullptr));
 
-				if (bIsSelected)
-				{
-					ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.08f, 0.36f, 0.80f, 0.65f));
-					ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.10f, 0.44f, 0.90f, 0.85f));
-				}
+				const ImVec2 CardMin = ImGui::GetCursorScreenPos();
+				bool bHovered = false;
 
-				if (Thumbnail)
+				if (!bRenamingThis)
 				{
-					ImGui::ImageButton(PathString.c_str(), (ImTextureID)Thumbnail->GetResource()->GetSRV(), { ItemImgSize, ItemImgSize });
+					ImGui::InvisibleButton("##AssetCard", ImVec2(CardW, CardH));
+					bHovered = ImGui::IsItemHovered();
+
+					if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
+					{
+						SelectedAssetPath = Path;
+						bSelectedAssetIsDirectory = bIsDirectory;
+					}
+
+					if (ImGui::BeginPopupContextItem("##AssetContext"))
+					{
+						if (!bIsDirectory)
+						{
+							URenderAsset* ContextAsset = UAssetManager::FindLoadedAsset(PathString);
+							const bool bSkeletalMesh = (ContextAsset && ContextAsset->IsA<USkeletalMesh>())
+								|| UAssetManager::GetUnloadedAssetType(PathString) == EAssetType::SkeletalMesh;
+							if (bSkeletalMesh)
+							{
+								BlendSpaceCreator.DrawMenuItems(PathString, CurrentPath);
+								AnimBlueprintCreator.DrawMenuItems(PathString, CurrentPath);
+								ImGui::Separator();
+							}
+						}
+
+						if (ImGui::MenuItem("Rename", "F2"))
+						{
+							RequestRenameItem(Path, bIsDirectory, false);
+						}
+						if (DrawDeleteMenuItem())
+						{
+							RequestDeleteItem(Path, bIsDirectory);
+						}
+						ImGui::EndPopup();
+					}
+
+					// 페이로드에 포인터를 그대로 실어서 받는 쪽이 AssetMap을 다시 뒤지지 않게 한다.
+					if (TextureAsset && ImGui::BeginDragDropSource())
+					{
+						ImGui::SetDragDropPayload(EditorDragDrop::Texture, &TextureAsset, sizeof(UTexture2D*));
+
+						// 끌고 다니는 동안 커서를 따라다니는 미리보기
+						ImGui::Image((ImTextureID)TextureAsset->GetResource()->GetSRV(), { ThumbSize, ThumbSize });
+						ImGui::TextUnformatted(FilenameString.c_str());
+
+						ImGui::EndDragDropSource();
+					}
+					if (FontAsset && ImGui::BeginDragDropSource())
+					{
+						ImGui::SetDragDropPayload(EditorDragDrop::Font, &FontAsset, sizeof(UFont*));
+
+						ImGui::TextUnformatted(FilenameString.c_str());
+
+						ImGui::EndDragDropSource();
+					}
+
+					// 더블 클릭 이벤트 처리
+					if (bHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
+					{
+						if (bIsDirectory)
+						{
+							NavigateTo(CurrentPath / Path.filename()); // 하위 폴더로 이동
+						}
+
+						// TODO: UIEditor를 FAssetEditor 계열로 통합
+						else if (Path.extension() == ".widget" && OnOpenWidget)
+						{
+							OnOpenWidget(PathString);
+						}
+
+						else if (Path.extension() == ".scene" && OnOpenScene)
+						{
+							OnOpenScene(PathString);
+						}
+
+						else if ((Path.extension() == ".obj" || FFbxMeshBake::IsBakedPath(PathString)
+							|| AnimSequenceFile::IsAnimSequencePath(PathString)) && OnOpenMesh)
+						{
+							OnOpenMesh(PathString);
+						}
+
+						else if ((BlendSpaceFile::IsBlendSpacePath(PathString) || AnimBlueprintFile::IsAnimBlueprintPath(PathString)) && OnOpenMesh)
+						{
+							OnOpenMesh(PathString);
+						}
+					}
 				}
 				else
 				{
-					ImGui::Button("##FallbackAssetButton", { ItemImgSize + framePadX * 2.0f, ItemImgSize + framePadY * 2.0f });
+					ImGui::Dummy(ImVec2(CardW, CardH));
+					bHovered = ImGui::IsItemHovered();
 				}
 
-				if (bIsSelected)
+				bool bNameTruncated = false;
+				bool bTypeTruncated = false;
+				DrawCardVisuals(CardMin, bHovered, bIsSelected, bIsDirectory,
+					bIsRenderedMeshThumb, bIsFullImageThumb, TileTextureId, CardStyle,
+					FilenameString, !bRenamingThis, bNameTruncated, bTypeTruncated);
+
+				if (bHovered && (bNameTruncated || bTypeTruncated))
 				{
-					ImGui::PopStyleColor(2);
+					if (bNameTruncated && bTypeTruncated)
+					{
+						ImGui::SetTooltip("%s\n%s", FilenameString.c_str(), CardStyle.TypeLabel);
+					}
+					else if (bNameTruncated)
+					{
+						ImGui::SetTooltip("%s", FilenameString.c_str());
+					}
+					else
+					{
+						ImGui::SetTooltip("%s", CardStyle.TypeLabel);
+					}
 				}
 
-				if (ImGui::IsItemClicked(ImGuiMouseButton_Left) || ImGui::IsItemClicked(ImGuiMouseButton_Right))
-				{
-					SelectedAssetPath = Path;
-					bSelectedAssetIsDirectory = bIsDirectory;
-				}
-
-				if (ImGui::BeginPopupContextItem("##AssetContext"))
-				{
-					if (!bIsDirectory)
-					{
-						URenderAsset* ContextAsset = UAssetManager::FindLoadedAsset(PathString);
-						const bool bSkeletalMesh = (ContextAsset && ContextAsset->IsA<USkeletalMesh>())
-							|| UAssetManager::GetUnloadedAssetType(PathString) == EAssetType::SkeletalMesh;
-						if (bSkeletalMesh)
-						{
-							BlendSpaceCreator.DrawMenuItems(PathString, CurrentPath);
-							AnimBlueprintCreator.DrawMenuItems(PathString, CurrentPath);
-							ImGui::Separator();
-						}
-					}
-
-					if (ImGui::MenuItem("Rename", "F2"))
-					{
-						RequestRenameItem(Path, bIsDirectory, false);
-					}
-					if (DrawDeleteMenuItem())
-					{
-						RequestDeleteItem(Path, bIsDirectory);
-					}
-					ImGui::EndPopup();
-				}
-
-				// 페이로드에 포인터를 그대로 실어서 받는 쪽이 AssetMap을 다시 뒤지지 않게 한다.
-				if (TextureAsset && ImGui::BeginDragDropSource())
-				{
-					ImGui::SetDragDropPayload(EditorDragDrop::Texture, &TextureAsset, sizeof(UTexture2D*));
-
-					// 끌고 다니는 동안 커서를 따라다니는 미리보기
-					ImGui::Image((ImTextureID)TextureAsset->GetResource()->GetSRV(), { thumbnailSize, thumbnailSize });
-					ImGui::TextUnformatted(FilenameString.c_str());
-
-					ImGui::EndDragDropSource();
-				}
-				if (FontAsset && ImGui::BeginDragDropSource())
-				{
-					ImGui::SetDragDropPayload(EditorDragDrop::Font, &FontAsset, sizeof(UFont*));
-
-					ImGui::TextUnformatted(FilenameString.c_str());
-
-					ImGui::EndDragDropSource();
-				}
-				// 더블 클릭 이벤트 처리
-				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
-				{
-					if (bIsDirectory)
-					{
-						NavigateTo(CurrentPath / Path.filename()); // 하위 폴더로 이동
-					}
-
-					// TODO: UIEditor를 FAssetEditor 계열로 통합
-					else if (Path.extension() == ".widget" && OnOpenWidget)
-					{
-						OnOpenWidget(PathString);
-					}
-
-					else if (Path.extension() == ".scene" && OnOpenScene)
-					{
-						OnOpenScene(PathString);
-					}
-
-					else if ((Path.extension() == ".obj" || FFbxMeshBake::IsBakedPath(PathString)
-						|| AnimSequenceFile::IsAnimSequencePath(PathString)) && OnOpenMesh)
-					{
-						OnOpenMesh(PathString);
-					}
-
-					else if ((BlendSpaceFile::IsBlendSpacePath(PathString) || AnimBlueprintFile::IsAnimBlueprintPath(PathString)) && OnOpenMesh)
-					{
-						OnOpenMesh(PathString);
-					}
-
-				}
-				// 이름 표시 또는 폴더/파일 아래 인라인 이름 수정 입력창
 				if (bRenamingThis)
 				{
-					ImGui::SetNextItemWidth(ItemImgSize + framePadX * 2.0f);
+					const ImVec2 AfterDummyCursor = ImGui::GetCursorScreenPos();
+					ImGui::SetCursorScreenPos(ImVec2(
+						CardMin.x + EditorStyle::Scale(3.0f),
+						CardMin.y + ThumbSize + StripeH + EditorStyle::Scale(3.0f)));
+					ImGui::SetNextItemWidth(CardW - EditorStyle::Scale(6.0f));
 					if (bFocusInlineRename)
 					{
 						ImGui::SetKeyboardFocusHere();
@@ -983,10 +1267,9 @@ void FContentDrawerPanel::RenderContents()
 					{
 						bPendingCommitInlineRename = true;
 					}
-				}
-				else
-				{
-					DrawTruncatedName(FilenameString, thumbnailSize);
+
+					ImGui::SetCursorScreenPos(AfterDummyCursor);
+					ImGui::Dummy(ImVec2(0.0f, 0.0f));
 				}
 
 				ImGui::PopID();
@@ -1009,6 +1292,7 @@ void FContentDrawerPanel::RenderContents()
 				NavigateTo(CurrentPath.parent_path());
 			}
 		}
+		ImGui::PopStyleVar();
 		}
 		ImGui::EndChild();
 	}
@@ -1168,6 +1452,7 @@ void FContentDrawerPanel::NavigateTo(const fs::path& NewPath)
 	PathHistoryIndex = PathHistory.size() - 1;
 	CurrentPath = NewPath;
 	SelectedAssetPath.clear();
+	MeshThumbnailRenderer.ClearPendingQueue();
 	CancelInlineRename();
 }
 
@@ -1424,6 +1709,7 @@ void FContentDrawerPanel::TryCommitInlineRename()
 		fs::rename(InlineRenameTarget, TargetPath, RenameError);
 		if (!RenameError)
 		{
+			MeshThumbnailRenderer.InvalidateDirectoryPrefix(FPaths::ToUtf8(InlineRenameTarget));
 			if (SelectedAssetPath == InlineRenameTarget)
 			{
 				SelectedAssetPath = TargetPath;
@@ -1495,6 +1781,7 @@ void FContentDrawerPanel::RenderAssetModals()
 			fs::remove_all(PendingItemTarget, RemoveError);
 			if (!RemoveError)
 			{
+				MeshThumbnailRenderer.InvalidateDirectoryPrefix(FPaths::ToUtf8(PendingItemTarget));
 				if (!SelectedAssetPath.empty() && IsPathOrDescendant(SelectedAssetPath, PendingItemTarget))
 				{
 					SelectedAssetPath.clear();

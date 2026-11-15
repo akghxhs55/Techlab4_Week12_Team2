@@ -2,7 +2,7 @@
     "Format": "KurisuAnimBlueprint",
     "Graphs": [
         {
-            "EditorSettings": "",
+            "EditorSettings": "{\"view\":{\"scroll\":{\"x\":-256,\"y\":-387},\"visible_rect\":{\"max\":{\"x\":896,\"y\":531},\"min\":{\"x\":-256,\"y\":-387}},\"zoom\":1}}",
             "Id": 1,
             "Links": [],
             "Name": "AnimGraph",

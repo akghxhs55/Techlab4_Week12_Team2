@@ -3,6 +3,7 @@
 #include "Editor/EditorUI/EditorPanel.h"
 #include "Editor/BlendSpaceEditor/BlendSpaceAssetCreator.h"
 #include "Editor/AnimBlueprintEditor/AnimBlueprintAssetCreator.h"
+#include "Editor/ContentDrawer/MeshThumbnailRenderer.h"
 #include "Asset/FbxImporter/FbxMeshBake.h"
 
 #include <filesystem>
@@ -15,9 +16,11 @@ class FContentDrawerPanel : public IEditorPanel
 {
 public:
 	bool Init() override;
+	void Shutdown();
 	void Tick(float DeltaTime) override;
 	void OnRender() override;
 	void RenderContents();
+	void RenderPendingThumbnails(class UEditorEngine& Engine, class FRenderer* Renderer);
 	const char* GetPanelName() const override { return "Content Drawer"; }
 	void RenderFolderTree(const fs::path& Path, fs::path& SelectedPath);
 
@@ -92,4 +95,5 @@ private:
 
 	FBlendSpaceAssetCreator BlendSpaceCreator;
     FAnimBlueprintAssetCreator AnimBlueprintCreator;
+	FMeshThumbnailRenderer MeshThumbnailRenderer;
 };

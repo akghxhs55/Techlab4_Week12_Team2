@@ -972,6 +972,10 @@ void UEditorEngine::Tick(const float DeltaTime)
 
 	// 열려 있는 에셋 에디터의 미리보기를 그린다.
 	EditorManager->RenderPreview();
+	if (ContentDrawerPanel)
+	{
+		ContentDrawerPanel->RenderPendingThumbnails(*this, Renderer);
+	}
 
 	// 네 View의 결과 텍스처와 ImGui를 메인 창의 백버퍼에 합성한다. Present는 FEngineLoop가 한다.
 	// Swapchain 렌더링
@@ -1452,6 +1456,10 @@ void UEditorEngine::PreExit()
 
 	// 레벨 패널을 마지막으로 사용한 뒤 탭을 파괴하고 빌린 참조를 비운다.
 	FLog::RemoveSink(OutputLogPanel);
+	if (ContentDrawerPanel)
+	{
+		ContentDrawerPanel->Shutdown();
+	}
 	if (EditorManager)
 	{
 		EditorManager->Shutdown();
