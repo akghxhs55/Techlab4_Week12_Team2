@@ -59,6 +59,7 @@ void FGizmoRenderer::OnRender(
 	case EGizmoMode::Location: AxisMesh = LocationMesh; break;
 	case EGizmoMode::Rotation: AxisMesh = RotationMesh; break;
 	case EGizmoMode::Scale:    AxisMesh = ScaleMesh;    break;
+	case EGizmoMode::Select:
 	default: return;
 	}
 

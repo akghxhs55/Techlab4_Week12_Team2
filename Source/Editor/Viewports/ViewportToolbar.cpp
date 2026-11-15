@@ -58,9 +58,9 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
     // 왼쪽은 기즈모와 스폰, 오른쪽은 UE처럼 투영·카메라 속도·뷰 모드·표시·레이아웃 드롭다운을 둔다.
     // Layout: ⋮ 버튼(레이아웃 프리셋 메뉴), LayoutToggle: UE의 쿼드/싱글 전환 버튼
     // Add와 그리드 스냅은 UE처럼 레벨 에디터 메인 툴바에 있다.
-    enum EItem { Move, Rotate, Scale, Space, Projection, Speed, ViewMode, Show, Render, Layout, LayoutToggle, ItemCount };
+    enum EItem { Select, Move, Rotate, Scale, Space, Projection, Speed, ViewMode, Show, Render, Layout, LayoutToggle, ItemCount };
     // 왼쪽 묶음은 왼쪽 정렬, 오른쪽 묶음은 UE처럼 오른쪽 정렬한다.
-    const EItem LeftItems[] = { Move, Rotate, Scale, Space };
+    const EItem LeftItems[] = { Select, Move, Rotate, Scale, Space };
     const EItem RightItems[] = { Projection, Speed, ViewMode, Show, Render, Layout, LayoutToggle };
     const char* PopupIds[ItemCount]{};
     PopupIds[Projection] = "Projection"; PopupIds[Speed] = "CameraSpeed";
@@ -75,13 +75,14 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
     std::snprintf(SpeedLabel, sizeof(SpeedLabel), "%.2f", EditorSettings ? EditorSettings->GetSettings().CameraSpeed : 1.0f);
 
     // 항목별 내용. 아이콘이 있으면 UE식 드롭다운 버튼, 없으면 기존 텍스트 버튼이다.
-    // Glyph가 있으면 아이콘 파일 대신 선으로 직접 그린다 (⋮, 田, □).
-    enum class EGlyph : uint8 { None, Kebab, Quad, Single };
+    // Glyph가 있으면 아이콘 파일 대신 선으로 직접 그린다 (⋮, 田, □, 선택 커서).
+    enum class EGlyph : uint8 { None, Kebab, Quad, Single, SelectCursor };
     struct FItemDesc { const char* Label = nullptr; const char* Icon = nullptr; bool bChevron = false; const char* Tooltip = nullptr; EGlyph Glyph = EGlyph::None; };
     FItemDesc Items[ItemCount];
-    Items[Move] = { nullptr, "TransformMove", false, "Select and translate objects\nSpace: cycle Move / Rotate / Scale" };
-    Items[Rotate] = { nullptr, "TransformRotate", false, "Select and rotate objects\nSpace: cycle Move / Rotate / Scale" };
-    Items[Scale] = { nullptr, "TransformScale", false, "Select and scale objects\nSpace: cycle Move / Rotate / Scale" };
+    Items[Select] = { nullptr, nullptr, false, "Select objects (Q)", EGlyph::SelectCursor };
+    Items[Move] = { nullptr, "TransformMove", false, "Select and translate objects (W)\nSpace: cycle Move / Rotate / Scale" };
+    Items[Rotate] = { nullptr, "TransformRotate", false, "Select and rotate objects (E)\nSpace: cycle Move / Rotate / Scale" };
+    Items[Scale] = { nullptr, "TransformScale", false, "Select and scale objects (R)\nSpace: cycle Move / Rotate / Scale" };
     // UE처럼 스케일은 항상 로컬 축이라 그동안은 Local로 고정해 보여 주고 버튼을 막는다. 고른 공간은 그대로 기억한다.
     const bool bScaleMode = Gizmo && Gizmo->GetMode() == EGizmoMode::Scale;
     const bool bWorldSpace = Gizmo && Gizmo->GetSpace() == EGizmoSpace::World && !bScaleMode;
@@ -189,13 +190,14 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
             const float ButtonWidth = ButtonWidths[Item];
             ImGui::SetCursorPos({ Padding + ItemX[Item], Padding + ItemRow[Item] * (ImGui::GetFrameHeight() + Gap) });
 
-            const bool bGizmoItem = Item >= Move && Item <= Space;
+            const bool bGizmoItem = Item >= Select && Item <= Space;
             // PIE 게임 화면에서는 에디터 카메라·기즈모·스폰을 쓸 수 없다.
             const bool bDisabled = (bGizmoItem && !Gizmo) || (Item == Space && bScaleMode) ||
                 (bGameView && (bGizmoItem || Item == Projection || Item == ViewMode || Item == Speed));
             // 지금 선택된 기즈모 모드는 눌린 색으로 표시한다.
-            const bool bSelected = Gizmo && Item >= Move && Item <= Scale &&
-                static_cast<int>(Gizmo->GetMode()) == Item - Move;
+            const bool bSelected = Gizmo && (
+                (Item == Select && Gizmo->GetMode() == EGizmoMode::Select) ||
+                (Item >= Move && Item <= Scale && static_cast<int>(Gizmo->GetMode()) == Item - Move));
 
             EditorStyle::PushSelectedButton(bSelected);
             ImGui::BeginDisabled(bDisabled);
@@ -215,6 +217,21 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
                     const float Step = EditorStyle::Scale(5.0f), Radius = EditorStyle::Scale(1.6f);
                     for (int Dot = -1; Dot <= 1; ++Dot)
                         DrawList->AddCircleFilled({ Center.x, Center.y + Step * Dot }, Radius, Color);
+                }
+                else if (Desc.Glyph == EGlyph::SelectCursor)
+                {
+                    // UE 선택 모드 커서 화살표
+                    const float S = EditorStyle::Scale(6.0f);
+                    const ImVec2 Tip{ Center.x - S * 0.55f, Center.y - S * 0.90f };
+                    const ImVec2 LeftBottom{ Center.x - S * 0.55f, Center.y + S * 0.70f };
+                    const ImVec2 RightWing{ Center.x + S * 0.65f, Center.y + S * 0.15f };
+                    DrawList->AddTriangleFilled(Tip, LeftBottom, RightWing, Color);
+                    DrawList->AddQuadFilled(
+                        { Center.x - S * 0.15f, Center.y + S * 0.42f },
+                        { Center.x + S * 0.18f, Center.y + S * 0.28f },
+                        { Center.x + S * 0.46f, Center.y + S * 0.90f },
+                        { Center.x + S * 0.16f, Center.y + S * 1.02f },
+                        Color);
                 }
                 else
                 {
@@ -245,6 +262,7 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
                     bHasLayoutRequest = true;
                 }
                 else if (PopupIds[Item]) ImGui::OpenPopup(PopupIds[Item]);
+                else if (Item == Select) Gizmo->SetMode(EGizmoMode::Select);
                 else if (Item >= Move && Item <= Scale) Gizmo->SetMode(static_cast<EGizmoMode>(Item - Move));
                 else if (Item == Space)
                     Gizmo->SetSpace(Gizmo->GetSpace() == EGizmoSpace::World ? EGizmoSpace::Local : EGizmoSpace::World);

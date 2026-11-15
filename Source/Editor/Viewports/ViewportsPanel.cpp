@@ -52,15 +52,44 @@ bool FViewportsPanel::Init() {
 	return true;
 }
 
-// 패널의 프레임 갱신 인터페이스이며 별도 계산은 하지 않는다.
+// 패널의 프레임 갱신 인터페이스에서 뷰포트 단축키(Q/W/E/R, Space)로 기즈모 모드를 전환한다.
 void FViewportsPanel::Tick(float DeltaTime)
 {
 	(void)DeltaTime;
-	if (Gizmo && bFocused && IsHovered() && !ImGui::GetIO().WantTextInput &&
-		!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt && !ImGui::GetIO().KeyShift &&
-		(!GameViewportClient || ActiveViewIndex != GameViewportIndex) &&
-		FInputSystem::IsKeyPressed(EKeyCode::Space))
-		Gizmo->SetMode(static_cast<EGizmoMode>((static_cast<int>(Gizmo->GetMode()) + 1) % 3));
+	const ImGuiIO& IO = ImGui::GetIO();
+	if (Gizmo && WasRenderedThisFrame() && (bFocused || IsHovered()) && !IO.WantTextInput &&
+		!IO.KeyCtrl && !IO.KeyAlt && !IO.KeyShift &&
+		!ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) &&
+		!FInputSystem::IsMouseDown(EMouseButton::Right) &&
+		!FInputSystem::IsMouseDown(EMouseButton::Left) &&
+		!FInputSystem::IsMouseDown(EMouseButton::Middle) &&
+		!Gizmo->IsUsing() &&
+		(!GameViewportClient || ActiveViewIndex != GameViewportIndex))
+	{
+		if (FInputSystem::IsKeyPressed(EKeyCode::Q))
+		{
+			Gizmo->SetMode(EGizmoMode::Select);
+		}
+		else if (FInputSystem::IsKeyPressed(EKeyCode::W))
+		{
+			Gizmo->SetMode(EGizmoMode::Location);
+		}
+		else if (FInputSystem::IsKeyPressed(EKeyCode::E))
+		{
+			Gizmo->SetMode(EGizmoMode::Rotation);
+		}
+		else if (FInputSystem::IsKeyPressed(EKeyCode::R))
+		{
+			Gizmo->SetMode(EGizmoMode::Scale);
+		}
+		else if (FInputSystem::IsKeyPressed(EKeyCode::Space))
+		{
+			const EGizmoMode NextMode = (Gizmo->GetMode() == EGizmoMode::Select)
+				? EGizmoMode::Location
+				: static_cast<EGizmoMode>((static_cast<int>(Gizmo->GetMode()) + 1) % 3);
+			Gizmo->SetMode(NextMode);
+		}
+	}
 }
 
 // Core Rect에 맞춰 View 활성 상태와 타깃 크기를 갱신한다.

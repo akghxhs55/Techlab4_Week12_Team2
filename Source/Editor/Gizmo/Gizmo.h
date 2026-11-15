@@ -14,6 +14,7 @@ enum class EGizmoMode
 	Location,
 	Rotation,
 	Scale,
+	Select,
 };
 
 enum class EGizmoSpace
