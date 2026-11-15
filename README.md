@@ -66,6 +66,7 @@ MSBuild.exe .\Kurisu.slnx -t:KurisuGame -p:Configuration=Release -p:Platform=x64
 
 ## 프로젝트 썸네일
 
+- 새 프로젝트의 `Config`에는 `DefaultGame.ini`와 `EngineResources/Config`에서 복사한 기본 `editor.ini`, `imgui.ini`가 생성됩니다. 새 프로젝트의 렌더 설정과 창 배치는 이 템플릿에서 관리합니다.
 - 대표 씬은 `Config/DefaultGame.ini`의 `[Game] GameDefaultMap`으로 지정합니다. 기본값은 `Content/Scenes/Main.scene`입니다.
 - 프로젝트를 열면 대표 씬을 불러옵니다. 썸네일이 없으면 최초 화면에서 자동 생성하므로, 새 프로젝트에서 저장을 누르지 않고 종료해도 기본 씬의 썸네일이 남습니다.
 - 대표 씬을 저장하면 현재 활성 뷰포트의 시점으로 `Saved/ProjectThumbnail.png`를 자동 갱신합니다. 기즈모, 그리드, 선택 외곽선은 제외합니다.

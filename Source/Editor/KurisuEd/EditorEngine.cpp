@@ -1535,6 +1535,7 @@ void UEditorEngine::FinishGizmoDragUndo()
 // ImGui를 정리한다. UObject 일괄 삭제와 공용 자원·Device 정리는 FEngineLoop가 이어서 한다.
 void UEditorEngine::PreExit()
 {
+	EndViewportNavCapture();
 	bTrackingGizmoDrag = false;
 	UndoHistory.Clear();
 	ActorClipboard.Reset();

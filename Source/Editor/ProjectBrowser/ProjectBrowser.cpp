@@ -179,9 +179,27 @@ bool ProjectCreator::Create(const FString& Name, const fs::path& ParentDir, fs::
 
 	// 아이콘, 폰트, Lua 템플릿 같은 엔진용 파일은 엔진 콘텐츠(Engine/...)에서 바로 읽으므로 복사하지 않는다.
 
+	// 새 프로젝트는 사용자별 설정 대신 엔진에 포함된 기본 설정으로 시작한다.
+	for (const wchar_t* Filename : { L"editor.ini", L"imgui.ini" })
+	{
+		const fs::path Source = FPaths::EngineFile(L"EngineResources/Config") / Filename;
+		const fs::path Target = ProjectDir / L"Config" / Filename;
+		if (!fs::copy_file(Source, Target, fs::copy_options::none, Ec))
+		{
+			OutError = "Cannot copy default settings: " + FPaths::ToUtf8(Source) + " (" + Ec.message() + ")";
+			return false;
+		}
+	}
+
 	{
 		std::ofstream Ini(ProjectDir / L"Config" / L"DefaultGame.ini");
 		Ini << MakeDefaultGameIni(Name);
+		Ini.close();
+		if (!Ini)
+		{
+			OutError = "Cannot write game settings: " + FPaths::ToUtf8(ProjectDir / L"Config/DefaultGame.ini");
+			return false;
+		}
 	}
 
 	{
