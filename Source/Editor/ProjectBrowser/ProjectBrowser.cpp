@@ -223,7 +223,7 @@ namespace
 	}
 
 	// 엔진 콘텐츠의 로고 이미지를 텍스처로 만든다. 파일이 없거나 읽지 못하면 nullptr이고, 제목 표시줄은 빈 칸으로 남는다.
-	ComPtr<ID3D11ShaderResourceView> CreateLogoTexture(ID3D11Device* Device, const FString& ContentPath)
+	ComPtr<ID3D11ShaderResourceView> CreateLogoTexture(ID3D11Device* Device, const FString& ContentPath, ImVec2* OutSize = nullptr)
 	{
 		const FImageData Image = ImageLoader::Load(FPaths::ResolveContentPath(ContentPath));
 		if (!Image.IsValid()) return nullptr;
@@ -246,6 +246,7 @@ namespace
 		ComPtr<ID3D11ShaderResourceView> View;
 		if (FAILED(Device->CreateTexture2D(&Desc, &Data, &Texture))) return nullptr;
 		if (FAILED(Device->CreateShaderResourceView(Texture.Get(), nullptr, &View))) return nullptr;
+		if (OutSize) *OutSize = ImVec2(static_cast<float>(Image.Width), static_cast<float>(Image.Height));
 		return View;
 	}
 
@@ -358,6 +359,8 @@ namespace
 		ImTextureID LogoTexture = ImTextureID_Invalid;
 		ImTextureID NewProjectIcon = ImTextureID_Invalid;
 		ImTextureID MyProjectsIcon = ImTextureID_Invalid;
+		ImTextureID SignatureTexture = ImTextureID_Invalid;
+		ImVec2 SignatureSize = {};
 		char NameBuffer[64] = {};
 		char LocationBuffer[1024] = {};
 		FString Error;
@@ -470,6 +473,23 @@ namespace
 			if (DrawIconButton("##MyProjects", MyProjectsIcon, "My Projects", ImVec2(InnerW, ButtonH)))
 			{
 				ActivePage = EPage::Home;
+			}
+
+			// 버튼 아래 여백에만 그려 캐릭터가 가려지지 않게 한다. 원본 비율과 알파를 유지한다.
+			if (SignatureTexture != ImTextureID_Invalid && SignatureSize.x > 0.0f && SignatureSize.y > 0.0f)
+			{
+				const ImVec2 Available = ImGui::GetContentRegionAvail();
+				const float Gap = EditorStyle::Scale(24.0f);
+				const float AvailableH = Available.y - Gap;
+				if (Available.x > 0.0f && AvailableH > 0.0f)
+				{
+					const float Scale = std::min(Available.x / SignatureSize.x, AvailableH / SignatureSize.y);
+					const ImVec2 Size(SignatureSize.x * Scale, SignatureSize.y * Scale);
+					const ImVec2 Cursor = ImGui::GetCursorScreenPos();
+					const ImVec2 Min(Cursor.x + (Available.x - Size.x) * 0.5f, Cursor.y + Available.y - Size.y);
+					ImGui::GetWindowDrawList()->AddImage(SignatureTexture, Min,
+						{ Min.x + Size.x, Min.y + Size.y }, { 0, 0 }, { 1, 1 }, IM_COL32(255, 255, 255, 64));
+				}
 			}
 
 			ImGui::EndChild();
@@ -865,6 +885,8 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 		const ComPtr<ID3D11ShaderResourceView> MyProjectsIcon = CreateLogoTexture(Window.Device.Get(), "Engine/Icons/ProjectBrowser/MyProjects.png");
 		if (NewProjectIcon) UI.NewProjectIcon = (ImTextureID)NewProjectIcon.Get();
 		if (MyProjectsIcon) UI.MyProjectsIcon = (ImTextureID)MyProjectsIcon.Get();
+		const ComPtr<ID3D11ShaderResourceView> Signature = CreateLogoTexture(Window.Device.Get(), "Engine/Sprites/KurisuSignature.png", &UI.SignatureSize);
+		if (Signature) UI.SignatureTexture = (ImTextureID)Signature.Get();
 		UI.Init();
 
 		bool bRunning = true;
