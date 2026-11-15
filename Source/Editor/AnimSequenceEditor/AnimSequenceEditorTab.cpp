@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "AnimSequenceEditorTab.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "AnimSequenceEditor.h"
 #include "Editor/SkeletalPreviewEditor/SkeletalPreviewViewportPanel.h"
 #include "Panels/AnimTimelinePanel.h"
@@ -151,7 +152,7 @@ void FAnimSequenceEditorTab::DrawUnsavedChangesPrompt()
 
         if (!AnimEditor.GetSaveMessage().empty() && AnimEditor.GetSaveMessage().rfind("Save failed", 0) == 0)
         {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "%s", AnimEditor.GetSaveMessage().c_str());
+            ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "%s", AnimEditor.GetSaveMessage().c_str());
         }
         ImGui::EndPopup();
     }

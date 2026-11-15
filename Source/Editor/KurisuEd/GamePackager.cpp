@@ -1,5 +1,5 @@
 #include "EnginePCH.h"
-#include "Editor/HitoriEd/GamePackager.h"
+#include "Editor/KurisuEd/GamePackager.h"
 
 #include <algorithm>
 
@@ -61,14 +61,14 @@ bool FGamePackager::StartBuildAndPackage(const std::filesystem::path& Root, cons
 	CloseHandle(OutputWrite);
 	if (!bCreated)
 	{
-		HTR_LOG(Error, "Failed to start Package.bat (error {})", GetLastError());
+		KRS_LOG(Error, "Failed to start Package.bat (error {})", GetLastError());
 		CloseHandle(OutputRead);
 		OutputRead = nullptr;
 		return false;
 	}
 	CloseHandle(Info.hThread);
 	Process = Info.hProcess;
-	HTR_LOG(Info, "Packaging started ({})", Config);
+	KRS_LOG(Info, "Packaging started ({})", Config);
 	return true;
 }
 
@@ -76,10 +76,10 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 {
 	wchar_t ExePath[MAX_PATH] = {};
 	GetModuleFileNameW(nullptr, ExePath, MAX_PATH);
-	const std::filesystem::path GameExe = std::filesystem::path(ExePath).parent_path() / L"HitoriGame.exe";
+	const std::filesystem::path GameExe = std::filesystem::path(ExePath).parent_path() / L"KurisuGame.exe";
 	if (!std::filesystem::exists(GameExe))
 	{
-		HTR_LOG(Error, "Packaging canceled: no source tree to build from and no prebuilt HitoriGame.exe next to the editor.");
+		KRS_LOG(Error, "Packaging canceled: no source tree to build from and no prebuilt KurisuGame.exe next to the editor.");
 		return false;
 	}
 
@@ -89,7 +89,7 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 	bCopyDone = false;
 	bCopyFailed = false;
 	CopyResult = FPaths::ToUtf8(Out);
-	HTR_LOG(Info, "Packaging with prebuilt HitoriGame.exe (no build) -> {}", CopyResult);
+	KRS_LOG(Info, "Packaging with prebuilt KurisuGame.exe (no build) -> {}", CopyResult);
 
 	// 콘텐츠가 100MB 넘게 복사되므로 에디터가 멈추지 않게 따로 돌린다. 로그는 메인 스레드의 Tick에서만 남긴다.
 	CopyThread = std::thread([this, Root, ProjectDir, ProjectFile, GameExe, Out]
@@ -98,13 +98,13 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 			std::error_code Ec;
 			fs::remove_all(Out, Ec);
 			fs::create_directories(Out, Ec);
-			if (Ec || !fs::copy_file(GameExe, Out / L"HitoriGame.exe", fs::copy_options::overwrite_existing, Ec))
+			if (Ec || !fs::copy_file(GameExe, Out / L"KurisuGame.exe", fs::copy_options::overwrite_existing, Ec))
 			{
-				CopyResult = "HitoriGame.exe";
+				CopyResult = "KurisuGame.exe";
 				bCopyFailed = true;
 			}
 			// 엔진 콘텐츠(EngineResources)는 엔진 폴더에서, 프로젝트 콘텐츠(Content)는 프로젝트 폴더에서 가져온다.
-			// 게임 exe는 옆에 있는 .hproject를 찾아 그 폴더를 프로젝트 폴더로 쓴다.
+			// 게임 exe는 옆에 있는 .kproject를 찾아 그 폴더를 프로젝트 폴더로 쓴다.
 			const std::pair<std::filesystem::path, const char*> Folders[] =
 			{
 				{ Root / "EngineResources", "EngineResources" },
@@ -146,8 +146,8 @@ void FGamePackager::Tick()
 	if (CopyThread.joinable() && bCopyDone)
 	{
 		CopyThread.join();
-		if (bCopyFailed) HTR_LOG(Error, "Packaging failed: could not copy {}", CopyResult);
-		else HTR_LOG(Info, "Packaging finished: {}", CopyResult);
+		if (bCopyFailed) KRS_LOG(Error, "Packaging failed: could not copy {}", CopyResult);
+		else KRS_LOG(Info, "Packaging finished: {}", CopyResult);
 	}
 	if (!Process) return;
 	// 종료 여부를 먼저 본다. 끝났다면 출력은 이미 전부 파이프에 들어와 있으므로 아래에서 다 읽힌다.
@@ -183,14 +183,14 @@ void FGamePackager::DrainOutput()
 	{
 		FString Line = Pending.substr(0, NewLine);
 		if (!Line.empty() && Line.back() == '\r') Line.pop_back();
-		if (!Line.empty()) HTR_LOG(Info, "[Package] {}", Line);
+		if (!Line.empty()) KRS_LOG(Info, "[Package] {}", Line);
 		Pending.erase(0, NewLine + 1);
 	}
 }
 
 void FGamePackager::Finish()
 {
-	if (!Pending.empty()) HTR_LOG(Info, "[Package] {}", Pending);
+	if (!Pending.empty()) KRS_LOG(Info, "[Package] {}", Pending);
 	Pending.clear();
 
 	DWORD ExitCode = 1;
@@ -200,6 +200,6 @@ void FGamePackager::Finish()
 	Process = nullptr;
 	OutputRead = nullptr;
 
-	if (ExitCode == 0) HTR_LOG(Info, "Packaging finished: {}", FPaths::ToUtf8(FPaths::ProjectDir() / "Build" / "Package" / FPaths::FromUtf8(FPaths::ProjectName())));
-	else HTR_LOG(Error, "Packaging failed (exit code {}). See the log above.", ExitCode);
+	if (ExitCode == 0) KRS_LOG(Info, "Packaging finished: {}", FPaths::ToUtf8(FPaths::ProjectDir() / "Build" / "Package" / FPaths::FromUtf8(FPaths::ProjectName())));
+	else KRS_LOG(Error, "Packaging failed (exit code {}). See the log above.", ExitCode);
 }

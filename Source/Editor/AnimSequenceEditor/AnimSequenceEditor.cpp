@@ -44,7 +44,7 @@ bool FAnimSequenceEditor::Save()
         std::error_code Ignored;
         std::filesystem::remove(TempPath, Ignored);
         SaveMessage = "Save failed: " + Error;
-        HTR_LOG(Error, "AnimSequence save failed: {} ({})", GetAssetPath(), Error);
+        KRS_LOG(Error, "AnimSequence save failed: {} ({})", GetAssetPath(), Error);
         return false;
     }
 
@@ -55,7 +55,7 @@ bool FAnimSequenceEditor::Save()
         std::error_code Ignored;
         std::filesystem::remove(TempPath, Ignored);
         SaveMessage = "Save failed: cannot replace file (" + Ec.message() + ")";
-        HTR_LOG(Error, "AnimSequence save failed: {} ({})", GetAssetPath(), Ec.message());
+        KRS_LOG(Error, "AnimSequence save failed: {} ({})", GetAssetPath(), Ec.message());
         return false;
     }
 
@@ -63,7 +63,7 @@ bool FAnimSequenceEditor::Save()
     CaptureSequenceSnapshot(SavedSnapshot);   // 실행 취소로 이 상태에 돌아오면 변경 없음
     SavedRootMotionSettings = CaptureRootMotionSettings();
     SaveMessage = "Saved.";
-    HTR_LOG(Info, "AnimSequence saved: {}", GetAssetPath());
+    KRS_LOG(Info, "AnimSequence saved: {}", GetAssetPath());
     return true;
 }
 
@@ -82,7 +82,7 @@ bool FAnimSequenceEditor::RevertToSaved()
     if (!AnimSequenceFile::Read(std::filesystem::path(Resolved.empty() ? GetAssetPath() : Resolved), *Sequence, Error))
     {
         SaveMessage = "Revert failed: " + Error;
-        HTR_LOG(Error, "AnimSequence revert failed: {} ({})", GetAssetPath(), Error);
+        KRS_LOG(Error, "AnimSequence revert failed: {} ({})", GetAssetPath(), Error);
         return false;
     }
 
@@ -142,7 +142,7 @@ void FAnimSequenceEditor::TriggerPreviewNotifies(float PrevTime, float DeltaMove
         else
         {
             // 이름 Notify는 받을 AnimInstance가 없으므로 로그와 반짝임으로만 보여 준다
-            HTR_LOG(Info, "[AnimPreview] Notify: {}", Event->NotifyName.ToString());
+            KRS_LOG(Info, "[AnimPreview] Notify: {}", Event->NotifyName.ToString());
             FlashNotify(Event->Guid);
         }
     }
@@ -213,14 +213,14 @@ bool FAnimSequenceEditor::InitializeResources()
 {
     if (!Sequence || !Sequence->GetDataModel())
     {
-        HTR_LOG(Warning, "AnimSequence has no animation data: {}", GetAssetPath());
+        KRS_LOG(Warning, "AnimSequence has no animation data: {}", GetAssetPath());
         return false;
     }
 
     const FString& PreviewPath = Sequence->GetPreviewMeshPath();
     if (PreviewPath.empty())
     {
-        HTR_LOG(Warning, "AnimSequence has no preview mesh. Re-import its FBX to record one: {}", GetAssetPath());
+        KRS_LOG(Warning, "AnimSequence has no preview mesh. Re-import its FBX to record one: {}", GetAssetPath());
         return false;
     }
 
@@ -230,13 +230,13 @@ bool FAnimSequenceEditor::InitializeResources()
     USkeletalMesh* PreviewMesh = Cast<USkeletalMesh>(UAssetManager::LoadFbxMesh(FilePath.empty() ? PreviewPath : FilePath, Error));
     if (!PreviewMesh)
     {
-        HTR_LOG(Warning, "AnimSequence preview mesh failed to load: {} ({})", PreviewPath, Error);
+        KRS_LOG(Warning, "AnimSequence preview mesh failed to load: {} ({})", PreviewPath, Error);
         return false;
     }
 
     if (!IsCompatible(*PreviewMesh))
     {
-        HTR_LOG(Warning, "AnimSequence tracks do not match the preview mesh bones: {}", GetAssetPath());
+        KRS_LOG(Warning, "AnimSequence tracks do not match the preview mesh bones: {}", GetAssetPath());
         return false;
     }
 
@@ -372,7 +372,7 @@ void FAnimSequenceEditor::ApplyNotifySnapshot(const TArray<uint8>& Snapshot)
     EndPreviewNotifyStates();
     if (!RestoreSequenceSnapshot(Snapshot))
     {
-        HTR_LOG(Error, "AnimSequence undo snapshot restore failed: {}", GetAssetPath());
+        KRS_LOG(Error, "AnimSequence undo snapshot restore failed: {}", GetAssetPath());
         return;
     }
     // Guid가 유지되므로 선택은 그대로 둔다 (그 Notify가 없는 상태면 선택이 자연히 비어 보인다)

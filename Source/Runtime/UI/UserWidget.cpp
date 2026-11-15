@@ -45,7 +45,7 @@ void UUserWidget::AddToViewport(int32 InZOrder)
 	FWorldContext* Context = GEngine ? GEngine->GetWorldContextFromWorld(OwningWorld) : nullptr;
 	if (!Context || !Context->GameViewport)
 	{
-		HTR_LOG(Warning, "AddToViewport: no game viewport for widget {}", GetName());
+		KRS_LOG(Warning, "AddToViewport: no game viewport for widget {}", GetName());
 		return;
 	}
 

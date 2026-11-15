@@ -1,7 +1,7 @@
 #requires -Version 5.1
 $ErrorActionPreference = 'Stop'
 $engineRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
-$solution = Join-Path $engineRoot 'Hitori.slnx'
+$solution = Join-Path $engineRoot 'Kurisu.slnx'
 try {
     Push-Location -LiteralPath $engineRoot
     try {
@@ -11,7 +11,7 @@ try {
     }
     finally { Pop-Location }
     Write-Host "Solution: $solution"
-    Write-Host 'Open the root Hitori.slnx in Visual Studio. Project files are under Build\Projects.'
+    Write-Host 'Open the root Kurisu.slnx in Visual Studio. Project files are under Build\Projects.'
     exit 0
 }
 catch {

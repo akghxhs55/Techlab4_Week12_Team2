@@ -117,11 +117,11 @@ namespace
 	FString MakeDefaultGameIni(const FString& Name)
 	{
 		return
-			"; HitoriGame 실행 설정. 프로젝트 폴더의 Config에서 읽는다.\n"
-			"; 항목이 없거나 값이 잘못되면 코드의 기본값을 쓴다.\n"
+			"; KurisuGame launch settings. Read from the project's Config folder.\n"
+			"; Missing or invalid entries fall back to the defaults in code.\n"
 			"\n"
 			"[Game]\n"
-			"; 시작할 씬. 프로젝트 폴더 기준 상대 경로. 에디터에서 이 경로로 씬을 저장한다.\n"
+			"; Startup scene, relative to the project folder. The editor saves the scene to this path.\n"
 			"GameDefaultMap=Content/Scenes/Main.scene\n"
 			"\n"
 			"[Window]\n"
@@ -223,9 +223,9 @@ namespace
 	}
 
 	// 엔진 콘텐츠의 로고 이미지를 텍스처로 만든다. 파일이 없거나 읽지 못하면 nullptr이고, 제목 표시줄은 빈 칸으로 남는다.
-	ComPtr<ID3D11ShaderResourceView> CreateLogoTexture(ID3D11Device* Device)
+	ComPtr<ID3D11ShaderResourceView> CreateLogoTexture(ID3D11Device* Device, const FString& ContentPath)
 	{
-		const FImageData Image = ImageLoader::Load(FPaths::ResolveContentPath("Engine/Icons/KrisLogo.png"));
+		const FImageData Image = ImageLoader::Load(FPaths::ResolveContentPath(ContentPath));
 		if (!Image.IsValid()) return nullptr;
 
 		D3D11_TEXTURE2D_DESC Desc{};
@@ -274,7 +274,7 @@ namespace
 		return ImGui_ImplWin32_WndProcHandler(Hwnd, Msg, WParam, LParam) != 0;
 	}
 
-	// IFileOpenDialog로 폴더나 .hproject 파일을 고른다. 취소하면 빈 경로.
+	// IFileOpenDialog로 폴더나 .kproject 파일을 고른다. 취소하면 빈 경로.
 	fs::path ShowOpenDialog(HWND Owner, bool bPickFolder, const fs::path& InitialDir)
 	{
 		ComPtr<IFileOpenDialog> Dialog;
@@ -292,7 +292,7 @@ namespace
 		else
 		{
 			Options |= FOS_FILEMUSTEXIST;
-			const COMDLG_FILTERSPEC Filter[] = { { L"Kris Project (*.hproject)", L"*.hproject" } };
+			const COMDLG_FILTERSPEC Filter[] = { { L"Kurisu Project (*.kproject)", L"*.kproject" } };
 			Dialog->SetFileTypes(1, Filter);
 			Dialog->SetTitle(L"Open Project");
 		}
@@ -322,7 +322,7 @@ namespace
 		PWSTR Documents = nullptr;
 		fs::path Result;
 		if (SUCCEEDED(SHGetKnownFolderPath(FOLDERID_Documents, 0, nullptr, &Documents)))
-			Result = fs::path(Documents) / L"KrisProjects";
+			Result = fs::path(Documents) / L"KurisuProjects";
 		CoTaskMemFree(Documents);
 		return Result;
 	}
@@ -356,6 +356,8 @@ namespace
 		int32 SelectedRecent = -1;
 		EPage ActivePage = EPage::Home;
 		ImTextureID LogoTexture = ImTextureID_Invalid;
+		ImTextureID NewProjectIcon = ImTextureID_Invalid;
+		ImTextureID MyProjectsIcon = ImTextureID_Invalid;
 		char NameBuffer[64] = {};
 		char LocationBuffer[1024] = {};
 		FString Error;
@@ -384,40 +386,56 @@ namespace
 
 		static void PushAccentButtonColors()
 		{
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.62f, 0.20f, 0.17f, 1.00f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.75f, 0.27f, 0.23f, 1.00f));
-			ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.13f, 0.11f, 1.00f));
+			ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::ToVec4(EditorColor::Accent));
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorColor::ToVec4(EditorColor::AccentHover));
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorColor::ToVec4(EditorColor::AccentActive));
 		}
 
-		bool DrawSidebarTab(const char* Label, bool bSelected, float Width)
+		// Text가 MaxWidth보다 넓으면 앞쪽을 잘라 "..."를 붙인다. UTF-8 글자 중간에서는 자르지 않는다.
+		static FString ElideLeft(const FString& Text, float MaxWidth)
 		{
-			const float Height = EditorStyle::Scale(32.0f);
+			if (ImGui::CalcTextSize(Text.c_str()).x <= MaxWidth) return Text;
+
+			const char* const Ellipsis = "...";
+			const float Budget = MaxWidth - ImGui::CalcTextSize(Ellipsis).x;
+			size_t Start = 0;
+			while (Start < Text.size())
+			{
+				// 다음 글자의 첫 바이트로 건너뛴다(10xxxxxx는 이어지는 바이트).
+				++Start;
+				while (Start < Text.size() && (static_cast<unsigned char>(Text[Start]) & 0xC0) == 0x80) ++Start;
+				if (ImGui::CalcTextSize(Text.c_str() + Start).x <= Budget) break;
+			}
+			return Ellipsis + Text.substr(Start);
+		}
+
+		// 아이콘 이미지와 글자를 가운데에 나란히 놓는 버튼. 아이콘을 못 읽었으면 글자만 그린다.
+		bool DrawIconButton(const char* Id, ImTextureID Icon, const char* Label, const ImVec2& Size)
+		{
 			const ImVec2 Pos = ImGui::GetCursorScreenPos();
-			const bool bClicked = ImGui::InvisibleButton(Label, ImVec2(Width, Height));
-			const bool bHovered = ImGui::IsItemHovered();
+			const bool bClicked = ImGui::Button(Id, Size);
+
+			const bool bHasIcon = Icon != ImTextureID_Invalid;
+			const float IconSize = bHasIcon ? EditorStyle::Scale(16.0f) : 0.0f;
+			const float Gap = bHasIcon ? EditorStyle::Scale(8.0f) : 0.0f;
+			const ImVec2 TextSize = ImGui::CalcTextSize(Label);
+			const float StartX = Pos.x + (Size.x - (IconSize + Gap + TextSize.x)) * 0.5f;
+			const float CenterY = Pos.y + Size.y * 0.5f;
 
 			ImDrawList* DL = ImGui::GetWindowDrawList();
-			if (bSelected || bHovered)
+			const ImU32 Col = ImGui::GetColorU32(ImGuiCol_Text);
+			if (bHasIcon)
 			{
-				const ImU32 Bg = bSelected ? IM_COL32(46, 26, 26, 255) : IM_COL32(34, 34, 38, 255);
-				DL->AddRectFilled(Pos, { Pos.x + Width, Pos.y + Height }, Bg, EditorStyle::Scale(4.0f));
+				DL->AddImage(Icon, { StartX, CenterY - IconSize * 0.5f }, { StartX + IconSize, CenterY + IconSize * 0.5f }, { 0, 0 }, { 1, 1 }, Col);
 			}
-			if (bSelected)
-			{
-				const float BarW = EditorStyle::Scale(3.0f);
-				DL->AddRectFilled(Pos, { Pos.x + BarW, Pos.y + Height }, IM_COL32(184, 58, 48, 255), EditorStyle::Scale(2.0f));
-			}
-
-			const ImU32 TextCol = bSelected ? IM_COL32(246, 242, 242, 255) : IM_COL32(190, 190, 196, 255);
-			const float TextY = Pos.y + (Height - ImGui::GetTextLineHeight()) * 0.5f;
-			DL->AddText({ Pos.x + EditorStyle::Scale(14.0f), TextY }, TextCol, Label);
+			DL->AddText({ StartX + IconSize + Gap, CenterY - TextSize.y * 0.5f }, Col, Label);
 			return bClicked;
 		}
 
-		void DrawSidebar(HWND Hwnd)
+		void DrawSidebar()
 		{
 			const float SidebarW = EditorStyle::Scale(220.0f);
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(20, 20, 24, 255));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorColor::BgPanel);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(16.0f), EditorStyle::Scale(18.0f)));
 			ImGui::BeginChild("##BrowserSidebar", ImVec2(SidebarW, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
 
@@ -436,51 +454,22 @@ namespace
 				ImGui::SetCursorPosX(ImGui::GetCursorPosX() + std::max(0.0f, (InnerW - TextW) * 0.5f));
 				ImGui::TextColored(Color, "%s", Text);
 			};
-			CenteredText("KRIS ENGINE", ImVec4(0.96f, 0.94f, 0.94f, 1.0f));
-			CenteredText("크리스 엔진 1.0", ImVec4(0.68f, 0.44f, 0.41f, 1.0f));
+			CenteredText("KURISU ENGINE", EditorColor::ToVec4(EditorColor::TextPrimary));
 
 			ImGui::Dummy(ImVec2(0.0f, EditorStyle::Scale(10.0f)));
 
 			const float ButtonH = EditorStyle::Scale(32.0f);
 			PushAccentButtonColors();
-			if (ImGui::Button("+ 새 프로젝트", ImVec2(InnerW, ButtonH)))
+			if (DrawIconButton("##NewProject", NewProjectIcon, "New Project", ImVec2(InnerW, ButtonH)))
 			{
 				ActivePage = EPage::NewProject;
 			}
 			ImGui::PopStyleColor(3);
 
 			ImGui::Spacing();
-			if (ImGui::Button("내 프로젝트 열기", ImVec2(InnerW, ButtonH)))
-			{
-				const fs::path File = ShowOpenDialog(Hwnd, false, {});
-				if (!File.empty()) TryOpen(File);
-			}
-
-			ImGui::Dummy(ImVec2(0.0f, EditorStyle::Scale(12.0f)));
-			ImGui::Separator();
-			ImGui::Dummy(ImVec2(0.0f, EditorStyle::Scale(8.0f)));
-
-			if (DrawSidebarTab("최근 프로젝트", ActivePage == EPage::Home, InnerW))
+			if (DrawIconButton("##MyProjects", MyProjectsIcon, "My Projects", ImVec2(InnerW, ButtonH)))
 			{
 				ActivePage = EPage::Home;
-			}
-			ImGui::Spacing();
-			if (DrawSidebarTab("새 프로젝트 생성", ActivePage == EPage::NewProject, InnerW))
-			{
-				ActivePage = EPage::NewProject;
-			}
-
-			const float BottomHeight = ImGui::GetTextLineHeightWithSpacing() * 2.0f + EditorStyle::Scale(8.0f);
-			if (ImGui::GetContentRegionAvail().y > BottomHeight)
-			{
-				ImGui::SetCursorPosY(ImGui::GetWindowHeight() - BottomHeight);
-			}
-			ImGui::Separator();
-			ImGui::Spacing();
-			ImGui::TextDisabled("Kris Engine 1.0");
-			if (ImGui::IsItemHovered())
-			{
-				ImGui::SetTooltip("Engine: %s", FPaths::ToUtf8(FPaths::EngineDir()).c_str());
 			}
 
 			ImGui::EndChild();
@@ -496,7 +485,6 @@ namespace
 			const bool bHovered = ImGui::IsItemHovered();
 
 			const FString Name = FPaths::ToUtf8(ProjectPath.stem());
-			const FString Folder = FPaths::ToUtf8(fs::path(ProjectPath.parent_path()).make_preferred());
 			if (bHovered)
 			{
 				ImGui::SetTooltip("%s", FPaths::ToUtf8(fs::path(ProjectPath).make_preferred()).c_str());
@@ -510,14 +498,14 @@ namespace
 			// 상단 썸네일 영역
 			DL->AddRectFilledMultiColor(
 				Pos, { Max.x, Pos.y + ThumbH },
-				IM_COL32(28, 26, 28, 255), IM_COL32(22, 22, 25, 255),
-				IM_COL32(14, 14, 16, 255), IM_COL32(18, 16, 18, 255));
+				EditorColor::BgRaised, EditorColor::BgPanel,
+				EditorColor::BgDeepest, EditorColor::BgDeepest);
 
 			if (LogoTexture != ImTextureID_Invalid)
 			{
 				const float MarkSize = EditorStyle::Scale(56.0f);
 				const ImVec2 Center = { Pos.x + CardW * 0.5f, Pos.y + ThumbH * 0.5f };
-				const ImU32 Tint = bSelected ? IM_COL32(255, 235, 235, 210) : IM_COL32(255, 255, 255, 85);
+				const ImU32 Tint = bSelected ? EditorColor::White(210) : EditorColor::White(85);
 				DL->AddImage(LogoTexture,
 					{ Center.x - MarkSize * 0.5f, Center.y - MarkSize * 0.5f },
 					{ Center.x + MarkSize * 0.5f, Center.y + MarkSize * 0.5f },
@@ -526,22 +514,20 @@ namespace
 
 			// 하단 정보 밴드 (선택 시 마키세 크리스 적갈색 강조)
 			const ImU32 FooterCol = bSelected
-				? IM_COL32(158, 51, 43, 255)
-				: (bHovered ? IM_COL32(44, 34, 34, 255) : IM_COL32(30, 30, 34, 255));
+				? EditorColor::Accent
+				: (bHovered ? EditorColor::BgAccentHover : EditorColor::BgElevated);
 			DL->AddRectFilled({ Pos.x, Pos.y + ThumbH }, Max, FooterCol, Radius, ImDrawFlags_RoundCornersBottom);
 
 			const float Pad = EditorStyle::Scale(10.0f);
 			DL->PushClipRect({ Pos.x + Pad, Pos.y + ThumbH }, { Max.x - Pad, Max.y }, true);
-			DL->AddText({ Pos.x + Pad, Pos.y + ThumbH + EditorStyle::Scale(8.0f) },
-				IM_COL32(246, 244, 244, 255), Name.c_str());
-			const ImU32 SubCol = bSelected ? IM_COL32(240, 210, 206, 255) : IM_COL32(150, 150, 156, 255);
-			DL->AddText({ Pos.x + Pad, Pos.y + ThumbH + EditorStyle::Scale(30.0f) },
-				SubCol, Folder.c_str());
+			// 경로는 선택했을 때 Open 버튼 옆에 나오므로 카드에는 이름만 밴드 가운데 높이에 그린다.
+			const float NameY = Pos.y + ThumbH + (CardH - ThumbH - ImGui::GetTextLineHeight()) * 0.5f;
+			DL->AddText({ Pos.x + Pad, NameY }, EditorColor::TextPrimary, Name.c_str());
 			DL->PopClipRect();
 
 			const ImU32 BorderCol = bSelected
-				? IM_COL32(215, 86, 74, 255)
-				: (bHovered ? IM_COL32(110, 62, 58, 255) : IM_COL32(46, 46, 52, 255));
+				? EditorColor::AccentBright
+				: (bHovered ? EditorColor::AccentDim : EditorColor::Border);
 			DL->AddRect(Pos, Max, BorderCol, Radius, 0, bSelected ? EditorStyle::Scale(1.8f) : 1.0f);
 
 			if (bClicked) SelectedRecent = Index;
@@ -550,48 +536,40 @@ namespace
 
 		void DrawHomePage(HWND Hwnd, float BodyHeight)
 		{
-			ImGui::TextUnformatted("최근 프로젝트");
+			ImGui::TextUnformatted("My Projects");
 			ImGui::SameLine();
 
-			const float RemoveW = ImGui::CalcTextSize("목록에서 제거").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-			const float BrowseW = ImGui::CalcTextSize("찾아보기...").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-			const float RightGap = ImGui::GetStyle().ItemSpacing.x;
-			const float ActionsW = RemoveW + RightGap + BrowseW;
-			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ActionsW));
+			const float RemoveW = ImGui::CalcTextSize("Remove from List").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - RemoveW));
 
-			const bool bHasSelection = SelectedRecent >= 0 && SelectedRecent < Recent.Num();
-			ImGui::BeginDisabled(!bHasSelection);
-			if (ImGui::Button("목록에서 제거", ImVec2(RemoveW, 0)))
+			ImGui::BeginDisabled(SelectedRecent < 0 || SelectedRecent >= Recent.Num());
+			if (ImGui::Button("Remove from List", ImVec2(RemoveW, 0)))
 			{
 				RecentProjects::Remove(Recent[SelectedRecent]);
 				Recent = RecentProjects::Load();
 				SelectedRecent = Recent.Num() > 0 ? 0 : -1;
 			}
 			ImGui::EndDisabled();
-			ImGui::SameLine();
-			if (ImGui::Button("찾아보기...", ImVec2(BrowseW, 0)))
-			{
-				const fs::path File = ShowOpenDialog(Hwnd, false, {});
-				if (!File.empty()) TryOpen(File);
-			}
+			// 위에서 목록이 바뀔 수 있으므로 선택 여부는 제거 처리 뒤에 구한다. 마지막 항목을 지우면 선택이 없어진다.
+			const bool bHasSelection = SelectedRecent >= 0 && SelectedRecent < Recent.Num();
 
 			ImGui::Spacing();
 
 			const float FooterH = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 2.0f;
 			const float GridH = std::max(EditorStyle::Scale(180.0f), BodyHeight - ImGui::GetFrameHeightWithSpacing() - FooterH - EditorStyle::Scale(8.0f));
 
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(18, 18, 21, 255));
-			ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(40, 38, 42, 255));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorColor::BgPanel);
+			ImGui::PushStyleColor(ImGuiCol_Border, EditorColor::Border);
 			ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(6.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(18.0f), EditorStyle::Scale(18.0f)));
 			ImGui::BeginChild("##RecentCardsPanel", ImVec2(0.0f, GridH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
 
 			if (Recent.IsEmpty())
 			{
-				ImGui::TextDisabled("최근에 연 프로젝트가 없습니다.");
+				ImGui::TextDisabled("No projects yet.");
 				ImGui::Spacing();
 				PushAccentButtonColors();
-				if (ImGui::Button("새 프로젝트 만들기"))
+				if (ImGui::Button("Create a New Project"))
 				{
 					ActivePage = EPage::NewProject;
 				}
@@ -600,7 +578,7 @@ namespace
 			else
 			{
 				const float CardW = EditorStyle::Scale(148.0f);
-				const float CardH = EditorStyle::Scale(196.0f);
+				const float CardH = EditorStyle::Scale(172.0f);
 				const float Gap = EditorStyle::Scale(14.0f);
 				const float AvailW = ImGui::GetContentRegionAvail().x;
 				const int32 Columns = std::max(1, static_cast<int32>((AvailW + Gap) / (CardW + Gap)));
@@ -631,20 +609,34 @@ namespace
 
 			ImGui::Spacing();
 
-			const float OpenW = EditorStyle::Scale(116.0f);
+			// 아래 줄: 선택한 프로젝트 경로, 그 오른쪽 끝에 Browse...와 Open.
+			const float OpenW = EditorStyle::Scale(96.0f);
+			const float BrowseW = OpenW;
+			const float ButtonsW = BrowseW + ImGui::GetStyle().ItemSpacing.x + OpenW;
 			if (bHasSelection)
 			{
-				const float PathMaxW = std::max(60.0f, ImGui::GetContentRegionAvail().x - OpenW - EditorStyle::Scale(12.0f));
+				const float PathMaxW = std::max(60.0f, ImGui::GetContentRegionAvail().x - ButtonsW - EditorStyle::Scale(12.0f));
+				// 경로는 한 줄로만 그린다. 길면 앞쪽을 ...로 줄여 파일 이름이 보이게 하고, 전체 경로는 툴팁으로 보여준다.
+				const FString FullPath = FPaths::ToUtf8(fs::path(Recent[SelectedRecent]).make_preferred());
+				const FString ShownPath = ElideLeft(FullPath, PathMaxW);
 				ImGui::AlignTextToFramePadding();
-				ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + PathMaxW);
-				ImGui::TextDisabled("%s", FPaths::ToUtf8(fs::path(Recent[SelectedRecent]).make_preferred()).c_str());
-				ImGui::PopTextWrapPos();
+				ImGui::TextDisabled("%s", ShownPath.c_str());
+				if (ShownPath.size() != FullPath.size() && ImGui::IsItemHovered())
+				{
+					ImGui::SetTooltip("%s", FullPath.c_str());
+				}
 				ImGui::SameLine();
 			}
-			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - OpenW));
+			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ButtonsW));
+			if (ImGui::Button("Browse...", ImVec2(BrowseW, 0)))
+			{
+				const fs::path File = ShowOpenDialog(Hwnd, false, {});
+				if (!File.empty()) TryOpen(File);
+			}
+			ImGui::SameLine();
 			ImGui::BeginDisabled(!bHasSelection);
 			PushAccentButtonColors();
-			if (ImGui::Button("열기", ImVec2(OpenW, 0)) && bHasSelection)
+			if (ImGui::Button("Open", ImVec2(OpenW, 0)) && bHasSelection)
 			{
 				TryOpen(Recent[SelectedRecent]);
 			}
@@ -654,56 +646,58 @@ namespace
 
 		void DrawNewProjectPage(HWND Hwnd, float BodyHeight)
 		{
-			ImGui::TextUnformatted("새 프로젝트");
-			ImGui::SameLine();
-			const float BackW = ImGui::CalcTextSize("최근 프로젝트로").x + ImGui::GetStyle().FramePadding.x * 2.0f;
-			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - BackW));
-			if (ImGui::Button("최근 프로젝트로", ImVec2(BackW, 0)))
-			{
-				ActivePage = EPage::Home;
-			}
+			// 버튼이 없어도 제목 줄 높이를 My Projects 페이지와 같게 맞춰 아래 패널 위치가 페이지마다 달라지지 않게 한다.
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted("New Project");
 
 			ImGui::Spacing();
 
 			const float FooterH = ImGui::GetFrameHeightWithSpacing() + ImGui::GetStyle().ItemSpacing.y * 2.0f;
 			const float PanelH = std::max(EditorStyle::Scale(220.0f), BodyHeight - ImGui::GetFrameHeightWithSpacing() - FooterH - EditorStyle::Scale(8.0f));
 
-			ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(18, 18, 21, 255));
-			ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(40, 38, 42, 255));
+			ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorColor::BgPanel);
+			ImGui::PushStyleColor(ImGuiCol_Border, EditorColor::Border);
 			ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(6.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(20.0f), EditorStyle::Scale(18.0f)));
 			ImGui::BeginChild("##CreateProjectPanel", ImVec2(0.0f, PanelH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
 
 			// 템플릿 배너 카드
 			{
+				const char* const Description = "Creates a new Kurisu Engine project with a default scene and settings.";
 				const ImVec2 BannerMin = ImGui::GetCursorScreenPos();
 				const float BannerW = ImGui::GetContentRegionAvail().x;
-				const float BannerH = EditorStyle::Scale(74.0f);
+				const float SidePad = EditorStyle::Scale(18.0f);
+				const float IconSize = LogoTexture != ImTextureID_Invalid ? EditorStyle::Scale(44.0f) : 0.0f;
+				const float IconGap = LogoTexture != ImTextureID_Invalid ? EditorStyle::Scale(14.0f) : 0.0f;
+				// 설명은 배너 안쪽 폭에서 줄바꿈한다. 창이 좁아 여러 줄이 되면 배너를 그만큼 키운다.
+				const float WrapW = std::max(EditorStyle::Scale(40.0f), BannerW - SidePad * 2.0f - IconSize - IconGap);
+				const float DescriptionH = ImGui::CalcTextSize(Description, nullptr, false, WrapW).y;
+				const float BannerH = std::max(EditorStyle::Scale(74.0f), EditorStyle::Scale(38.0f) + DescriptionH + EditorStyle::Scale(16.0f));
 				ImDrawList* DL = ImGui::GetWindowDrawList();
-				DL->AddRectFilled(BannerMin, { BannerMin.x + BannerW, BannerMin.y + BannerH }, IM_COL32(28, 22, 24, 255), EditorStyle::Scale(6.0f));
-				DL->AddRectFilled(BannerMin, { BannerMin.x + EditorStyle::Scale(4.0f), BannerMin.y + BannerH }, IM_COL32(168, 52, 42, 255), EditorStyle::Scale(2.0f));
-				DL->AddRect(BannerMin, { BannerMin.x + BannerW, BannerMin.y + BannerH }, IM_COL32(95, 42, 38, 255), EditorStyle::Scale(6.0f));
+				DL->AddRectFilled(BannerMin, { BannerMin.x + BannerW, BannerMin.y + BannerH }, EditorColor::BgRaised, EditorStyle::Scale(6.0f));
+				DL->AddRectFilled(BannerMin, { BannerMin.x + EditorStyle::Scale(4.0f), BannerMin.y + BannerH }, EditorColor::Accent, EditorStyle::Scale(2.0f));
+				DL->AddRect(BannerMin, { BannerMin.x + BannerW, BannerMin.y + BannerH }, EditorColor::AccentDim, EditorStyle::Scale(6.0f));
 
-				float TextX = BannerMin.x + EditorStyle::Scale(18.0f);
+				float TextX = BannerMin.x + SidePad;
 				if (LogoTexture != ImTextureID_Invalid)
 				{
-					const float IconSize = EditorStyle::Scale(44.0f);
 					const float IconY = BannerMin.y + (BannerH - IconSize) * 0.5f;
 					DL->AddImage(LogoTexture, { TextX, IconY }, { TextX + IconSize, IconY + IconSize });
-					TextX += IconSize + EditorStyle::Scale(14.0f);
+					TextX += IconSize + IconGap;
 				}
-				DL->AddText({ TextX, BannerMin.y + EditorStyle::Scale(16.0f) }, IM_COL32(246, 244, 244, 255), "기본 프로젝트 (Blank)");
-				DL->AddText({ TextX, BannerMin.y + EditorStyle::Scale(38.0f) }, IM_COL32(175, 170, 172, 255), "기본 씬과 설정이 포함된 새 크리스 엔진 프로젝트를 생성합니다.");
+				DL->AddText({ TextX, BannerMin.y + EditorStyle::Scale(16.0f) }, EditorColor::TextPrimary, "Blank Project");
+				DL->AddText(ImGui::GetFont(), ImGui::GetFontSize(), { TextX, BannerMin.y + EditorStyle::Scale(38.0f) },
+					EditorColor::TextMuted, Description, nullptr, WrapW);
 				ImGui::Dummy(ImVec2(BannerW, BannerH));
 			}
 
 			ImGui::Dummy(ImVec2(0.0f, EditorStyle::Scale(10.0f)));
-			ImGui::TextUnformatted("프로젝트 이름");
+			ImGui::TextUnformatted("Project Name");
 			ImGui::SetNextItemWidth(-FLT_MIN);
 			ImGui::InputText("##Name", NameBuffer, sizeof(NameBuffer));
 
 			ImGui::Spacing();
-			ImGui::TextUnformatted("저장 위치");
+			ImGui::TextUnformatted("Project Location");
 			const float BrowseWidth = ImGui::CalcTextSize("...").x + ImGui::GetStyle().FramePadding.x * 4.0f;
 			ImGui::SetNextItemWidth(-(BrowseWidth + ImGui::GetStyle().ItemSpacing.x));
 			ImGui::InputText("##Location", LocationBuffer, sizeof(LocationBuffer));
@@ -718,20 +712,12 @@ namespace
 			const fs::path Location = FPaths::FromUtf8(LocationBuffer);
 			const FString NameError = ProjectCreator::ValidateName(Name);
 
-			ImGui::Spacing();
-			ImGui::TextDisabled("생성될 프로젝트 파일");
-			if (NameError.empty())
+			// 이름이 잘못되면 Create 버튼이 꺼지므로 이유를 보여준다.
+			if (!NameError.empty())
 			{
-				fs::path Preview = Location / FPaths::FromUtf8(Name) / (FPaths::FromUtf8(Name).native() + FPaths::ProjectExtension);
-				ImGui::TextWrapped("%s", FPaths::ToUtf8(Preview.make_preferred()).c_str());
+				ImGui::Spacing();
+				ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "%s", NameError.c_str());
 			}
-			else
-			{
-				ImGui::TextColored(ImVec4(0.95f, 0.48f, 0.36f, 1.0f), "%s", NameError.c_str());
-			}
-
-			ImGui::Spacing();
-			ImGui::TextDisabled("Content 및 Config 폴더를 생성하며, 엔진 아이콘과 폰트는 엔진 리소스를 공유합니다.");
 
 			ImGui::EndChild();
 			ImGui::PopStyleVar(2);
@@ -742,7 +728,7 @@ namespace
 			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - CreateW));
 			ImGui::BeginDisabled(!NameError.empty() || Location.empty());
 			PushAccentButtonColors();
-			if (ImGui::Button("프로젝트 생성", ImVec2(CreateW, 0)))
+			if (ImGui::Button("Create", ImVec2(CreateW, 0)))
 			{
 				std::error_code Ec;
 				fs::create_directories(Location, Ec);
@@ -767,13 +753,13 @@ namespace
 			ImGui::SetNextWindowSize(Viewport->WorkSize);
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
-			ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(13, 13, 16, 255));
+			ImGui::PushStyleColor(ImGuiCol_WindowBg, EditorColor::BgDeepest);
 			ImGui::Begin("Project Browser", nullptr,
 				ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoBringToFrontOnFocus);
 			ImGui::PopStyleColor();
 			ImGui::PopStyleVar(2);
 
-			DrawSidebar(Hwnd);
+			DrawSidebar();
 			ImGui::SameLine();
 
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(22.0f), EditorStyle::Scale(18.0f)));
@@ -790,9 +776,9 @@ namespace
 			if (!Error.empty())
 			{
 				ImGui::Spacing();
-				ImGui::TextColored(ImVec4(0.95f, 0.38f, 0.34f, 1.0f), "%s", Error.c_str());
+				ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "%s", Error.c_str());
 				ImGui::SameLine();
-				if (ImGui::SmallButton("닫기")) Error.clear();
+				if (ImGui::SmallButton("Close")) Error.clear();
 			}
 
 			ImGui::EndChild();
@@ -823,11 +809,13 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 	// 에디터 메인 창과 같은 FWindow를 쓴다. 기본 제목 표시줄 제거와 히트 테스트도 그대로 가져온다.
 	FWindow MainWindow;
 	FBrowserWindow Window;
-	if (MainWindow.Create(hInstance, Width, Height, L"크리스 엔진"))
+	if (MainWindow.Create(hInstance, Width, Height, L"Kurisu Engine 1.0"))
 	{
 		Window.Hwnd = MainWindow.GetHandle();
 		// 닫기는 앱 종료(WM_QUIT)가 아니라 요청만 남긴다. WM_QUIT이 엔진 메인 루프까지 남으면 안 된다.
 		MainWindow.SetQuitOnClose(false);
+		// 좌측 패널과 프로젝트 카드 세 개가 한 줄에 들어가고, New Project 페이지가 스크롤 없이 보이는 최소 크기.
+		MainWindow.SetMinSize(720, 480);
 
 		RECT Rect;
 		GetWindowRect(Window.Hwnd, &Rect);
@@ -866,12 +854,17 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 		// 기본 제목 표시줄을 없애고 메뉴 바를 제목 표시줄로 쓴다. 클라이언트 크기가 바뀌므로 아래 루프에서 스왑체인을 맞춘다.
 		EditorTitleBar::Install(MainWindow);
 		// 에디터와 같은 로고를 왼쪽 위에 그린다. 엔진(UAssetManager)이 아직 없으므로 이 창의 장치로 직접 텍스처를 만든다.
-		const ComPtr<ID3D11ShaderResourceView> Logo = CreateLogoTexture(Window.Device.Get());
-		if (Logo) EditorTitleBar::SetLogo((ImTextureID)Logo.Get());
+		const ComPtr<ID3D11ShaderResourceView> TitleBarLogo = CreateLogoTexture(Window.Device.Get(), "Engine/Icons/KurisuLogoReverse.png");
+		const ComPtr<ID3D11ShaderResourceView> Logo = CreateLogoTexture(Window.Device.Get(), "Engine/Icons/KurisuLogo.png");
+		if (TitleBarLogo) EditorTitleBar::SetLogo((ImTextureID)TitleBarLogo.Get());
 		MainWindow.Show();
 
 		FBrowserUI UI;
 		if (Logo) UI.LogoTexture = (ImTextureID)Logo.Get();
+		const ComPtr<ID3D11ShaderResourceView> NewProjectIcon = CreateLogoTexture(Window.Device.Get(), "Engine/Icons/ProjectBrowser/NewProject.png");
+		const ComPtr<ID3D11ShaderResourceView> MyProjectsIcon = CreateLogoTexture(Window.Device.Get(), "Engine/Icons/ProjectBrowser/MyProjects.png");
+		if (NewProjectIcon) UI.NewProjectIcon = (ImTextureID)NewProjectIcon.Get();
+		if (MyProjectsIcon) UI.MyProjectsIcon = (ImTextureID)MyProjectsIcon.Get();
 		UI.Init();
 
 		bool bRunning = true;
@@ -918,7 +911,7 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 	}
 	else
 	{
-		MessageBoxW(nullptr, L"Cannot create the project browser window.", L"크리스 엔진", MB_OK | MB_ICONERROR);
+		MessageBoxW(nullptr, L"Cannot create the project browser window.", L"Kurisu Engine", MB_OK | MB_ICONERROR);
 	}
 
 	Window.RenderTarget.Reset();

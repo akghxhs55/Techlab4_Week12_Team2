@@ -19,7 +19,7 @@ FJsonArchiveInputFormatter::FJsonArchiveInputFormatter(FArchive& InInner)
     Root = json::parse(Text, nullptr, false);
     if (Root.is_discarded())
     {
-        HTR_LOG(Error, "Load: invalid json");
+        KRS_LOG(Error, "Load: invalid json");
         Inner.SetError();
         Root = json::object(); 
     }
@@ -51,7 +51,7 @@ void FJsonArchiveInputFormatter::EnterRecord()
     const bool bIsObject = Value && Value->is_object();
 
     if(Value && !bIsObject && !Value->is_null())
-        HTR_LOG(Warning, "Load: expected object, got {}", Value->type_name());
+        KRS_LOG(Warning, "Load: expected object, got {}", Value->type_name());
 
     ObjectStack.Add({ bIsObject ? Value : nullptr, ValueStack.Num() });
 }
@@ -68,7 +68,7 @@ void FJsonArchiveInputFormatter::EnterField(FArchiveFieldName Name)
     // Record 자체가 없을 때(Object == nullptr)는 이미 EnterRecord에서 드러나므로 필드마다 경고하지 않는다.
     const FJsonValue* Field = FindField(Name);
     if (!Field && ObjectStack.Last().JsonObject)
-        HTR_LOG(Warning, "Load: missing field '{}', keeping default", Name.Name);
+        KRS_LOG(Warning, "Load: missing field '{}', keeping default", Name.Name);
 
     ValueStack.Add(Field);
 }
@@ -108,7 +108,7 @@ void FJsonArchiveInputFormatter::EnterArrayElement()
 {
     if (RemainingStack.Top() <= 0)
     {
-        HTR_LOG(Warning, "Load: array has fewer elements than expected");
+        KRS_LOG(Warning, "Load: array has fewer elements than expected");
         ValueStack.Add(nullptr);
     }
 }
@@ -235,7 +235,7 @@ void FJsonArchiveInputFormatter::Serialize(UObject*& Value)
         }
         else
         {
-            HTR_LOG(Warning, "Load: animation '{}' not found, keeping default", AssetPath);
+            KRS_LOG(Warning, "Load: animation '{}' not found, keeping default", AssetPath);
         }
         return;
     }
@@ -243,7 +243,7 @@ void FJsonArchiveInputFormatter::Serialize(UObject*& Value)
     if (URenderAsset* Asset = UAssetManager::GetAssetByPath<URenderAsset>(AssetPath))
         Value = Asset;
     else
-        HTR_LOG(Warning, "Load: asset '{}' not found, keeping default", AssetPath);
+        KRS_LOG(Warning, "Load: asset '{}' not found, keeping default", AssetPath);
 }
 
 void FJsonArchiveInputFormatter::Serialize(void* Data, uint64 DataSize)

@@ -34,7 +34,7 @@ FEngineConfig UGameEngine::GetConfig() const
 	Desc.bCreateDepthBuffer = false;
 	// Esc는 FGameViewportClient가 받아 종료 요청으로 바꾼다. 나중에 게임 UI가 가로챌 수 있다.
 	Desc.bExitOnEscape = false;
-	Desc.SplashImage = "Engine/Splash/KrisSplash.png";
+	Desc.SplashImage = "Engine/Splash/KurisuSplash.png";
 	return Desc;
 }
 
@@ -57,7 +57,7 @@ bool UGameEngine::Start()
 	{
 		const FString Message = "Cannot open startup map:\n" + Settings.StartupMap +
 			"\n\nCheck GameDefaultMap in Config/DefaultGame.ini and the Scenes folder.";
-		MessageBoxW(GetEngineLoop().GetMainWindow()->GetHandle(), std::wstring(Message.begin(), Message.end()).c_str(), L"크리스 엔진", MB_OK | MB_ICONERROR);
+		MessageBoxW(GetEngineLoop().GetMainWindow()->GetHandle(), std::wstring(Message.begin(), Message.end()).c_str(), L"Kurisu Engine", MB_OK | MB_ICONERROR);
 		return false;
 	}
 
@@ -129,7 +129,7 @@ bool UGameEngine::OpenStartupMap(const FString& MapPath)
 		DestroyWorldContext(Context.World());
 		return false;
 	}
-	HTR_LOG(Info, "Game map loaded: {}", MapPath);
+	KRS_LOG(Info, "Game map loaded: {}", MapPath);
 	return true;
 }
 

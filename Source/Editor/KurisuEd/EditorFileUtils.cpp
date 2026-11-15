@@ -1,5 +1,5 @@
 #include "EnginePCH.h"
-#include "Editor/HitoriEd/EditorFileUtils.h"
+#include "Editor/KurisuEd/EditorFileUtils.h"
 
 #include "Core/EngineLog.h"
 #include <commdlg.h>
@@ -23,7 +23,7 @@ void FEditorFileUtils::ImportFbx(EFbxImportMode Mode)
 	if (!GetOpenFileNameW(&Dialog))
 	{
 		const DWORD Error = CommDlgExtendedError();
-		if (Error != 0) HTR_LOG(Error, "FBX file dialog failed: {}", Error);
+		if (Error != 0) KRS_LOG(Error, "FBX file dialog failed: {}", Error);
 		return;
 	}
 
@@ -33,8 +33,8 @@ void FEditorFileUtils::ImportFbx(EFbxImportMode Mode)
 	FString Error;
 	if (!FFbxImporter::ImportToAssets(FString(Utf8.begin(), Utf8.end()), Mode, Result, Error))
 	{
-		HTR_LOG(Error, "FBX Import failed: {}", Error);
-		MessageBoxW(Dialog.hwndOwner, L"FBX를 가져오지 못했습니다. Output Log에서 오류를 확인하세요.", L"FBX Import", MB_OK | MB_ICONERROR);
+		KRS_LOG(Error, "FBX Import failed: {}", Error);
+		MessageBoxW(Dialog.hwndOwner, L"Failed to import FBX. Check the Output Log for errors.", L"FBX Import", MB_OK | MB_ICONERROR);
 	}
 	// 성공·skip·경고는 Importer가 기록하므로 여기서 다시 출력하지 않는다.
 }
@@ -63,17 +63,17 @@ bool FEditorFileUtils::SaveScene(UWorld* World)
 
 	if (!FJsonArchive::SaveWorld(World, CurrentScenePath))
 	{
-		HTR_LOG(Error, "Failed to save scene: {}", CurrentScenePath);
+		KRS_LOG(Error, "Failed to save scene: {}", CurrentScenePath);
 
 		MessageBoxW(
 			GetActiveWindow(),
-			L"씬을 저장하지 못했습니다.\n경로와 쓰기 권한을 확인하세요.",
-			L"저장 실패",
+			L"Failed to save the scene.\nCheck the path and write permission.",
+			L"Save Failed",
 			MB_OK | MB_ICONERROR
 		);
 		return false;
 	}
-	HTR_LOG(Info, "Save Scene : {}", CurrentScenePath);
+	KRS_LOG(Info, "Save Scene : {}", CurrentScenePath);
 
 	return true;
 }
@@ -92,12 +92,12 @@ bool FEditorFileUtils::SaveSceneAs(UWorld* World)
 
 	if (!FJsonArchive::SaveWorld(World, FilePath))
 	{
-		HTR_LOG(Error, "Failed to save scene: {}", FilePath);
+		KRS_LOG(Error, "Failed to save scene: {}", FilePath);
 
 		MessageBoxW(
 			GetActiveWindow(),
-			L"씬을 저장하지 못했습니다.\n경로와 쓰기 권한을 확인하세요.",
-			L"저장 실패",
+			L"Failed to save the scene.\nCheck the path and write permission.",
+			L"Save Failed",
 			MB_OK | MB_ICONERROR
 		);
 
@@ -106,7 +106,7 @@ bool FEditorFileUtils::SaveSceneAs(UWorld* World)
 
 	CurrentScenePath = FilePath;
 
-	HTR_LOG(Info, "Save Scene As : {}", CurrentScenePath);
+	KRS_LOG(Info, "Save Scene As : {}", CurrentScenePath);
 
 	return true;
 }
@@ -138,7 +138,7 @@ bool FEditorFileUtils::LoadScene(UWorld* World, const FString& InFilePath)
 	// 이제 이 파일이 현재 Scene
 	CurrentScenePath = FilePath;
 
-	HTR_LOG(Info, "Load Scene : {}", CurrentScenePath);
+	KRS_LOG(Info, "Load Scene : {}", CurrentScenePath);
 
 	return true;
 }

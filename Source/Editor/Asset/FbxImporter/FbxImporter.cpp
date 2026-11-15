@@ -1295,7 +1295,7 @@ namespace
 		FString ReadError;
 		if (!AnimSequenceFile::Read(File, *LoadedSequence, ReadError))
 		{
-			HTR_LOG(Error, "FBX animation test: cannot read {}: {}", Expected.GetClipName(), ReadError);
+			KRS_LOG(Error, "FBX animation test: cannot read {}: {}", Expected.GetClipName(), ReadError);
 			return false;
 		}
 		const UAnimDataModel* ExpectedModel = Expected.GetDataModel();
@@ -1310,7 +1310,7 @@ namespace
 			&& DataModel->GetFrameRate() == SampleRate
 			&& std::abs(DataModel->GetPlayLength() - ExpectedLength) <= 1.0e-4f
 			&& LoadedSequence->GetClipName() == Expected.GetClipName();
-		HTR_LOG(Info, "FBX animation test: stack={}, file={}, samples={}, tracks={}, bones={}, rate={}, length={}",
+		KRS_LOG(Info, "FBX animation test: stack={}, file={}, samples={}, tracks={}, bones={}, rate={}, length={}",
 			LoadedSequence->GetClipName(), Utf8Path(File.filename()), SampleCount, Tracks.Num(), Bones.Num(),
 			DataModel->GetFrameRate().AsDecimal(), DataModel->GetPlayLength());
 
@@ -1323,7 +1323,7 @@ namespace
 				|| Keys.ScaleKeys.Num() != SampleCount)
 			{
 				bPassed = false;
-				HTR_LOG(Error, "FBX animation test: invalid track {} (pos={}, rot={}, scale={})",
+				KRS_LOG(Error, "FBX animation test: invalid track {} (pos={}, rot={}, scale={})",
 					Track.Name, Keys.PosKeys.Num(), Keys.RotKeys.Num(), Keys.ScaleKeys.Num());
 			}
 		}
@@ -1345,7 +1345,7 @@ namespace
 				const FVector& Pos = Keys.PosKeys[KeyIndex];
 				const FQuat& Rot = Keys.RotKeys[KeyIndex];
 				const FVector& Scale = Keys.ScaleKeys[KeyIndex];
-				HTR_LOG(Info, "FBX animation test: bone={}, key={}, pos=({}, {}, {}), rot=({}, {}, {}, {}), scale=({}, {}, {})",
+				KRS_LOG(Info, "FBX animation test: bone={}, key={}, pos=({}, {}, {}), rot=({}, {}, {}, {}), scale=({}, {}, {})",
 					Track.Name, KeyIndex, Pos.X, Pos.Y, Pos.Z, Rot.X, Rot.Y, Rot.Z, Rot.W, Scale.X, Scale.Y, Scale.Z);
 			}
 			bInOutLogSamples = false;
@@ -1433,7 +1433,7 @@ bool FFbxImporter::ImportToAssets(const FString& Path, EFbxImportMode Mode, FFbx
 	struct FWarningLog
 	{
 		const TArray<FString>& Warnings;
-		~FWarningLog() { for (const auto& Warning : Warnings) HTR_LOG(Warning, "{}", Warning); }
+		~FWarningLog() { for (const auto& Warning : Warnings) KRS_LOG(Warning, "{}", Warning); }
 	} WarningLog{ OutResult.Warnings };
 	if (Mode != EFbxImportMode::Static && Mode != EFbxImportMode::Skeletal) { OutError = "FBX: invalid Import mode"; return false; }
 	try
@@ -1507,7 +1507,7 @@ bool FFbxImporter::ImportToAssets(const FString& Path, EFbxImportMode Mode, FFbx
 				OutResult.bSkipped = true;
 				OutResult.Paths = std::move(Paths);
 				if (bHasAnimation) for (const auto& AnimationFile : ExistingAnimations) OutResult.AnimationPaths.Add(Utf8Path(AnimationFile));
-				HTR_LOG(Info, "FBX Import skipped (source unchanged): {}", Source.Path);
+				KRS_LOG(Info, "FBX Import skipped (source unchanged): {}", Source.Path);
 				return RegisterImported(OutResult.Paths, false, OutResult.Warnings, OutError);
 			}
 		}
@@ -1606,7 +1606,7 @@ bool FFbxImporter::ImportToAssets(const FString& Path, EFbxImportMode Mode, FFbx
 						&& Previous->CaptureNotifySnapshot(NotifySnapshot)
 						&& Sequence.RestoreNotifySnapshot(NotifySnapshot))
 					{
-						HTR_LOG(Info, "FBX reimport kept {} notifies: {}", Sequence.GetNotifies().Num(), Utf8Path(Target));
+						KRS_LOG(Info, "FBX reimport kept {} notifies: {}", Sequence.GetNotifies().Num(), Utf8Path(Target));
 					}
 				}
 
@@ -1622,8 +1622,8 @@ bool FFbxImporter::ImportToAssets(const FString& Path, EFbxImportMode Mode, FFbx
 			if (!Sequences.IsEmpty()) Source.Outputs |= FFbxSourceInfo::AnimationOutput;
 			if (bTestAnimationImport && !Sequences.IsEmpty())
 			{
-				if (bAnimationTestPassed) HTR_LOG(Info, "FBX animation test PASS: {} stacks, tracks, key counts and frame metadata match", Sequences.Num());
-				else HTR_LOG(Error, "FBX animation test FAIL: tracks, key counts or frame metadata do not match");
+				if (bAnimationTestPassed) KRS_LOG(Info, "FBX animation test PASS: {} stacks, tracks, key counts and frame metadata match", Sequences.Num());
+				else KRS_LOG(Error, "FBX animation test FAIL: tracks, key counts or frame metadata do not match");
 			}
 
 			// 이전 임포트가 남긴 애니메이션 파일 중 이번에 다시 쓰지 않는 것은 삭제한다. (스택이 줄었거나 1개↔여러 개로 바뀐 경우)
@@ -1708,9 +1708,9 @@ bool FFbxImporter::ImportToAssets(const FString& Path, EFbxImportMode Mode, FFbx
 		if (Source.Outputs & FFbxSourceInfo::AnimationOutput)
 		{
 			for (const auto& AnimationFile : AnimationPaths) OutResult.AnimationPaths.Add(Utf8Path(AnimationFile));
-			HTR_LOG(Info, "FBX animation saved: {} files in {}", OutResult.AnimationPaths.Num(), Utf8Path(Folder));
+			KRS_LOG(Info, "FBX animation saved: {} files in {}", OutResult.AnimationPaths.Num(), Utf8Path(Folder));
 		}
-		HTR_LOG(Info, "FBX Import saved: {} ({} files)", Source.Path, OutResult.Paths.Num());
+		KRS_LOG(Info, "FBX Import saved: {} ({} files)", Source.Path, OutResult.Paths.Num());
 		return RegisterImported(OutResult.Paths, true, OutResult.Warnings, OutError);
 	}
 	catch (const std::filesystem::filesystem_error& E)

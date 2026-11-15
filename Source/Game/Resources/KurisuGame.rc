@@ -3,7 +3,7 @@
 
 #pragma code_page(65001)
 
-IDI_ICON2 ICON "../../../EngineResources/Icons/Kris.ico"
+IDI_ICON2 ICON "../../../EngineResources/Icons/KurisuLogoReverse.ico"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION 1,0,0,0
@@ -22,11 +22,11 @@ BEGIN
     BEGIN
         BLOCK "041204b0"
         BEGIN
-            VALUE "CompanyName", "Kris Engine"
-            VALUE "FileDescription", "Kris Engine Game"
+            VALUE "CompanyName", "Kurisu Engine"
+            VALUE "FileDescription", "Kurisu Engine Game"
             VALUE "FileVersion", "1.0.0.0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 Kris Engine"
-            VALUE "ProductName", "Kris Engine"
+            VALUE "LegalCopyright", "Copyright (C) 2026 Kurisu Engine"
+            VALUE "ProductName", "Kurisu Engine"
             VALUE "ProductVersion", "1.0.0.0"
         END
     END

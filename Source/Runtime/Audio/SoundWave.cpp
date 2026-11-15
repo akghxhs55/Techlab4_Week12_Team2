@@ -9,7 +9,7 @@ bool USoundWave::LoadFromFile(const FString& Path)
     ma_decoder Decoder;
     if (ma_decoder_init_file(Path.c_str(), &Config, &Decoder) != MA_SUCCESS)
     {
-        HTR_LOG(Error, "[Audio] Cannot decode {}", Path);
+        KRS_LOG(Error, "[Audio] Cannot decode {}", Path);
         return false;
     }
     if (Decoder.outputChannels > 2)

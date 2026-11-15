@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 
-#include "Editor/HitoriEd/EditorEngine.h"
+#include "Editor/KurisuEd/EditorEngine.h"
 
 #include "Core/EngineStatics.h"
 #include "Core/EngineTimer.h"
@@ -35,7 +35,7 @@
 
 #include "Render/RenderCommand.h"
 #include "Editor/Outliner/OutlinerPanel.h"
-#include "Editor/HitoriEd/EditorFileUtils.h"
+#include "Editor/KurisuEd/EditorFileUtils.h"
 #include "Editor/Viewports/EditorViewportClient.h"
 #include "UObject/UObjectIterator.h"
 
@@ -421,9 +421,9 @@ bool UEditorEngine::CreatePIEWindow()
 	constexpr int32 DefaultHeight = 720;
 
 	TUniquePtr<FWindow> NewWindow = MakeUnique<FWindow>();
-	if (!NewWindow->Create(::GetModuleHandleW(nullptr), DefaultWidth, DefaultHeight, L"크리스 엔진 - PIE"))
+	if (!NewWindow->Create(::GetModuleHandleW(nullptr), DefaultWidth, DefaultHeight, L"Kurisu Engine - PIE"))
 	{
-		HTR_LOG(Error, "Failed to create PIE window. Falling back to the selected viewport.");
+		KRS_LOG(Error, "Failed to create PIE window. Falling back to the selected viewport.");
 		return false;
 	}
 	// 닫기 버튼은 PIE만 끝내고, ImGui는 메인 창 입력만 받도록 훅을 끊는다.

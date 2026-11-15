@@ -32,7 +32,7 @@ UWidget* FWidgetSerializer::LoadWidget(FStructuredArchive::FRecord Record)
 	UClass* Class = FindClass(ClassName);
 	if (!Class || !Class->IsChildOf(UWidget::StaticClass()) || !Class->Constructor)
 	{
-		HTR_LOG(Warning, "Unknown widget class: '{}'", ClassName);
+		KRS_LOG(Warning, "Unknown widget class: '{}'", ClassName);
 		return nullptr;
 	}
 
@@ -70,7 +70,7 @@ bool FWidgetSerializer::LoadAssetFromBytes(const TArray<uint8>& Bytes, FWidgetAs
 	FJsonArchiveInputFormatter Formatter(Reader);
 	if (Reader.IsError())
 	{
-		HTR_LOG(Error, "Load: invalid widget data");
+		KRS_LOG(Error, "Load: invalid widget data");
 		return false;
 	}
 
@@ -81,7 +81,7 @@ bool FWidgetSerializer::LoadAssetFromBytes(const TArray<uint8>& Bytes, FWidgetAs
 	File << SA_VALUE("Version", Version);
 	if (Version != WidgetAssetVersion)
 	{
-		HTR_LOG(Error, "Load: widget version {} is not supported (expected {})", Version, WidgetAssetVersion);
+		KRS_LOG(Error, "Load: widget version {} is not supported (expected {})", Version, WidgetAssetVersion);
 		return false;
 	}
 
@@ -92,7 +92,7 @@ bool FWidgetSerializer::LoadAssetFromBytes(const TArray<uint8>& Bytes, FWidgetAs
 	OutAsset.Root = Cast<UPanelWidget>(Root);
 	if (Root && !OutAsset.Root)
 	{
-		HTR_LOG(Warning, "Widget asset root must be a panel");
+		KRS_LOG(Warning, "Widget asset root must be a panel");
 		delete Root;
 	}
 	Ar.Close();
@@ -139,7 +139,7 @@ const TArray<uint8>* FWidgetAssetCache::Find(const FString& Path)
 	TArray<uint8> Bytes;
 	if (!FWidgetSerializer::ReadFileBytes(Path, Bytes))
 	{
-		HTR_LOG(Error, "Cannot open widget asset: {}", Path);
+		KRS_LOG(Error, "Cannot open widget asset: {}", Path);
 		return nullptr;
 	}
 	GetMap().Add(Path, std::move(Bytes));
@@ -159,7 +159,7 @@ UUserWidget* CreateWidget(UWorld* World, const FString& AssetPath)
 	FWidgetAssetData Asset;
 	if (!FWidgetSerializer::LoadAssetFromBytes(*Bytes, Asset))
 	{
-		HTR_LOG(Error, "Invalid widget asset: {}", AssetPath);
+		KRS_LOG(Error, "Invalid widget asset: {}", AssetPath);
 		return nullptr;
 	}
 
@@ -172,7 +172,7 @@ UUserWidget* CreateWidget(UWorld* World, const FString& AssetPath)
 	Widget->AssetPath = AssetPath;
 
 	if (!Asset.Root)
-		HTR_LOG(Warning, "Widget asset root must be a panel: {}", AssetPath);
+		KRS_LOG(Warning, "Widget asset root must be a panel: {}", AssetPath);
 	Widget->SetRootWidget(Asset.Root);
 	return Widget;
 }

@@ -95,7 +95,7 @@ bool FCoroutineScheduler::Resume(FCoroutine& Coroutine)
 	if (Status != LUA_YIELD)
 	{
 		luaL_traceback(Main, Co, lua_tostring(Co, -1), 0);
-		HTR_LOG(Error, "[Lua] 코루틴 오류\n{}", lua_tostring(Main, -1));
+		KRS_LOG(Error, "[Lua] Coroutine error\n{}", lua_tostring(Main, -1));
 		lua_pop(Main, 1);
 		return false;
 	}
@@ -152,7 +152,7 @@ void FCoroutineScheduler::Tick(float DeltaTime)
 			if (!R.valid())
 			{
 				sol::error E = R;
-				HTR_LOG(Error, "[Lua] wait_until 조건 오류\n{}", E.what());
+				KRS_LOG(Error, "[Lua] wait_until condition error\n{}", E.what());
 				C.bDead = true;
 				continue;
 			}

@@ -23,7 +23,7 @@ namespace
 
 		ImDrawList* DL = ImGui::GetWindowDrawList();
 		DL->ChannelsSetCurrent(0);
-		DL->AddRectFilled({ Min.x - EditorStyle::Scale(4.0f), Min.y - EditorStyle::Scale(2.0f) }, { Max.x + EditorStyle::Scale(4.0f), Max.y + EditorStyle::Scale(2.0f) }, IM_COL32(24, 24, 27, 255), 4.0f);
+		DL->AddRectFilled({ Min.x - EditorStyle::Scale(4.0f), Min.y - EditorStyle::Scale(2.0f) }, { Max.x + EditorStyle::Scale(4.0f), Max.y + EditorStyle::Scale(2.0f) }, EditorColor::BgRaised, 4.0f);
 		DL->ChannelsMerge();
 	}
 
@@ -45,7 +45,7 @@ namespace
 		float X = Pos.x + Pad;
 		if (const ImTextureID Texture = ViewportToolbarWidgets::GetIcon(Icon); Texture != ImTextureID_Invalid)
 			DL->AddImage(Texture, { X, CenterY - IconSide * 0.5f }, { X + IconSide, CenterY + IconSide * 0.5f },
-				{ 0, 0 }, { 1, 1 }, IM_COL32(220, 220, 220, 255));
+				{ 0, 0 }, { 1, 1 }, EditorColor::TextSecondary);
 		X += IconSide;
 		const ImU32 TextColor = ImGui::GetColorU32(ImGuiCol_Text);
 		if (Label)
@@ -62,7 +62,8 @@ namespace
 
 void FLevelEditorToolbar::Draw()
 {
-	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f) });
+	// UE처럼 버튼 크기는 유지하고 툴바 안에서 위아래로 여유를 둔다.
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { EditorStyle::Scale(8.0f), EditorStyle::Scale(8.0f) });
 	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { EditorStyle::Scale(4.0f), EditorStyle::Scale(4.0f) });
 	const float ToolbarHeight = EditorCommandUI::GetToolbarButtonSize().y + ImGui::GetStyle().WindowPadding.y * 2.0f;
 	const bool bOpen = ImGui::BeginChild("##LevelEditorToolbar", ImVec2(0.0f, ToolbarHeight),
@@ -82,7 +83,7 @@ void FLevelEditorToolbar::DrawPlacementGroup()
 {
 	BeginToolbarGroup();
 
-	EditorStyle::FPopupAnchor AddAnchor{}, GridAnchor{};
+	EditorStyle::FPopupAnchor AddAnchor{}, SnapAnchor{}, GridAnchor{};
 	if (DropdownButton("##AddActor", "Add", nullptr))
 		ImGui::OpenPopup("LevelAddPopup");
 	AddAnchor = EditorStyle::LastItemAnchor();
@@ -90,25 +91,24 @@ void FLevelEditorToolbar::DrawPlacementGroup()
 		ImGui::SetTooltip("Quickly add to the project");
 
 	ImGui::SameLine();
-	if (GetLocationSnap && SetLocationSnap)
+	if (GetLocationSnap && DrawSnapMenu)
 	{
+		// Grid와 같은 [아이콘][값][v] 드롭다운. 켜져 있으면 간격을, 꺼져 있으면 Off를 보여준다.
 		const bool bSnapOn = GetLocationSnap();
-		const float SnapSize = GetLocationSnapSize ? GetLocationSnapSize() : 1.0f;
-		char SnapText[24];
+		char SnapLabel[16];
 		if (bSnapOn)
-			std::snprintf(SnapText, sizeof(SnapText), "Snap %g", SnapSize);
+			std::snprintf(SnapLabel, sizeof(SnapLabel), "%g", GetLocationSnapSize ? GetLocationSnapSize() : 1.0f);
 		else
-			std::snprintf(SnapText, sizeof(SnapText), "Snap Off");
+			std::snprintf(SnapLabel, sizeof(SnapLabel), "Off");
 
-		const float BtnHeight = EditorCommandUI::GetToolbarButtonSize().y;
-		if (bSnapOn)
-			ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.45f, 0.78f, 1.0f));
-		if (ImGui::Button(SnapText, { 0.0f, BtnHeight }))
-			SetLocationSnap(!bSnapOn);
-		if (bSnapOn)
-			ImGui::PopStyleColor();
-		if (ImGui::IsItemHovered())
-			ImGui::SetTooltip(bSnapOn ? "Location snap: ON (G)" : "Location snap: OFF (G)");
+		// 켜진 상태는 다른 토글 버튼과 같은 엔진 강조색(적갈색)으로 표시한다.
+		EditorStyle::PushSelectedButton(bSnapOn);
+		if (DropdownButton("##LocationSnap", "Snap", SnapLabel))
+			ImGui::OpenPopup("LevelSnapPopup");
+		EditorStyle::PopSelectedButton(bSnapOn);
+		SnapAnchor = EditorStyle::LastItemAnchor();
+		if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("LevelSnapPopup"))
+			ImGui::SetTooltip(bSnapOn ? "Location snap: ON (G to toggle)" : "Location snap: OFF (G to toggle)");
 		ImGui::SameLine();
 	}
 
@@ -118,13 +118,18 @@ void FLevelEditorToolbar::DrawPlacementGroup()
 		ImGui::OpenPopup("LevelGridPopup");
 	GridAnchor = EditorStyle::LastItemAnchor();
 	if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("LevelGridPopup"))
-		ImGui::SetTooltip("Grid spacing & snap settings");
+		ImGui::SetTooltip("Grid spacing");
 
 	EndToolbarGroup();
 
 	if (EditorStyle::BeginButtonPopup("LevelAddPopup", AddAnchor))
 	{
 		if (DrawAddMenu) DrawAddMenu();
+		ImGui::EndPopup();
+	}
+	if (EditorStyle::BeginButtonPopup("LevelSnapPopup", SnapAnchor))
+	{
+		if (DrawSnapMenu) DrawSnapMenu();
 		ImGui::EndPopup();
 	}
 	if (EditorStyle::BeginButtonPopup("LevelGridPopup", GridAnchor))

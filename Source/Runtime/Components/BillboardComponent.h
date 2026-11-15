@@ -17,7 +17,7 @@ struct FBillboardConstants
 	float DecodeSRGB = 1.0f;
 	float Padding[3]{};
 };
-static_assert(sizeof(FBillboardConstants) == 48, "BillboardShader.hlsl cbuffer MaterialParams와 크기가 같아야 한다");
+static_assert(sizeof(FBillboardConstants) == 48, "Size must match cbuffer MaterialParams in BillboardShader.hlsl");
 
 UCLASS()
 class UBillboardComponent : public UPrimitiveComponent

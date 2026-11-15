@@ -44,7 +44,7 @@ bool FSceneLightResources::Init()
 	ShadowProjectionCB = RenderCommand::CreateConstantBuffer(sizeof(FShadowProjectionConstants));
 
 	if (!ForwardTileGrid.Init())
-		HTR_LOG(Warning, "Forward tile culling compute shader unavailable");
+		KRS_LOG(Warning, "Forward tile culling compute shader unavailable");
 	bInitialized = ForwardLightCB && ShadowDepthPassCB && ShadowProjectionCB;
 	return bInitialized;
 }

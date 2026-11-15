@@ -28,7 +28,7 @@
 #include "Editor/LevelViewportLayout.h"
 #include "Editor/ContentDrawer/ContentDrawerPanel.h"
 #include "Editor/UIEditor/UIEditor.h"
-#include "Editor/HitoriEd/EditorUndo.h"
+#include "Editor/KurisuEd/EditorUndo.h"
 
 #include "Editor/Rendering/Outline.h"
 #include "Editor/Rendering/OutLineRenderer.h"
@@ -39,7 +39,7 @@
 
 #include "Text/TextRenderer.h"
 
-#include "Editor/HitoriEd/GamePackager.h"
+#include "Editor/KurisuEd/GamePackager.h"
 
 #include <Engine\GameViewportClient.h>
 

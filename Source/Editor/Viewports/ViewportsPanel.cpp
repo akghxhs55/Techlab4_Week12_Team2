@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/Viewports/ViewportsPanel.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/Viewports/LevelEditorViewport.h"
 #include "Engine/GameViewportClient.h"
 
@@ -23,15 +24,15 @@
 
 namespace {
 constexpr float SplitterThickness = 6.0f;
-constexpr ImU32 SplitterColor = IM_COL32(24, 24, 28, 240);
-constexpr ImU32 SplitterHoverColor = IM_COL32(192, 68, 58, 255);
+constexpr ImU32 SplitterColor = EditorColor::BgRaised;
+constexpr ImU32 SplitterHoverColor = EditorColor::AccentHover;
 
 // Stat Overlay
 constexpr float StatOverlayMargin = 8.0f;
 constexpr float StatOverlayPadding = 6.0f;
-constexpr ImU32 StatOverlayBackgroundColor = IM_COL32(0, 0, 0, 140);
-constexpr ImU32 TitleColor = IM_COL32(235, 128, 86, 255);
-constexpr ImU32 ValueColor = IM_COL32(235, 235, 235, 255);
+constexpr ImU32 StatOverlayBackgroundColor = EditorColor::Scrim;
+constexpr ImU32 TitleColor = EditorColor::AccentText;
+constexpr ImU32 ValueColor = EditorColor::TextPrimary;
 } // namespace
 
 // 네 View의 렌더 타깃을 최소 크기로 초기화한다.
@@ -186,14 +187,14 @@ void FViewportsPanel::OnRender() {
 		if (ViewIndex == 0 && bShowNoCamera && !bGameViewport)
 		{
 			// 메인 원근 뷰포트 영역을 어두운 회색으로 채움
-			DrawList->AddRectFilled(ViewMin, ViewMax, IM_COL32(45, 45, 48, 255));
+			DrawList->AddRectFilled(ViewMin, ViewMax, EditorColor::BgHeader);
 			const char* WarningText = "No Camera";
 			ImVec2 TextSize = ImGui::CalcTextSize(WarningText);
 			ImVec2 CenterPos{
 				ViewMin.x + (Rect.Width - TextSize.x) * 0.5f,
 				ViewMin.y + (Rect.Height - TextSize.y) * 0.5f
 			};
-			DrawList->AddText(CenterPos, IM_COL32(220, 220, 220, 255), WarningText);
+			DrawList->AddText(CenterPos, EditorColor::TextSecondary, WarningText);
 			continue;
 		}
 

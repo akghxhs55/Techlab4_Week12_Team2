@@ -11,16 +11,17 @@
 
 namespace
 {
-	constexpr float SplashScreenRatio = 0.4f;
-	constexpr const wchar_t* SplashClassName = L"KrisSplash";
-	constexpr int32 BaseFooterHeight = 86;
-	constexpr int32 BaseProgressBarHeight = 4;
-	constexpr int32 BaseTextMargin = 22;
-	constexpr int32 BaseEmblemSize = 44;
-	constexpr COLORREF FooterBgColor = RGB(12, 12, 14);
-	constexpr COLORREF AccentColor = RGB(168, 52, 42);
-	constexpr COLORREF AccentTrackColor = RGB(36, 26, 26);
-	constexpr COLORREF BorderColor = RGB(48, 32, 32);
+	constexpr int32 BaseSplashWidth = 720;
+	constexpr int32 BaseImageHeight = 300;
+	constexpr const wchar_t* SplashClassName = L"KurisuSplash";
+	constexpr int32 BaseFooterHeight = 70;
+	constexpr int32 BaseProgressBarHeight = 1;
+	constexpr int32 BaseTextMargin = 10;
+	constexpr int32 BaseEmblemSize = 40;
+	constexpr COLORREF FooterBgColor = RGB(0, 0, 0);
+	constexpr COLORREF AccentColor = RGB(102, 128, 112);
+	constexpr COLORREF AccentTrackColor = RGB(54, 54, 58);
+	constexpr COLORREF BorderColor = RGB(116, 116, 120);
 
 	struct FSplashState
 	{
@@ -42,13 +43,14 @@ namespace
 		int32 LogoWidth = 0;
 		int32 LogoHeight = 0;
 
+		std::wstring Title;
 		std::wstring Text;
 		float Progress = 0.0f;
 	};
 
 	float CalcSplashUiScale(int32 Width)
 	{
-		return std::max(0.75f, static_cast<float>(Width) / 768.0f);
+		return static_cast<float>(Width) / BaseSplashWidth;
 	}
 
 	int32 ScaleSplashPx(int32 BasePx, float UiScale)
@@ -115,7 +117,7 @@ namespace
 		return CreateFontW(
 			-PixelHeight, 0, 0, 0, Weight, FALSE, FALSE, FALSE,
 			DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS,
-			CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Malgun Gothic");
+			CLEARTYPE_QUALITY, DEFAULT_PITCH | FF_SWISS, L"Segoe UI");
 	}
 
 	void Paint(HWND hWnd)
@@ -150,20 +152,17 @@ namespace
 
 			SetStretchBltMode(MemDC, HALFTONE);
 			SetBrushOrgEx(MemDC, 0, 0, nullptr);
-			StretchBlt(MemDC, 0, 0, W, ImageH,
-				ImageDC, 0, 0, GSplash.ImageWidth, GSplash.ImageHeight, SRCCOPY);
+			// Fill the wide artwork area without distorting the image.
+			const float ImageScale = std::max(static_cast<float>(W) / GSplash.ImageWidth,
+				static_cast<float>(ImageH) / GSplash.ImageHeight);
+			const int32 SourceW = std::max(1, static_cast<int32>(W / ImageScale));
+			const int32 SourceH = std::max(1, static_cast<int32>(ImageH / ImageScale));
+			StretchBlt(MemDC, 0, 0, W, ImageH, ImageDC,
+				(GSplash.ImageWidth - SourceW) / 2, (GSplash.ImageHeight - SourceH) / 3,
+				SourceW, SourceH, SRCCOPY);
 
 			SelectObject(ImageDC, OldImage);
 			DeleteDC(ImageDC);
-		}
-
-		// 아트워크와 검은 하단 푸터 사이 적갈색 1px 구분선
-		if (ImageH > 0 && ImageH < H)
-		{
-			RECT DividerRect = { 0, ImageH, W, ImageH + 1 };
-			HBRUSH DividerBrush = CreateSolidBrush(RGB(110, 36, 32));
-			FillRect(MemDC, &DividerRect, DividerBrush);
-			DeleteObject(DividerBrush);
 		}
 
 		std::wstring Text;
@@ -175,11 +174,8 @@ namespace
 		}
 
 		const int32 Percent = static_cast<int32>(std::lround(FMath::Clamp(Progress, 0.0f, 1.0f) * 100.0f));
-		std::wstring StatusLine = std::to_wstring(Percent) + L"%";
-		if (!Text.empty())
-		{
-			StatusLine += L" - " + Text;
-		}
+		const std::wstring StatusLine = Text.empty() ? L"Loading..." :
+			std::to_wstring(Percent) + L"% - " + Text;
 
 		// 오른쪽 엠블럼 및 저작권 텍스트 영역
 		int32 RightReserve = Margin;
@@ -189,7 +185,7 @@ namespace
 			HGDIOBJ OldLogo = SelectObject(LogoDC, GSplash.LogoBitmap);
 
 			const int32 LogoX = W - Margin - EmblemPx;
-			const int32 LogoY = ImageH + ScaleSplashPx(11, UiScale);
+			const int32 LogoY = ImageH + ScaleSplashPx(9, UiScale);
 			SetStretchBltMode(MemDC, HALFTONE);
 			SetBrushOrgEx(MemDC, 0, 0, nullptr);
 			StretchBlt(MemDC, LogoX, LogoY, EmblemPx, EmblemPx,
@@ -202,37 +198,39 @@ namespace
 
 		SetBkMode(MemDC, TRANSPARENT);
 
-		HFONT TitleFont = CreateSplashFont(ScaleSplashPx(20, UiScale), FW_BOLD);
+		HFONT TitleFont = CreateSplashFont(ScaleSplashPx(18, UiScale), FW_NORMAL);
 		HFONT SubFont = CreateSplashFont(ScaleSplashPx(12, UiScale), FW_NORMAL);
-		HFONT StatusFont = CreateSplashFont(ScaleSplashPx(13, UiScale), FW_NORMAL);
+		HFONT StatusFont = CreateSplashFont(ScaleSplashPx(11, UiScale), FW_NORMAL);
 		HFONT CopyFont = CreateSplashFont(ScaleSplashPx(11, UiScale), FW_NORMAL);
 		HGDIOBJ OldFont = SelectObject(MemDC, TitleFont);
 
 		const int32 TextRight = std::max(Margin + ScaleSplashPx(40, UiScale), W - std::max(RightReserve, ScaleSplashPx(150, UiScale)));
 
 		// 엔진 이름
-		SetTextColor(MemDC, RGB(246, 244, 244));
-		RECT TitleRect = { Margin, ImageH + ScaleSplashPx(10, UiScale), TextRight, ImageH + ScaleSplashPx(34, UiScale) };
-		DrawTextW(MemDC, L"크리스 엔진", -1, &TitleRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+		SetTextColor(MemDC, RGB(245, 245, 245));
+		RECT TitleRect = { Margin, ImageH + ScaleSplashPx(6, UiScale), TextRight, ImageH + ScaleSplashPx(28, UiScale) };
+		DrawTextW(MemDC, GSplash.Title.c_str(), -1, &TitleRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
 		// 부제
 		SelectObject(MemDC, SubFont);
-		SetTextColor(MemDC, RGB(178, 120, 114));
-		RECT SubRect = { Margin, ImageH + ScaleSplashPx(33, UiScale), TextRight, ImageH + ScaleSplashPx(51, UiScale) };
-		DrawTextW(MemDC, L"Kris Engine  |  Editor", -1, &SubRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+		SetTextColor(MemDC, RGB(160, 160, 160));
+		RECT SubRect = { Margin, ImageH + ScaleSplashPx(27, UiScale), TextRight, ImageH + ScaleSplashPx(43, UiScale) };
+		DrawTextW(MemDC, L"Kurisu Editor 1.0", -1, &SubRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
 		// % 및 현재 로딩 중인 파일/단계 상태
-		SelectObject(MemDC, StatusFont);
-		SetTextColor(MemDC, RGB(222, 220, 222));
-		const int32 StatusBottomPad = ScaleSplashPx(6, UiScale);
-		RECT StatusRect = { Margin, ImageH + ScaleSplashPx(54, UiScale), TextRight, H - ProgressBarH - StatusBottomPad };
-		DrawTextW(MemDC, StatusLine.c_str(), -1, &StatusRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
-
-		// 우측 하단 저작권 표기
 		SelectObject(MemDC, CopyFont);
-		SetTextColor(MemDC, RGB(130, 130, 135));
-		RECT CopyRect = { TextRight, ImageH + ScaleSplashPx(56, UiScale), W - Margin, H - ProgressBarH - StatusBottomPad };
-		DrawTextW(MemDC, L"© Kris Engine", -1, &CopyRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+		SetTextColor(MemDC, RGB(150, 150, 150));
+		constexpr const wchar_t* Copyright = L"Copyright © Kurisu Engine";
+		SIZE CopySize{};
+		GetTextExtentPoint32W(MemDC, Copyright, lstrlenW(Copyright), &CopySize);
+		const int32 CopyLeft = W - Margin - CopySize.cx;
+		RECT CopyRect = { CopyLeft, ImageH + ScaleSplashPx(50, UiScale), W - Margin, H - ScaleSplashPx(3, UiScale) };
+		DrawTextW(MemDC, Copyright, -1, &CopyRect, DT_RIGHT | DT_VCENTER | DT_SINGLELINE);
+
+		SelectObject(MemDC, StatusFont);
+		SetTextColor(MemDC, RGB(160, 160, 160));
+		RECT StatusRect = { Margin, CopyRect.top, CopyLeft - Margin, CopyRect.bottom };
+		DrawTextW(MemDC, StatusLine.c_str(), -1, &StatusRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE | DT_END_ELLIPSIS);
 
 		SelectObject(MemDC, OldFont);
 		DeleteObject(TitleFont);
@@ -240,8 +238,8 @@ namespace
 		DeleteObject(StatusFont);
 		DeleteObject(CopyFont);
 
-		// 하단 적갈색 진행 바
-		RECT BarBack = { 0, H - ProgressBarH, W, H };
+		// Thin progress accent along the top edge.
+		RECT BarBack = { 0, 1, W, 1 + ProgressBarH };
 		HBRUSH BackBrush = CreateSolidBrush(AccentTrackColor);
 		FillRect(MemDC, &BarBack, BackBrush);
 		DeleteObject(BackBrush);
@@ -249,16 +247,21 @@ namespace
 		const LONG FillWidth = static_cast<LONG>(W * FMath::Clamp(Progress, 0.0f, 1.0f));
 		if (FillWidth > 0)
 		{
-			RECT BarFill = { 0, H - ProgressBarH, FillWidth, H };
+			RECT BarFill = { 0, 1, FillWidth, 1 + ProgressBarH };
 			HBRUSH FillBrush = CreateSolidBrush(AccentColor);
 			FillRect(MemDC, &BarFill, FillBrush);
 			DeleteObject(FillBrush);
 		}
 
 		// 창 외곽선
-		HBRUSH FrameBrush = CreateSolidBrush(BorderColor);
-		FrameRect(MemDC, &Client, FrameBrush);
-		DeleteObject(FrameBrush);
+		HPEN FramePen = CreatePen(PS_SOLID, 1, BorderColor);
+		HGDIOBJ OldPen = SelectObject(MemDC, FramePen);
+		HGDIOBJ OldBrush = SelectObject(MemDC, GetStockObject(NULL_BRUSH));
+		const int32 Corner = ScaleSplashPx(12, UiScale);
+		RoundRect(MemDC, 0, 0, W, H, Corner, Corner);
+		SelectObject(MemDC, OldBrush);
+		SelectObject(MemDC, OldPen);
+		DeleteObject(FramePen);
 
 		BitBlt(ScreenDC, 0, 0, W, H, MemDC, 0, 0, SRCCOPY);
 
@@ -317,6 +320,9 @@ namespace
 
 		if (!hWnd) return;
 
+		const int32 Corner = ScaleSplashPx(12, CalcSplashUiScale(GSplash.Width));
+		HRGN Region = CreateRoundRectRgn(0, 0, GSplash.Width + 1, GSplash.Height + 1, Corner, Corner);
+		if (Region && !SetWindowRgn(hWnd, Region, FALSE)) DeleteObject(Region);
 		ShowWindow(hWnd, SW_SHOW);
 		UpdateWindow(hWnd);
 
@@ -350,24 +356,25 @@ void FSplashScreen::Show(HINSTANCE hInstance, const FString& ImagePath)
 		GSplash.ImageWidth = static_cast<int32>(Image.Width);
 		GSplash.ImageHeight = static_cast<int32>(Image.Height);
 
-		// 화면의 Ratio 크기 상자 안에 원본 비율을 유지한 채 맞추고 하단 푸터 높이를 더한다.
-		const float MaxW = GetSystemMetrics(SM_CXSCREEN) * SplashScreenRatio;
-		const float MaxH = GetSystemMetrics(SM_CYSCREEN) * SplashScreenRatio;
-		const float Scale = std::min(MaxW / Image.Width, MaxH / Image.Height);
-		GSplash.Width = static_cast<int32>(Image.Width * Scale);
-		GSplash.ImageAreaHeight = static_cast<int32>(Image.Height * Scale);
-		GSplash.FooterHeight = ScaleSplashPx(BaseFooterHeight, CalcSplashUiScale(GSplash.Width));
-		GSplash.Height = GSplash.ImageAreaHeight + GSplash.FooterHeight;
-	}
-	else
-	{
-		GSplash.Width = 680;
-		GSplash.ImageAreaHeight = 382;
-		GSplash.FooterHeight = ScaleSplashPx(BaseFooterHeight, CalcSplashUiScale(GSplash.Width));
-		GSplash.Height = GSplash.ImageAreaHeight + GSplash.FooterHeight;
 	}
 
-	const FImageData LogoImage = ImageLoader::Load(FPaths::ResolveContentPath("Engine/Icons/KrisLogo.png"));
+	// Match the reference proportions, independent of artwork resolution.
+	const float DpiScale = static_cast<float>(GetDpiForSystem()) / 96.0f;
+	const float FitScale = std::min(
+		GetSystemMetrics(SM_CXSCREEN) * 0.9f / BaseSplashWidth,
+		GetSystemMetrics(SM_CYSCREEN) * 0.9f / (BaseImageHeight + BaseFooterHeight));
+	const float UiScale = std::min(DpiScale, FitScale);
+	GSplash.Width = ScaleSplashPx(BaseSplashWidth, UiScale);
+	GSplash.ImageAreaHeight = ScaleSplashPx(BaseImageHeight, UiScale);
+	GSplash.FooterHeight = ScaleSplashPx(BaseFooterHeight, UiScale);
+	GSplash.Height = GSplash.ImageAreaHeight + GSplash.FooterHeight;
+	GSplash.Title = L"Kurisu Editor";
+	if (FPaths::HasProject())
+	{
+		GSplash.Title += L" - " + FPaths::FromUtf8(FPaths::ProjectName()).wstring();
+	}
+
+	const FImageData LogoImage = ImageLoader::Load(FPaths::ResolveContentPath("Engine/Icons/KurisuLogoReverse.png"));
 	if (LogoImage.IsValid())
 	{
 		GSplash.LogoBitmap = CreateBitmapFromImage(LogoImage, FooterBgColor);

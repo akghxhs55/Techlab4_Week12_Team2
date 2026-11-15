@@ -33,7 +33,7 @@ namespace
 				if (!std::filesystem::is_regular_file(Source, Error)) continue;
 				std::filesystem::rename(Source, Target, Error);
 				if (Error)
-					HTR_LOG(Warning, "Cannot move editor settings to Config: {} ({})", FPaths::ToUtf8(Source), Error.message());
+					KRS_LOG(Warning, "Cannot move editor settings to Config: {} ({})", FPaths::ToUtf8(Source), Error.message());
 				break;
 			}
 		}

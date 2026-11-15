@@ -70,7 +70,7 @@ void FEditorManager::ShowEditorAssetPicker(int32 EditorType)
 	if (!GetOpenFileNameW(&Dialog))
 	{
 		const DWORD Error = CommDlgExtendedError();
-		if (Error != 0) HTR_LOG(Error, "Editor asset dialog failed: {}", Error);
+		if (Error != 0) KRS_LOG(Error, "Editor asset dialog failed: {}", Error);
 		return;
 	}
 
@@ -93,7 +93,7 @@ void FEditorManager::ShowEditorAssetPicker(int32 EditorType)
 		FString Error;
 		if (!FFbxMeshBake::Read(Path, Mesh, Error))
 		{
-			HTR_LOG(Warning, "Cannot open mesh: {} ({})", Path, Error);
+			KRS_LOG(Warning, "Cannot open mesh: {} ({})", Path, Error);
 			MessageBoxW(Dialog.hwndOwner, L"Cannot read the mesh. See Output Log.", Launcher.Title, MB_OK | MB_ICONERROR);
 			return;
 		}
@@ -117,7 +117,7 @@ void FEditorManager::OpenEditor(const FString& AssetPath)
 	const FString Path = FAssetUtils::GetAssetKey(AssetPath);
 	if (Path.empty())
 	{
-		HTR_LOG(Warning, "Cannot open an editor for an empty or invalid asset path.");
+		KRS_LOG(Warning, "Cannot open an editor for an empty or invalid asset path.");
 		return;
 	}
 
@@ -154,7 +154,7 @@ void FEditorManager::CreateEditor(const FString& AssetPath)
 
         if (!AnimBlueprintFile::Read(FPaths::FromUtf8(FilePath.empty() ? AssetPath : FilePath), Data, Error))
         {
-            HTR_LOG(Warning, "Failed to open AnimBlueprint: {} ({})", AssetPath, Error);
+            KRS_LOG(Warning, "Failed to open AnimBlueprint: {} ({})", AssetPath, Error);
             const std::wstring Message = FPaths::FromUtf8(Error).wstring();
             MessageBoxW(GetActiveWindow(), Message.c_str(), L"Open Animation Blueprint", MB_OK | MB_ICONERROR);
             return;
@@ -186,11 +186,11 @@ void FEditorManager::CreateEditor(const FString& AssetPath)
 		if (!Editor->Initialize())
 		{
 			Editor->Shutdown();
-			HTR_LOG(Warning, "Asset editor initialization failed: {}", AssetPath.c_str());
+			KRS_LOG(Warning, "Asset editor initialization failed: {}", AssetPath.c_str());
 			return;
 		}
 		Editors.Add(std::move(Editor));
-		HTR_LOG(Info, "Opened asset editor: {}", AssetPath.c_str());
+		KRS_LOG(Info, "Opened asset editor: {}", AssetPath.c_str());
 		return;
 	}
 
@@ -206,7 +206,7 @@ void FEditorManager::CreateEditor(const FString& AssetPath)
 		if (!Editor->Initialize())
 		{
 			Editor->Shutdown();
-			HTR_LOG(Warning, "BlendSpace editor initialization failed: {}", AssetPath);
+			KRS_LOG(Warning, "BlendSpace editor initialization failed: {}", AssetPath);
 			return;
 		}
 		Editors.Add(std::move(Editor));
@@ -220,11 +220,11 @@ void FEditorManager::CreateEditor(const FString& AssetPath)
 		if (!Editor->Initialize())
 		{
 			Editor->Shutdown();
-			HTR_LOG(Warning, "Widget editor initialization failed: {}", AssetPath);
+			KRS_LOG(Warning, "Widget editor initialization failed: {}", AssetPath);
 			return;
 		}
 		Editors.Add(std::move(Editor));
-		HTR_LOG(Info, "Opened asset editor: {}", AssetPath.c_str());
+		KRS_LOG(Info, "Opened asset editor: {}", AssetPath.c_str());
 		return;
 	}
 
@@ -260,14 +260,14 @@ void FEditorManager::CreateEditor(const FString& AssetPath)
 		Asset = UAssetManager::LoadFbxMesh(FilePath, Error);
 		if (!Asset)
 		{
-			HTR_LOG(Warning, "Failed to load mesh preview: {} ({})", AssetPath, Error);
+			KRS_LOG(Warning, "Failed to load mesh preview: {} ({})", AssetPath, Error);
 			return;
 		}
 	}
 
 	if (!Asset)
 	{
-		HTR_LOG(Warning, "Asset is not loaded or could not be loaded: {}", AssetPath.c_str());
+		KRS_LOG(Warning, "Asset is not loaded or could not be loaded: {}", AssetPath.c_str());
 		return;
 	}
 
@@ -289,7 +289,7 @@ void FEditorManager::CreateEditor(const FString& AssetPath)
 	// 지원하지 않는 타입
 	if (!Editor)
 	{
-		HTR_LOG(Warning, "Unsupported asset editor type: {}", AssetPath.c_str());
+		KRS_LOG(Warning, "Unsupported asset editor type: {}", AssetPath.c_str());
 		return;
 	}
 
@@ -297,12 +297,12 @@ void FEditorManager::CreateEditor(const FString& AssetPath)
 	if (!Editor->Initialize())
 	{
 		Editor->Shutdown();
-		HTR_LOG(Warning, "Asset editor initialization failed: {}", AssetPath.c_str());
+		KRS_LOG(Warning, "Asset editor initialization failed: {}", AssetPath.c_str());
 		return;
 	}
 
 	Editors.Add(std::move(Editor));
-	HTR_LOG(Info, "Opened asset editor: {}", AssetPath.c_str());
+	KRS_LOG(Info, "Opened asset editor: {}", AssetPath.c_str());
 }
 
 void FEditorManager::Tick(float DeltaTime)
@@ -349,7 +349,7 @@ void FEditorManager::LateTick()
 	{
 		if (Editors[Index]->IsCloseRequested())
 		{
-			HTR_LOG(Info, "Closed asset editor: {}", Editors[Index]->GetAssetPath().c_str());
+			KRS_LOG(Info, "Closed asset editor: {}", Editors[Index]->GetAssetPath().c_str());
 			Editors[Index]->Shutdown();
 			Editors.RemoveAt(Index);
 		}
@@ -436,7 +436,7 @@ void FEditorManager::CreateAnimBlueprintPreview(const FString& PreviewMeshPath)
 	if (!Editor->Initialize())
 	{
 		Editor->Shutdown();
-		HTR_LOG(Warning, "AnimBlueprint preview initialization failed: {}", PreviewMeshPath);
+		KRS_LOG(Warning, "AnimBlueprint preview initialization failed: {}", PreviewMeshPath);
 		return;
 	}
 

@@ -79,7 +79,7 @@ void FRenderResourceManager::InitPipelineStates()
 		FShaderByteCode PSCode = RenderUtil::GetOrCompile(Path, "mainPS", EShaderType::Pixel, PSCSOPath, Defines);
 		if (!VSCode.IsValid() || !PSCode.IsValid())
 		{
-			HTR_LOG(Error, "[Shader] UberShader variant compile failed: {}", Name);
+			KRS_LOG(Error, "[Shader] UberShader variant compile failed: {}", Name);
 			continue;
 		}
 		auto VS = RenderCommand::CreateVertexShader(VSCode);
@@ -133,7 +133,7 @@ void FRenderResourceManager::ScanShaders(const fs::path& ShaderRoot)
 	const fs::path AbsoluteRoot = FPaths::EngineFile(ShaderRoot);
 	if (!fs::exists(AbsoluteRoot, ErrorCode))
 	{
-		HTR_LOG(Error, "[Shader] Scan Root Not Found : {}", FPaths::ToUtf8(AbsoluteRoot));
+		KRS_LOG(Error, "[Shader] Scan Root Not Found : {}", FPaths::ToUtf8(AbsoluteRoot));
 		return;
 	}
 
@@ -171,7 +171,7 @@ FShaderProgram* FRenderResourceManager::GetShaderProgram(const FString& InPath)
 	if (TUniquePtr<FShaderProgram>* Found = Get().ShaderProgramMap.Find(InPath))
 		return Found->get();
 
-	HTR_LOG(Error, "[Shader] not found: {}", InPath);
+	KRS_LOG(Error, "[Shader] not found: {}", InPath);
 
 	if (TUniquePtr<FShaderProgram>* Fallback =
 		Get().ShaderProgramMap.Find("EngineResources/Shaders/DefaultShader.hlsl"))
@@ -191,7 +191,7 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 
 	if (!VSCode.IsValid() || !PSCode.IsValid())
 	{
-		HTR_LOG(Error, "[Shader] compile failed: {}", Path);
+		KRS_LOG(Error, "[Shader] compile failed: {}", Path);
 		return;
 	}
 
@@ -200,7 +200,7 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 
 	if (!Vs || !Vs->IsValid() || !Ps || !Ps->IsValid())
 	{
-		HTR_LOG(Error, "[Shader] device create failed: {}", Path);
+		KRS_LOG(Error, "[Shader] device create failed: {}", Path);
 		return;
 	}
 
@@ -212,7 +212,7 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 	ShaderProgramMap[Path] = MakeUnique<FShaderProgram>(VsRaw, PsRaw);
 	ShaderProgramMap[Path]->Name = Path;
 
-	HTR_LOG(Info, "[Shader] loaded: {}", Path);
+	KRS_LOG(Info, "[Shader] loaded: {}", Path);
 
 }
 
@@ -226,13 +226,13 @@ void FRenderResourceManager::CreateSkinnedVariant(const FString& Path, const cha
 	FShaderByteCode Code = RenderUtil::GetOrCompile(Path, "mainVS", EShaderType::Vertex, CSOPath, LightingMacro ? LitSkin : SkinOnly);
 	if (!Code.IsValid())
 	{
-		HTR_LOG(Error, "[Shader] GPU skin variant compile failed: {}", Base.Name);
+		KRS_LOG(Error, "[Shader] GPU skin variant compile failed: {}", Base.Name);
 		return;
 	}
 	TUniquePtr<FVertexShader> VS = RenderCommand::CreateVertexShader(Code);
 	if (!VS || !VS->IsValid())
 	{
-		HTR_LOG(Error, "[Shader] GPU skin variant create failed: {}", Base.Name);
+		KRS_LOG(Error, "[Shader] GPU skin variant create failed: {}", Base.Name);
 		return;
 	}
 

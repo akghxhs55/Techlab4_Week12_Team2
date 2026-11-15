@@ -6,9 +6,9 @@
 
 #include "Components/ActorComponent.h"
 #include "Components/PrimitiveComponent.h"
-#include "Editor/HitoriEd/EditorDragDrop.h"
-#include "Editor/HitoriEd/EditorHierarchy.h"
-#include "Editor/HitoriEd/EditorUndo.h"
+#include "Editor/KurisuEd/EditorDragDrop.h"
+#include "Editor/KurisuEd/EditorHierarchy.h"
+#include "Editor/KurisuEd/EditorUndo.h"
 #include "Editor/EditorUI/EditorStyle.h"
 
 #include <cctype>
@@ -88,8 +88,8 @@ void FOutlinerPanel::OnRender()
     ImGui::InputTextWithHint("##OutlinerSearch", "Search...", SearchBuffer, sizeof(SearchBuffer));
 
     // 아이템 라벨 / 타입 두 열. 줄마다 배경색을 번갈아 칠한다.
-    ImGui::PushStyleColor(ImGuiCol_TableRowBg, IM_COL32(16, 16, 19, 255));
-    ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, IM_COL32(23, 23, 27, 255));
+    ImGui::PushStyleColor(ImGuiCol_TableRowBg, EditorColor::BgPanel);
+    ImGui::PushStyleColor(ImGuiCol_TableRowBgAlt, EditorColor::BgRaised);
     // PadOuterX + 셀 여백: 헤더 글자와 첫 열이 창 왼쪽 끝에 붙지 않게 한다.
     const ImGuiTableFlags TableFlags = ImGuiTableFlags_RowBg | ImGuiTableFlags_BordersInnerV |
         ImGuiTableFlags_Resizable | ImGuiTableFlags_SizingStretchProp | ImGuiTableFlags_PadOuterX;
@@ -322,7 +322,7 @@ void FOutlinerPanel::DrawActorNode(AActor* Actor)
 						}
 					}
 				}
-				else HTR_LOG(Warning, "An actor with this name already exists.");
+				else KRS_LOG(Warning, "An actor with this name already exists.");
 			}
 			RenamingActor = nullptr;
 		}
@@ -448,7 +448,7 @@ void FOutlinerPanel::SelectActor(AActor* Actor, bool bAdditiveToggle, bool bRang
         else
         {
             SelectedActors.Add(Actor);
-            HTR_LOG(Info, "{} UUID {} is selected (Multi: {})", Actor->GetName(), Actor->GetUUID(), SelectedActors.Num());
+            KRS_LOG(Info, "{} UUID {} is selected (Multi: {})", Actor->GetName(), Actor->GetUUID(), SelectedActors.Num());
         }
         SelectionAnchorActor = Actor;
         NotifySelectionChanged();
@@ -472,7 +472,7 @@ void FOutlinerPanel::SelectActor(AActor* Actor, bool bAdditiveToggle, bool bRang
     SelectedActors.Add(Actor);
     SelectionAnchorActor = Actor;
 
-    HTR_LOG(Info, "{} UUID {} is selected", Actor->GetName(), Actor->GetUUID());
+    KRS_LOG(Info, "{} UUID {} is selected", Actor->GetName(), Actor->GetUUID());
     NotifySelectionChanged();
 }
 

@@ -1,6 +1,6 @@
-// HitoriHeaderTool (HHT)
-// 사용법: HitoriHeaderTool <모듈 이름> <출력 폴더> <소스 폴더>...
-//   예:   HitoriHeaderTool Runtime Intermediate/Generated/Runtime Source/Runtime
+// KurisuHeaderTool (KHT)
+// 사용법: KurisuHeaderTool <모듈 이름> <출력 폴더> <소스 폴더>...
+//   예:   KurisuHeaderTool Runtime Intermediate/Generated/Runtime Source/Runtime
 //
 // 소스 폴더의 헤더 중 UCLASS(), USTRUCT(), UENUM()이 있는 것마다 <출력 폴더>/<헤더 이름>.generated.h를 만든다.
 // 오류가 하나라도 있으면 아무 파일도 쓰지 않고 1을 반환해서 빌드를 멈춘다.
@@ -67,15 +67,15 @@ namespace
 
         if (GeneratedLine == 0)
         {
-            Diag.Error(Header.Path, FirstClassLine, "#include " + Expected + "가 없어요. 헤더의 마지막 #include로 추가하세요.");
+            Diag.Error(Header.Path, FirstClassLine, "#include " + Expected + " is missing. Add it as the last #include of the header.");
         }
         else if (GeneratedLine > FirstClassLine)
         {
-            Diag.Error(Header.Path, GeneratedLine, Header.GeneratedName + "는 UCLASS()/USTRUCT()/UENUM()보다 앞에 include해야 해요.");
+            Diag.Error(Header.Path, GeneratedLine, Header.GeneratedName + " must be included before UCLASS()/USTRUCT()/UENUM().");
         }
         else if (LastIncludeLine > GeneratedLine)
         {
-            Diag.Error(Header.Path, LastIncludeLine, Header.GeneratedName + "가 마지막 #include여야 해요. 이 #include를 그 위로 옮기세요.");
+            Diag.Error(Header.Path, LastIncludeLine, Header.GeneratedName + " must be the last #include. Move this #include above it.");
         }
     }
 
@@ -145,7 +145,7 @@ namespace
     {
         if (Argc < 4)
         {
-            PrintLine("How To Use: HitoriHeaderTool <Module Name> <Output Folder> <Source Folder>...", true);
+            PrintLine("How To Use: KurisuHeaderTool <Module Name> <Output Folder> <Source Folder>...", true);
             return 2;
         }
 
@@ -166,13 +166,13 @@ namespace
             const auto [It, bInserted] = GeneratedNames.emplace(Header.GeneratedName, Header.Path);
             if (!bInserted)
             {
-                Diag.Error(Header.Path, 1, Header.GeneratedName + " Name " + ToUtf8(It->second) + " Already Exists. 모듈 안에서 UCLASS/USTRUCT/UENUM 헤더 이름은 달라야 해요.");
+                Diag.Error(Header.Path, 1, Header.GeneratedName + " Name " + ToUtf8(It->second) + " already exists. UCLASS/USTRUCT/UENUM header names must be unique within a module.");
             }
         }
 
         if (Diag.GetErrorCount() > 0)
         {
-            PrintLine("HHT: " + ModuleName + " - " + std::to_string(Diag.GetErrorCount()) + "Errors. Not Written Generated Files.", true);
+            PrintLine("KHT: " + ModuleName + " - " + std::to_string(Diag.GetErrorCount()) + "Errors. Not Written Generated Files.", true);
             return 1;
         }
 
@@ -202,7 +202,7 @@ namespace
             }
         }
 
-        PrintLine("HHT: " + ModuleName + " - Reflection Header " + std::to_string(Headers.size()) + " (Written "
+        PrintLine("KHT: " + ModuleName + " - Reflection Header " + std::to_string(Headers.size()) + " (Written "
             + std::to_string(WrittenCount) + ", Not Written " + std::to_string(Headers.size() - WrittenCount)
             + ", Removed " + std::to_string(RemovedCount) + ")");
         return 0;
@@ -217,7 +217,7 @@ int main(int Argc, char** Argv)
     }
     catch (const fs::filesystem_error& Exception)
     {
-        PrintLine(std::string("HHT: File System Error: ") + Exception.what(), true);
+        PrintLine(std::string("KHT: File System Error: ") + Exception.what(), true);
         return 1;
     }
 }

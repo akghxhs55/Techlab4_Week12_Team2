@@ -1,9 +1,9 @@
 #pragma once
 
-#include "HhtTypes.h"
+#include "KhtTypes.h"
 
 // Visual Studio 오류 목록이 읽는 형식으로 출력한다.
-//   Source\Runtime\Foo.h(12): error HHT001: 메시지
+//   Source\Runtime\Foo.h(12): error KHT001: 메시지
 class FDiagnostics
 {
 public:

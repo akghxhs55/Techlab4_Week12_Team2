@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/Viewports/LevelEditorViewport.h"
-#include "Editor/HitoriEd/Editor.h"
+#include "Editor/KurisuEd/Editor.h"
 #include "Launch/LaunchEngineLoop.h"
 #include "Render/Renderer.h"
 #include "Render/SceneRenderer.h"

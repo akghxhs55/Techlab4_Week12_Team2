@@ -32,7 +32,7 @@ public:
 		const int64 RequiredSize = Offset + Num;
 		if (RequiredSize > INT32_MAX)              // UE의 IndexSize 검사에 해당
 		{
-			HTR_LOG(Error, "{}: data larger than TArray can hold", GetArchiveName());
+			KRS_LOG(Error, "{}: data larger than TArray can hold", GetArchiveName());
 			SetError();
 			return;
 		}

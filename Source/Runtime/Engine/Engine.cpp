@@ -22,7 +22,7 @@ void UEngine::InitializeAudioDevice()
 	MainAudioDevice = new FAudioDevice();
 	if (!MainAudioDevice->Init())
 	{
-		HTR_LOG(Warning, "[Audio] No audio device. Sound disabled.");
+		KRS_LOG(Warning, "[Audio] No audio device. Sound disabled.");
 		delete MainAudioDevice;
 		MainAudioDevice = nullptr;
 	}
@@ -153,7 +153,7 @@ bool UEngine::LoadMap(FWorldContext& Context, const FString& MapPath)
 	if (!NewWorld) return false;
 	if (!FJsonArchive::LoadWorld(NewWorld, MapPath))
 	{
-		HTR_LOG(Error, "Failed to load map: {}", MapPath);
+		KRS_LOG(Error, "Failed to load map: {}", MapPath);
 		DestroyWorld(NewWorld);
 		return false;
 	}
@@ -173,7 +173,7 @@ bool UEngine::LoadMap(FWorldContext& Context, const FString& MapPath)
 	NewWorld->BeginPlay();
 	PostLoadMap(Context);
 
-	HTR_LOG(Info, "Map loaded: {}", MapPath);
+	KRS_LOG(Info, "Map loaded: {}", MapPath);
 	return true;
 }
 

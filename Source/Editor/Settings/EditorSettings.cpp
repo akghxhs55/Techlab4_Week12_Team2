@@ -29,7 +29,7 @@ bool FEditorSettingsManager::SaveSettings() const
 
 	if (!File.is_open())
 	{
-		HTR_LOG(Error, "Failed to open editor.ini for saving.");
+		KRS_LOG(Error, "Failed to open editor.ini for saving.");
 		return false;
 	}
 

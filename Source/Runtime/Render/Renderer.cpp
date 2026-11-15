@@ -108,7 +108,7 @@ void FRenderer::EnsurePerObjectSlotCapacity(uint32 SlotCount)
 	PerObjectSlotCB = RenderCommand::CreateConstantBuffer(NewCapacity * ObjectSlotBytes);
 	if (!PerObjectSlotCB || !PerObjectSlotCB->GetBuffer())
 	{
-		HTR_LOG(Warning, "Per-object constant buffer creation failed; using per-draw updates.");
+		KRS_LOG(Warning, "Per-object constant buffer creation failed; using per-draw updates.");
 		PerObjectSlotCB.reset();
 		PerObjectSlotCapacity = 0;
 		return;
@@ -137,7 +137,7 @@ void FRenderer::InitScenePasses()
 	Skybox = MakeUnique<FSkyboxRenderer>();
 	if (!Skybox->Init(FPaths::EngineFileUtf8("EngineResources/SkySphere/Sky.hdr")))
 	{
-		HTR_LOG(Warning, "Skybox panorama not loaded");
+		KRS_LOG(Warning, "Skybox panorama not loaded");
 		Skybox.reset();
 	}
 	HeightFog = MakeUnique<FHeightFogRenderer>();

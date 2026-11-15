@@ -48,7 +48,7 @@ bool FAnimBlueprintEditor::InitializeResources()
 
     if (!Mesh)
     {
-        HTR_LOG(Warning, "AnimBlueprint preview mesh failed: {} ({})", PreviewPath, Error);
+        KRS_LOG(Warning, "AnimBlueprint preview mesh failed: {} ({})", PreviewPath, Error);
         return false;
     }
 

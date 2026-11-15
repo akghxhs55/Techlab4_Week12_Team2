@@ -31,7 +31,7 @@ void FUIRenderer::Render(const FUIDrawList& DrawList, uint32 Width, uint32 Heigh
 
 	if (Vertices.Num() > static_cast<int32>(MaxVertices) || Indices.Num() > static_cast<int32>(MaxIndices))
 	{
-		HTR_LOG(Warning, "UI quad count exceeds buffer ({} quads max)", MaxVertices / 4);
+		KRS_LOG(Warning, "UI quad count exceeds buffer ({} quads max)", MaxVertices / 4);
 		return;
 	}
 

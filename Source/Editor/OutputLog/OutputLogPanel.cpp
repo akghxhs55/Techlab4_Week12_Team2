@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/OutputLog/OutputLogPanel.h"
+#include "Editor/EditorUI/EditorStyle.h"
 
 #include "Core/StatOverlay.h"
 #include "Render/SceneRenderer.h"
@@ -124,7 +125,7 @@ void FOutputLogPanel::OnRender()
 	const ImVec2 SearchPos = ImGui::GetCursorScreenPos();
 	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { Style.FramePadding.x + IconSize() + EditorStyle::Scale(4.0f), Style.FramePadding.y });
 	ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, EditorStyle::Scale(4.0f));
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 15, 15, 255));
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorColor::BgDeepest);
 	ImGui::SetNextItemWidth(SearchWidth);
 	if (ImGui::InputTextWithHint("##SearchLog", "Search Log", Filter.InputBuf, IM_COUNTOF(Filter.InputBuf)))
 		Filter.Build();
@@ -140,11 +141,11 @@ void FOutputLogPanel::OnRender()
 		const float CenterY = SearchPos.y + ImGui::GetFrameHeight() * 0.5f;
 		const float X = SearchPos.x + Style.FramePadding.x;
 		ImGui::GetWindowDrawList()->AddImage(SearchIcon, { X, CenterY - IconSize() * 0.5f }, { X + IconSize(), CenterY + IconSize() * 0.5f },
-			{ 0, 0 }, { 1, 1 }, IM_COL32(150, 150, 150, 255));
+			{ 0, 0 }, { 1, 1 }, EditorColor::TextMuted);
 	}
 
 	// 드롭다운 버튼은 UE처럼 배경 없이 그린다.
-	ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+	ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::Transparent);
 	ImGui::SameLine();
 	if (IconButton("##LogFilters", "Filter", "Filters", true, FiltersWidth))
 		ImGui::OpenPopup("LogFiltersPopup");
@@ -185,7 +186,7 @@ void FOutputLogPanel::OnRender()
 	// 로그 본문: 어두운 배경 + 고정폭 글꼴
 
 	const float FooterHeight = Style.ItemSpacing.y + ImGui::GetFrameHeight();
-	ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(15, 15, 15, 255));
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorColor::BgDeepest);
 	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f) });
 	if (ImGui::BeginChild("ScrollingRegion", ImVec2(0, -FooterHeight), ImGuiChildFlags_NavFlattened | ImGuiChildFlags_AlwaysUseWindowPadding,
 		ImGuiWindowFlags_HorizontalScrollbar))
@@ -228,7 +229,7 @@ void FOutputLogPanel::OnRender()
 	// 하단 (UE): [콘솔 Cmd v][Enter Console Command]
 
 	const float CmdWidth = IconButtonWidth("Cmd", true);
-	ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(0, 0, 0, 0));
+	ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::Transparent);
 	if (IconButton("##LogCmd", "Console", "Cmd", true, CmdWidth))
 		ImGui::OpenPopup("LogCmdPopup");
 	const EditorStyle::FPopupAnchor CmdAnchor = EditorStyle::LastItemAnchor();
@@ -248,7 +249,7 @@ void FOutputLogPanel::OnRender()
 	bool reclaim_focus = false;
 	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory;
 	ImGui::SetNextItemWidth(-1.0f);
-	ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(15, 15, 15, 255));
+	ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorColor::BgDeepest);
 	if (LogFont) ImGui::PushFont(LogFont, 0.0f);
 	if (ImGui::InputTextWithHint("##OutputLogInput", "Enter Console Command", InputBuf, IM_COUNTOF(InputBuf), input_text_flags, &TextEditCallbackStub, this))
 	{
@@ -296,8 +297,8 @@ void FOutputLogPanel::SaveFilteredLog()
 	File.flush();
 	const bool bSaved = !Error && File.good();
 	File.close();
-	if (bSaved) HTR_LOG(Info, "Output saved to {}", FPaths::ToUtf8(Path));
-	else HTR_LOG(Error, "Could not save output to {}", FPaths::ToUtf8(Path));
+	if (bSaved) KRS_LOG(Info, "Output saved to {}", FPaths::ToUtf8(Path));
+	else KRS_LOG(Error, "Could not save output to {}", FPaths::ToUtf8(Path));
 }
 
 void FOutputLogPanel::ClearLog()
@@ -540,16 +541,16 @@ void FOutputLogPanel::OnLog(ELogVerbosity Verbosity, const FString& Message)
 	switch (Verbosity)
 	{
 	case ELogVerbosity::Input:
-		LogData.Color = ImVec4(0.85f, 0.85f, 0.85f, 1.0f);
+		LogData.Color = EditorColor::ToVec4(EditorColor::TextSecondary);
 		break;
 	case ELogVerbosity::Warning:
-		LogData.Color = ImVec4(0.90f, 0.78f, 0.18f, 1.0f);
+		LogData.Color = EditorColor::ToVec4(EditorColor::Warning);
 		break;
 	case ELogVerbosity::Error:
-		LogData.Color = ImVec4(0.96f, 0.30f, 0.30f, 1.0f);
+		LogData.Color = EditorColor::ToVec4(EditorColor::Error);
 		break;
 	default:
-		LogData.Color = ImVec4(0.75f, 0.75f, 0.75f, 1.0f);
+		LogData.Color = EditorColor::ToVec4(EditorColor::TextMuted);
 		break;
 	}
 	LogData.message = Message;

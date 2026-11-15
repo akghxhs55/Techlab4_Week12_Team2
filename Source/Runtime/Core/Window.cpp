@@ -60,7 +60,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 namespace
 {
-	const wchar_t* FindKrisIconPath(wchar_t* OutPath, DWORD MaxLen)
+	const wchar_t* FindKurisuIconPath(wchar_t* OutPath, DWORD MaxLen)
 	{
 		const DWORD Len = GetModuleFileNameW(nullptr, OutPath, MaxLen);
 		if (Len == 0 || Len >= MaxLen) return nullptr;
@@ -76,7 +76,7 @@ namespace
 			*LastSlash = L'\0';
 
 			wchar_t Candidate[512]{};
-			swprintf_s(Candidate, L"%s\\EngineResources\\Icons\\Kris.ico", Current);
+			swprintf_s(Candidate, L"%s\\EngineResources\\Icons\\KurisuLogoReverse.ico", Current);
 			if (GetFileAttributesW(Candidate) != INVALID_FILE_ATTRIBUTES)
 			{
 				wcscpy_s(OutPath, MaxLen, Candidate);
@@ -86,7 +86,7 @@ namespace
 		return nullptr;
 	}
 
-	void GetKrisWindowIcons(HICON& OutBigIcon, HICON& OutSmallIcon)
+	void GetKurisuWindowIcons(HICON& OutBigIcon, HICON& OutSmallIcon)
 	{
 		static bool bLoaded = false;
 		static HICON CachedBigIcon = nullptr;
@@ -96,7 +96,7 @@ namespace
 		{
 			bLoaded = true;
 			wchar_t IconPath[512]{};
-			if (FindKrisIconPath(IconPath, 512))
+			if (FindKurisuIconPath(IconPath, 512))
 			{
 				const int SmallW = GetSystemMetrics(SM_CXSMICON);
 				const int SmallH = GetSystemMetrics(SM_CYSMICON);
@@ -118,7 +118,7 @@ bool FWindow::Create(HINSTANCE hInstance, int InWidth, int InHeight, const wchar
 
 	HICON BigIcon = nullptr;
 	HICON SmallIcon = nullptr;
-	GetKrisWindowIcons(BigIcon, SmallIcon);
+	GetKurisuWindowIcons(BigIcon, SmallIcon);
 
 	WNDCLASS wc = {};
 	wc.lpfnWndProc = WndProc;
@@ -252,6 +252,17 @@ LRESULT FWindow::HandleMessage(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam
             SWP_NOZORDER | SWP_NOACTIVATE);
         return 0;
     }
+
+	case WM_GETMINMAXINFO:
+	{
+		if (MinWidth <= 0 && MinHeight <= 0) break;
+		// 창이 놓인 모니터의 배율을 따라간다. 다른 배율의 모니터로 옮기면 최소 크기도 함께 바뀐다.
+		MINMAXINFO* Info = reinterpret_cast<MINMAXINFO*>(lParam);
+		const UINT Dpi = GetDpiForWindow(hWnd);
+		if (MinWidth > 0) Info->ptMinTrackSize.x = MulDiv(MinWidth, static_cast<int>(Dpi), 96);
+		if (MinHeight > 0) Info->ptMinTrackSize.y = MulDiv(MinHeight, static_cast<int>(Dpi), 96);
+		return 0;
+	}
 
 	case WM_NCCALCSIZE:
 		if (!bCustomTitleBar || !wParam)

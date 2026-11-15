@@ -1,7 +1,7 @@
 #include "EnginePCH.h"
 #include "Editor/SkeletalPreviewEditor/SkeletalPreviewEditor.h"
 #include "Editor/Viewports/EditorViewportClient.h"   
-#include "Editor/HitoriEd/EditorEngine.h"
+#include "Editor/KurisuEd/EditorEngine.h"
 #include "Launch/LaunchEngineLoop.h"            
 #include "Components/SkeletalMeshComponent.h"        
 #include "Render/SkeletalMesh.h"                     

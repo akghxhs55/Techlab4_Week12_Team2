@@ -45,7 +45,7 @@ namespace
 			return true;
 
 		sol::error Err = Result;
-		HTR_LOG(Error, "[Lua] {} : {}() Function Error\n{}", Path, Name, Err.what());
+		KRS_LOG(Error, "[Lua] {} : {}() Function Error\n{}", Path, Name, Err.what());
 		return false;
 	}
 }
@@ -65,7 +65,7 @@ bool FLuaScriptInstance::Load(AActor* InOwner, const FString& InPath)
 	FString Code;
 	if (!ReadTextFile(Path, Code))
 	{
-		HTR_LOG(Error, "[Lua] Cannot Open Script File : {}", Path);
+		KRS_LOG(Error, "[Lua] Cannot Open Script File : {}", Path);
 		return false;
 	}
 
@@ -84,7 +84,7 @@ bool FLuaScriptInstance::Load(AActor* InOwner, const FString& InPath)
 	if (!Result.valid())
 	{
 		sol::error Err = Result;
-		HTR_LOG(Error, "[Lua] {} Failed To Load\n{}", Path, Err.what());
+		KRS_LOG(Error, "[Lua] {} Failed To Load\n{}", Path, Err.what());
 		return false;
 	}
 
@@ -103,7 +103,7 @@ void FLuaScriptInstance::Tick(float DeltaTime)
 	if (!CallLua(Impl->Env, Path, "Tick", DeltaTime))
 	{
 		Impl->bTickBroken = true;
-		HTR_LOG(Warning, "[Lua] {} : Tick Broken", Path);
+		KRS_LOG(Warning, "[Lua] {} : Tick Broken", Path);
 	}
 }
 
@@ -127,7 +127,7 @@ void FLuaScriptInstance::ReloadIfChanged(float DeltaTime)
 	{
 		World->GetCoroutineScheduler().StopAll(Owner);
 		FLuaBindings::ReleaseCallbacks(Owner);
-		HTR_LOG(Info, "[Lua] Hot Reload: {}", Path);
+		KRS_LOG(Info, "[Lua] Hot Reload: {}", Path);
 		Call("OnReload");
 	}
 }

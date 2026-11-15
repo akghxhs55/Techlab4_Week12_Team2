@@ -137,7 +137,7 @@ namespace
 						if (!Result.valid())
 						{
 							sol::error Err = Result;
-							HTR_LOG(Error, "[Lua] OnClicked: {}", Err.what());
+							KRS_LOG(Error, "[Lua] OnClicked: {}", Err.what());
 						}
 					};
 				ClickBindings.Add({ Owner, R });
@@ -316,7 +316,7 @@ namespace
 			"PrintLocation", [](const FLuaActorRef& Ref)
 			{
 				const FVector Location = Deref(Ref).GetActorLocation();
-				HTR_LOG(Info, "[Lua] {} ({:.2f}, {:.2f}, {:.2f})", Deref(Ref).GetName(), Location.X, Location.Y, Location.Z);
+				KRS_LOG(Info, "[Lua] {} ({:.2f}, {:.2f}, {:.2f})", Deref(Ref).GetName(), Location.X, Location.Y, Location.Z);
 			},
 
 			"Destroy", [](const FLuaActorRef& Ref)
@@ -914,7 +914,7 @@ namespace
 		if (!Result.valid())
 		{
 			sol::error Err = Result;
-			HTR_LOG(Error, "[Lua] AnimGraph {} : {} (disabled until the graph is rebuilt)", What, Err.what());
+			KRS_LOG(Error, "[Lua] AnimGraph {} : {} (disabled until the graph is rebuilt)", What, Err.what());
 			*bBroken = true;
 			return sol::nullopt;
 		}
@@ -929,7 +929,7 @@ namespace
 		if (!Result.valid())
 		{
 			sol::error Err = Result;
-			HTR_LOG(Error, "[Lua] AnimGraph {} : {} (disabled until the graph is rebuilt)", What, Err.what());
+			KRS_LOG(Error, "[Lua] AnimGraph {} : {} (disabled until the graph is rebuilt)", What, Err.what());
 			*bBroken = true;
 		}
 	}

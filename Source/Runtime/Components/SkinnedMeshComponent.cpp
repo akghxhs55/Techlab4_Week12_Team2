@@ -19,7 +19,7 @@ namespace
 			TUniquePtr<FSkeletalMeshObjectGPUSkin> GPUObject = MakeUnique<FSkeletalMeshObjectGPUSkin>(Mesh);
 			if (GPUObject->IsValid())
 				return GPUObject;
-			HTR_LOG(Warning, "GPU skinning unavailable; falling back to CPU skinning.");
+			KRS_LOG(Warning, "GPU skinning unavailable; falling back to CPU skinning.");
 		}
 		return MakeUnique<FSkeletalMeshObjectCPUSkin>(Mesh);
 	}

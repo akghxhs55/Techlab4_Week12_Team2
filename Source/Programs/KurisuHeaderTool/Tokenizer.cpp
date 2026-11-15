@@ -98,7 +98,7 @@ namespace
 			}
 			if (Pos >= Src.size())
 			{
-				Diag.Error(File, StartLine, "/* 주석이 닫히지 않았어요.");
+				Diag.Error(File, StartLine, "Unterminated /* comment.");
 				return false;
 			}
 			Pos += 2;

@@ -19,7 +19,7 @@ FBuffer::FBuffer(ID3D11Device* Device, const D3D11_BUFFER_DESC& Desc, const void
 	}
 	if (FAILED(hr))
 	{
-		HTR_LOG(Warning, "Failed To Create Buffer!");
+		KRS_LOG(Warning, "Failed To Create Buffer!");
 	}
 }
 
@@ -37,7 +37,7 @@ FStructuredBuffer::FStructuredBuffer(ID3D11Device* Device, const D3D11_BUFFER_DE
 	ViewDesc.ViewDimension = D3D11_SRV_DIMENSION_BUFFER;
 	ViewDesc.Buffer.NumElements = InCapacity;
 	if (FAILED(Device->CreateShaderResourceView(Buffer.Get(), &ViewDesc, SRV.GetAddressOf())))
-		HTR_LOG(Warning, "Failed to create structured buffer SRV");
+		KRS_LOG(Warning, "Failed to create structured buffer SRV");
 
 	if (!(Desc.BindFlags & D3D11_BIND_UNORDERED_ACCESS)) return;
 	D3D11_UNORDERED_ACCESS_VIEW_DESC UAVDesc{};
@@ -45,7 +45,7 @@ FStructuredBuffer::FStructuredBuffer(ID3D11Device* Device, const D3D11_BUFFER_DE
 	UAVDesc.ViewDimension = D3D11_UAV_DIMENSION_BUFFER;
 	UAVDesc.Buffer.NumElements = InCapacity;
 	if (FAILED(Device->CreateUnorderedAccessView(Buffer.Get(), &UAVDesc, UAV.GetAddressOf())))
-		HTR_LOG(Warning, "Failed to create structured buffer UAV");
+		KRS_LOG(Warning, "Failed to create structured buffer UAV");
 }
 
 FVertexBuffer::FVertexBuffer(ID3D11Device* Device, const D3D11_BUFFER_DESC& Desc, uint32 InStride, const void* InitialData)

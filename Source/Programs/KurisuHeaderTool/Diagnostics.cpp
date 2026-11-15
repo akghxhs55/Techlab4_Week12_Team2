@@ -10,7 +10,7 @@
 void FDiagnostics::Error(const fs::path& File, int Line, const std::string& Message)
 {
 	++ErrorCount;
-	PrintLine(ToUtf8(fs::absolute(File).make_preferred()) + "(" + std::to_string(Line) + "): error HHT001: " + Message, true);
+	PrintLine(ToUtf8(fs::absolute(File).make_preferred()) + "(" + std::to_string(Line) + "): error KHT001: " + Message, true);
 }
 
 std::string ToUtf8(const fs::path& Path)

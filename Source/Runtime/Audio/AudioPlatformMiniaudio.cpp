@@ -16,7 +16,7 @@ bool FAudioPlatformMiniaudio::OpenAudioStream(const FAudioStreamParams& InParams
 
 	if (ma_device_init(nullptr, &Config, &Device) != MA_SUCCESS)
 	{
-		HTR_LOG(Error, "[Audio] Failed to open playback device");
+		KRS_LOG(Error, "[Audio] Failed to open playback device");
 		return false;
 	}
 

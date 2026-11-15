@@ -42,7 +42,7 @@ FImageData ImageLoader::LoadHDR(const FString& Path)
 	float* Pixels = stbi_loadf(Path.c_str(), &Width, &Height, &Channels, 4);
 	if (!Pixels)
 	{
-		HTR_LOG(Error, "[Image] HDR load failed: {} ({})", Path, stbi_failure_reason());
+		KRS_LOG(Error, "[Image] HDR load failed: {} ({})", Path, stbi_failure_reason());
 		return Result;
 	}
 
@@ -112,7 +112,7 @@ FImageData ImageLoader::LoadDDS(const FString& Path)
 	ID3D11Device* Device{ FRenderDevice::Get()->GetDevice() };
 	ID3D11DeviceContext* Context{ FRenderDevice::Get()->GetContext() };
 	if (!Device || !Context) {
-		HTR_LOG(Error, "[Image] DDS load requires a render device: {}", Path);
+		KRS_LOG(Error, "[Image] DDS load requires a render device: {}", Path);
 		return FImageData();
 	}
 
@@ -132,27 +132,27 @@ FImageData ImageLoader::LoadDDS(const FString& Path)
 		Resource.GetAddressOf(),
 		nullptr) };                 // STAGING은 SRV를 만들 수 없다
 	if (FAILED(LoadResult)) {
-		HTR_LOG(Error, "[Image] DDS load failed: {} (hr=0x{:08X})", Path, static_cast<uint32>(LoadResult));
+		KRS_LOG(Error, "[Image] DDS load failed: {} (hr=0x{:08X})", Path, static_cast<uint32>(LoadResult));
 		return FImageData();
 	}
 
 	ComPtr<ID3D11Texture2D> Texture{};
 	if (FAILED(Resource.As(&Texture))) {
-		HTR_LOG(Error, "[Image] DDS is not a 2D texture: {}", Path);
+		KRS_LOG(Error, "[Image] DDS is not a 2D texture: {}", Path);
 		return FImageData();
 	}
 
 	D3D11_TEXTURE2D_DESC Desc{};
 	Texture->GetDesc(&Desc);
 	if (Desc.ArraySize != 1 || (Desc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0) {
-		HTR_LOG(Error, "[Image] DDS arrays and cubemaps are not supported by FImageData: {}", Path);
+		KRS_LOG(Error, "[Image] DDS arrays and cubemaps are not supported by FImageData: {}", Path);
 		return FImageData();
 	}
 
 	bool bBlockCompressed{ false };
 	const uint32 UnitBytes{ GetDDSFormatUnitBytes(Desc.Format, bBlockCompressed) };
 	if (UnitBytes == 0) {
-		HTR_LOG(Error, "[Image] Unsupported DDS format {}: {}", static_cast<uint32>(Desc.Format), Path);
+		KRS_LOG(Error, "[Image] Unsupported DDS format {}: {}", static_cast<uint32>(Desc.Format), Path);
 		return FImageData();
 	}
 
@@ -162,7 +162,7 @@ FImageData ImageLoader::LoadDDS(const FString& Path)
 
 	D3D11_MAPPED_SUBRESOURCE Mapped{};
 	if (FAILED(Context->Map(Texture.Get(), 0, D3D11_MAP_READ, 0, &Mapped))) {
-		HTR_LOG(Error, "[Image] DDS staging map failed: {}", Path);
+		KRS_LOG(Error, "[Image] DDS staging map failed: {}", Path);
 		return FImageData();
 	}
 

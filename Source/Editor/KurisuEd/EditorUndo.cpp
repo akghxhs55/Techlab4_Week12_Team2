@@ -1,7 +1,7 @@
 #include "EnginePCH.h"
-#include "Editor/HitoriEd/EditorUndo.h"
-#include "Editor/HitoriEd/EditorEngine.h"
-#include "Editor/HitoriEd/EditorHierarchy.h"
+#include "Editor/KurisuEd/EditorUndo.h"
+#include "Editor/KurisuEd/EditorEngine.h"
+#include "Editor/KurisuEd/EditorHierarchy.h"
 
 #include "Core/EngineLog.h"
 #include "Engine/Level.h"

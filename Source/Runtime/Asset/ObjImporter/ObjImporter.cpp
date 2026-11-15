@@ -117,7 +117,7 @@ namespace
 		std::ifstream File(Path);
 		if (!File.is_open())
 		{
-			HTR_LOG(Warning, "[MTL] {}: cannot open file", Path);
+			KRS_LOG(Warning, "[MTL] {}: cannot open file", Path);
 			return false;
 		}
 
@@ -152,7 +152,7 @@ namespace
 
 				if (!(Stream >> MtlInfo.Name))
 				{
-					HTR_LOG(Warning, "[MTL] {}:{}: newmtl without name", Path, LineNumber);
+					KRS_LOG(Warning, "[MTL] {}:{}: newmtl without name", Path, LineNumber);
 					return false;
 				}
 			}
@@ -160,7 +160,7 @@ namespace
 			{
 				if (!(Stream >> MtlInfo.Kd.X >> MtlInfo.Kd.Y >> MtlInfo.Kd.Z))
 				{
-					HTR_LOG(Warning, "[MTL] {}:{}: invalid Kd '{}'", Path, LineNumber, Line);
+					KRS_LOG(Warning, "[MTL] {}:{}: invalid Kd '{}'", Path, LineNumber, Line);
 					return false;
 				}
 			}
@@ -169,7 +169,7 @@ namespace
 				FString MapKd;
 				if (!(Stream >> MapKd) || !TransformPath(Path, MapKd, MtlInfo.MapKd))
 				{
-					HTR_LOG(Warning, "[MTL] {}:{}: invalid map_Kd '{}'", Path, LineNumber, Line);
+					KRS_LOG(Warning, "[MTL] {}:{}: invalid map_Kd '{}'", Path, LineNumber, Line);
 					return false;
 				}
 			}
@@ -177,7 +177,7 @@ namespace
 			{
 				if (!(Stream >> MtlInfo.D))
 				{
-					HTR_LOG(Warning, "[MTL] {}:{}: invalid d '{}'", Path, LineNumber, Line);
+					KRS_LOG(Warning, "[MTL] {}:{}: invalid d '{}'", Path, LineNumber, Line);
 					return false;
 				}
 			}
@@ -185,7 +185,7 @@ namespace
 				FString MapBump;
 				if (!(Stream >> MapBump) || !TransformPath(Path, MapBump, MtlInfo.MapBump))
 				{
-					HTR_LOG(Warning, "[MTL] {}:{}: invalid map_bump '{}'", Path, LineNumber, Line);
+					KRS_LOG(Warning, "[MTL] {}:{}: invalid map_bump '{}'", Path, LineNumber, Line);
 					return false;
 				}
 			}
@@ -218,7 +218,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 	std::ifstream File(Path);
 	if (!File.is_open())
 	{
-		HTR_LOG(Error, "[OBJ] {}: cannot open file", Path);
+		KRS_LOG(Error, "[OBJ] {}: cannot open file", Path);
 		return false;
 	}
 
@@ -249,7 +249,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			FVector P;
 			if (!(Stream >> P.X >> P.Y >> P.Z))
 			{
-				HTR_LOG(Error, "[OBJ] {}:{}: invalid position '{}'", Path, LineNumber, Line);
+				KRS_LOG(Error, "[OBJ] {}:{}: invalid position '{}'", Path, LineNumber, Line);
 				return false;
 			}
 			Info.Positions.Add(P);
@@ -259,7 +259,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			FVector2 UV;
 			if (!(Stream >> UV.X >> UV.Y))
 			{
-				HTR_LOG(Error, "[OBJ] {}:{}: invalid uv '{}'", Path, LineNumber, Line);
+				KRS_LOG(Error, "[OBJ] {}:{}: invalid uv '{}'", Path, LineNumber, Line);
 				return false;
 			}
 			Info.UVs.Add(UV);
@@ -269,7 +269,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			FVector N;
 			if (!(Stream >> N.X >> N.Y >> N.Z))
 			{
-				HTR_LOG(Error, "[OBJ] {}:{}: invalid normal '{}'", Path, LineNumber, Line);
+				KRS_LOG(Error, "[OBJ] {}:{}: invalid normal '{}'", Path, LineNumber, Line);
 				return false;
 			}
 			Info.Normals.Add(N);
@@ -284,14 +284,14 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 				// 칸이 없거나 비어 있으면 0, 파일에 적힌 0은 실패
 				if (!ParseIndex(Token, I))
 				{
-					HTR_LOG(Error, "[OBJ] {}:{}: invalid face token '{}'", Path, LineNumber, Token);
+					KRS_LOG(Error, "[OBJ] {}:{}: invalid face token '{}'", Path, LineNumber, Token);
 					return false;
 				}
 				if (!TransformIndex(I.PositionIndex, Info.Positions.Num(), I.PositionIndex) ||
 					!TransformIndex(I.UVIndex, Info.UVs.Num(), I.UVIndex) ||
 					!TransformIndex(I.NormalIndex, Info.Normals.Num(), I.NormalIndex))
 				{
-					HTR_LOG(Error, "[OBJ] {}:{}: face index out of range '{}' (v {}, vt {}, vn {})",
+					KRS_LOG(Error, "[OBJ] {}:{}: face index out of range '{}' (v {}, vt {}, vn {})",
 						Path, LineNumber, Token, Info.Positions.Num(), Info.UVs.Num(), Info.Normals.Num());
 					return false;
 				}
@@ -303,7 +303,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			}
 			if (F.Indexes.Num() < 3)
 			{
-				HTR_LOG(Error, "[OBJ] {}:{}: face needs at least 3 vertices (got {})", Path, LineNumber, F.Indexes.Num());
+				KRS_LOG(Error, "[OBJ] {}:{}: face needs at least 3 vertices (got {})", Path, LineNumber, F.Indexes.Num());
 				return false;
 			}
 			Info.Faces.Add(F);
@@ -314,7 +314,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 			FString Mtl;
 			if (!(Stream >> Mtl))
 			{
-				HTR_LOG(Error, "[OBJ] {}:{}: usemtl without name", Path, LineNumber);
+				KRS_LOG(Error, "[OBJ] {}:{}: usemtl without name", Path, LineNumber);
 				return false;
 			}
 
@@ -345,7 +345,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 	// No Faces
 	if (Info.Faces.IsEmpty())
 	{
-		HTR_LOG(Error, "[OBJ] {}: no faces", Path);
+		KRS_LOG(Error, "[OBJ] {}: no faces", Path);
 		return false;
 	}
 
@@ -361,7 +361,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 		if (!TransformPath(Path, Mtl, MtlPath) ||
 			!ParseMaterial(MtlPath, Info.MaterialInfos))
 		{
-			HTR_LOG(Warning, "[OBJ] {}: mtllib '{}' skipped", Path, Mtl);
+			KRS_LOG(Warning, "[OBJ] {}: mtllib '{}' skipped", Path, Mtl);
 		}
 	}
 
@@ -379,7 +379,7 @@ bool FObjImporter::ParseObj(const FString& Path, FObjInfo& Out)
 		}
 		if (Section.MaterialIndex == 0 && !Section.Material.empty())
 		{
-			HTR_LOG(Warning, "[OBJ] {}: material '{}' not found, using Default", Path, Section.Material);
+			KRS_LOG(Warning, "[OBJ] {}: material '{}' not found, using Default", Path, Section.Material);
 		}
 	}
 
@@ -489,7 +489,7 @@ bool FObjImporter::Cook(const FObjInfo& Raw, FStaticMeshData& Out)
 	FString Error;
 	if (!Cooked.Validate(Error))
 	{
-		HTR_LOG(Error, "[OBJ] {}: {}", Raw.Path, Error);
+		KRS_LOG(Error, "[OBJ] {}: {}", Raw.Path, Error);
 		return false;
 	}
 
@@ -522,20 +522,20 @@ TUniquePtr<FStaticMeshData> FObjImporter::LoadStaticMeshData(const FString& Path
 // 디버그용 출력
 void FObjImporter::PrintObjInfo(const FObjInfo& ObjInfo)
 {
-	HTR_LOG(Info, "Path: {}", ObjInfo.Path);
-	HTR_LOG(Info, "Positions Size: {}", ObjInfo.Positions.Num());
-	HTR_LOG(Info, "UVs Size: {}", ObjInfo.UVs.Num());
-	HTR_LOG(Info, "Normals Size: {}", ObjInfo.Normals.Num());
-	HTR_LOG(Info, "Faces Size: {}", ObjInfo.Faces.Num());
-	HTR_LOG(Info, "Sections Size: {}", ObjInfo.Sections.Num());
-	HTR_LOG(Info, "Mtllibs Size: {}", ObjInfo.Mtllibs.Num());
-	HTR_LOG(Info, "MaterialInfos Size: {}", ObjInfo.MaterialInfos.Num());
+	KRS_LOG(Info, "Path: {}", ObjInfo.Path);
+	KRS_LOG(Info, "Positions Size: {}", ObjInfo.Positions.Num());
+	KRS_LOG(Info, "UVs Size: {}", ObjInfo.UVs.Num());
+	KRS_LOG(Info, "Normals Size: {}", ObjInfo.Normals.Num());
+	KRS_LOG(Info, "Faces Size: {}", ObjInfo.Faces.Num());
+	KRS_LOG(Info, "Sections Size: {}", ObjInfo.Sections.Num());
+	KRS_LOG(Info, "Mtllibs Size: {}", ObjInfo.Mtllibs.Num());
+	KRS_LOG(Info, "MaterialInfos Size: {}", ObjInfo.MaterialInfos.Num());
 }
 
 void FObjImporter::PrintSMD(const FStaticMeshData& SMD)
 {
-	HTR_LOG(Info, "Vertices Size: {}", SMD.Vertices.Num());
-	HTR_LOG(Info, "Indices Size: {}", SMD.Indices.Num());
-	HTR_LOG(Info, "Sections Size: {}", SMD.Sections.Num());
-	HTR_LOG(Info, "MaterialSlots Size: {}", SMD.MaterialSlots.Num());
+	KRS_LOG(Info, "Vertices Size: {}", SMD.Vertices.Num());
+	KRS_LOG(Info, "Indices Size: {}", SMD.Indices.Num());
+	KRS_LOG(Info, "Sections Size: {}", SMD.Sections.Num());
+	KRS_LOG(Info, "MaterialSlots Size: {}", SMD.MaterialSlots.Num());
 }

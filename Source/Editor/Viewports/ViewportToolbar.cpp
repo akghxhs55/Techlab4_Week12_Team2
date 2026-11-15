@@ -176,7 +176,7 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { Padding, Padding });
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { Gap, Gap });
     ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(2.0f));
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(16, 16, 18, 238));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorColor::BgOverlay);
     if (ImGui::BeginChild("ViewportToolbar", { Width, Height }, ImGuiChildFlags_AlwaysUseWindowPadding,
         ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
     {
@@ -207,7 +207,7 @@ void FViewportsPanel::DrawViewportToolbar(int32 ViewIndex)
                 ImDrawList* DrawList = ImGui::GetWindowDrawList();
                 const ImVec2 Min = ImGui::GetItemRectMin(), Max = ImGui::GetItemRectMax();
                 const ImVec2 Center{ (Min.x + Max.x) * 0.5f, (Min.y + Max.y) * 0.5f };
-                const ImU32 Color = IM_COL32(210, 210, 210, 255);
+                const ImU32 Color = EditorColor::TextSecondary;
                 const float Line = std::max(1.0f, EditorStyle::Scale(1.2f));
                 if (Desc.Glyph == EGlyph::Kebab)
                 {
@@ -471,7 +471,7 @@ float FViewportsPanel::GetLocationSnapSize() const
     return EditorSettings ? EditorSettings->GetSettings().LocationSnapSize : 1.0f;
 }
 
-void FViewportsPanel::DrawGridMenu()
+void FViewportsPanel::DrawSnapMenu()
 {
     if (!EditorSettings) return;
     FEditorSettings& Settings = EditorSettings->GetMutableSettings();
@@ -489,9 +489,12 @@ void FViewportsPanel::DrawGridMenu()
     ImGui::SetNextItemWidth(EditorStyle::Scale(120.0f));
     if (ImGui::DragFloat("Snap size", &Settings.LocationSnapSize, 0.05f, 0.01f, 1000.0f, "%.2g"))
         Settings.LocationSnapSize = FMath::Clamp(Settings.LocationSnapSize, 0.01f, 1000.0f);
+}
 
-    ImGui::Separator();
-    int32& Spacing = Settings.GridSpacing;
+void FViewportsPanel::DrawGridMenu()
+{
+    if (!EditorSettings) return;
+    int32& Spacing = EditorSettings->GetMutableSettings().GridSpacing;
     ImGui::SeparatorText("Grid spacing");
     for (const int32 Preset : { 1, 5, 10, 50, 100 })
     {
@@ -499,7 +502,8 @@ void FViewportsPanel::DrawGridMenu()
         std::snprintf(Label, sizeof(Label), "%d", Preset);
         if (ImGui::MenuItem(Label, nullptr, Spacing == Preset)) Spacing = Preset;
     }
-    ImGui::Separator();
+    // Snap size와 같은 입력 방식(끌어서 조절, 더블클릭으로 직접 입력)이고 정수만 받는다.
     ImGui::SetNextItemWidth(EditorStyle::Scale(120.0f));
-    ImGui::SliderInt("Custom", &Spacing, 1, 100, "%d", ImGuiSliderFlags_AlwaysClamp);
+    if (ImGui::DragInt("Grid size", &Spacing, 0.25f, 1, 100, "%d"))
+        Spacing = FMath::Clamp(Spacing, 1, 100);
 }

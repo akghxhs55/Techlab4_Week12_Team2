@@ -29,7 +29,7 @@ enum EPropertyFlags : uint32
 };
 
 // UPROPERTY(meta=(...))로 정하는 디테일 패널 숫자 위젯 설정 (UE의 ClampMin/ClampMax/UIMin/UIMax/Delta)
-// 필드 순서를 바꾸면 HHT가 만드는 지정 초기화(.ClampMin = ...) 순서도 바꿔야 한다.
+// 필드 순서를 바꾸면 KHT가 만드는 지정 초기화(.ClampMin = ...) 순서도 바꿔야 한다.
 struct FPropertyMeta
 {
     float ClampMin = -FLT_MAX; // 값 자체의 범위. Ctrl+클릭으로 직접 입력해도 이 범위로 자른다
@@ -76,8 +76,8 @@ public:
 };
 
 // 숫자 위젯을 쓰는 프로퍼티의 공통 부모 (UE: FNumericProperty)
-// UE의 FNumericProperty는 정수·실수만이고 FVector는 FStructProperty다. Hitori는 벡터도 숫자 드래그 위젯을 쓰므로 여기 묶는다.
-// UE는 meta를 FField의 문자열 맵(GetMetaData("ClampMin"))에 두지만, Hitori는 HHT가 검사한 값을 float로 바로 넣는다.
+// UE의 FNumericProperty는 정수·실수만이고 FVector는 FStructProperty다. Kurisu는 벡터도 숫자 드래그 위젯을 쓰므로 여기 묶는다.
+// UE는 meta를 FField의 문자열 맵(GetMetaData("ClampMin"))에 두지만, Kurisu는 KHT가 검사한 값을 float로 바로 넣는다.
 class FNumericProperty : public FProperty
 {
     DECLARE_FIELD(FNumericProperty, FProperty)
@@ -205,7 +205,7 @@ public:
 };
 
 // UENUM을 붙인 enum class (UE: EnumProperty.h의 FEnumProperty)
-// UE는 기반 정수용 FNumericProperty를 하나 품지만, Hitori는 ElementSize(1/2/4/8)로 읽고 쓴다. 저장은 이름으로 한다.
+// UE는 기반 정수용 FNumericProperty를 하나 품지만, Kurisu는 ElementSize(1/2/4/8)로 읽고 쓴다. 저장은 이름으로 한다.
 class FEnumProperty : public FProperty
 {
     DECLARE_FIELD(FEnumProperty, FProperty)
@@ -233,7 +233,7 @@ public:
 
 // ---- C++ 타입 → 프로퍼티 클래스 ----
 // UE는 UHT가 멤버 타입을 읽고 .gen.cpp에 FFloatPropertyParams 같은 표를 쓴다.
-// Hitori의 HHT는 타입을 읽지 않으므로 decltype(멤버)를 받아 여기서 고른다.
+// Kurisu의 KHT는 타입을 읽지 않으므로 decltype(멤버)를 받아 여기서 고른다.
 
 template <typename T>
 struct TPropertyTypeFor
@@ -278,6 +278,6 @@ struct TPropertyTypeFor<T>
     using Type = FStructProperty;
 };
 
-// meta를 쓸 수 있는 타입. HHT가 만든 static_assert가 이걸로 검사한다.
+// meta를 쓸 수 있는 타입. KHT가 만든 static_assert가 이걸로 검사한다.
 template <typename T>
 constexpr bool TSupportsNumericMeta = std::is_base_of_v<FNumericProperty, typename TPropertyTypeFor<T>::Type>;

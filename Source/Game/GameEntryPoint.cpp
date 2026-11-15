@@ -8,7 +8,7 @@ UClass* GetEngineClass()
 {
 	return UGameEngine::StaticClass();
 }
-// 패키지된 게임은 exe 옆의 .hproject를 쓴다. 개발 중에는 엔진 폴더의 기본 프로젝트를 쓴다.
+// 패키지된 게임은 exe 옆의 .kproject를 쓴다. 개발 중에는 엔진 폴더의 기본 프로젝트를 쓴다.
 std::filesystem::path ResolveProjectFile(HINSTANCE hInstance, const std::filesystem::path& FromCommandLine)
 {
 	(void)hInstance;
@@ -25,7 +25,7 @@ std::filesystem::path ResolveProjectFile(HINSTANCE hInstance, const std::filesys
 	if (Found.empty())
 		Found = FPaths::FindProjectFileIn(FPaths::EngineDir() / "DefaultProject");
 	if (Found.empty())
-		MessageBoxW(nullptr, L"No .hproject file found. Pass one on the command line: HitoriGame.exe Path/To/Game.hproject",
-			L"크리스 엔진", MB_OK | MB_ICONERROR);
+		MessageBoxW(nullptr, L"No .kproject file found. Pass one on the command line: KurisuGame.exe Path/To/Game.kproject",
+			L"Kurisu Engine", MB_OK | MB_ICONERROR);
 	return Found;
 }

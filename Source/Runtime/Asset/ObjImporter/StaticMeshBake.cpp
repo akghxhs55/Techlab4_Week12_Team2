@@ -113,7 +113,7 @@ TUniquePtr<FStaticMeshData> FStaticMeshBake::ReadBaked(const FString& BinPath)
 		std::memcmp(Header.Magic, Expected.Magic, sizeof(Header.Magic)) != 0 ||
 		Header.Version != Expected.Version)
 	{
-		HTR_LOG(Warning, "[BAKE] {}: invalid header or version, re-cooking", BinPath);
+		KRS_LOG(Warning, "[BAKE] {}: invalid header or version, re-cooking", BinPath);
 		return nullptr;
 	}
 
@@ -149,11 +149,11 @@ TUniquePtr<FStaticMeshData> FStaticMeshBake::ReadBaked(const FString& BinPath)
 	FString Error;
 	if (!Data->Validate(Error))
 	{
-		HTR_LOG(Warning, "[BAKE] {}: {}, re-cooking", BinPath, Error);
+		KRS_LOG(Warning, "[BAKE] {}: {}, re-cooking", BinPath, Error);
 		return nullptr;
 	}
 
-	HTR_LOG(Info, "[BAKE] {}: loaded", BinPath);
+	KRS_LOG(Info, "[BAKE] {}: loaded", BinPath);
 	return Data;
 }
 
@@ -162,7 +162,7 @@ void FStaticMeshBake::WriteBaked(const FString& BinPath, const FStaticMeshData& 
 	std::ofstream Out(BinPath, std::ios::binary);
 	if (!Out)
 	{
-		HTR_LOG(Warning, "[BAKE] {}: cannot open for writing", BinPath);
+		KRS_LOG(Warning, "[BAKE] {}: cannot open for writing", BinPath);
 		return;
 	}
 
@@ -187,6 +187,6 @@ void FStaticMeshBake::WriteBaked(const FString& BinPath, const FStaticMeshData& 
 	// 스트림은 한 번 실패하면 상태가 유지되므로 마지막에 한 번만 확인
 	if (!Out)
 	{
-		HTR_LOG(Warning, "[BAKE] {}: write failed", BinPath);
+		KRS_LOG(Warning, "[BAKE] {}: write failed", BinPath);
 	}
 }

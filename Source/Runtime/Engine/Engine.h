@@ -49,7 +49,7 @@ class FEngineLoop;
 // Width·Height가 0이면 주 모니터 해상도를 쓴다.
 struct FEngineConfig
 {
-	const wchar_t* Title = L"크리스 엔진";
+	const wchar_t* Title = L"Kurisu Engine";
 	uint32 Width = 0;
 	uint32 Height = 0;
 	bool bBorderless = true;

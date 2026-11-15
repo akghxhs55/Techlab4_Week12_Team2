@@ -57,7 +57,7 @@ bool FJsonArchive::LoadWorldFromBytes(UWorld* World, const TArray<uint8>& Bytes)
 	FJsonArchiveInputFormatter Formatter(Reader);   
 	if (Reader.IsError())
 	{
-		HTR_LOG(Error, "Load: invalid scene data");
+		KRS_LOG(Error, "Load: invalid scene data");
 		return false;                               
 	}
 
@@ -68,7 +68,7 @@ bool FJsonArchive::LoadWorldFromBytes(UWorld* World, const TArray<uint8>& Bytes)
 	Root << SA_VALUE("Version", Version);
 	if (Version != SceneVersion)
 	{
-		HTR_LOG(Error, "Load: scene version {} is not supported (expected {})", Version, SceneVersion);
+		KRS_LOG(Error, "Load: scene version {} is not supported (expected {})", Version, SceneVersion);
 		return false;                               
 	}
 
@@ -97,7 +97,7 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 {
 	if (!std::filesystem::exists(FPaths::FromUtf8(FPaths::ResolveContentPath(Path))))
 	{
-		HTR_LOG(Warning, "{} is Not Exist!", Path);
+		KRS_LOG(Warning, "{} is Not Exist!", Path);
 		return false;
 	}
 
@@ -213,7 +213,7 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 //
 //	if (!std::filesystem::exists(Path))
 //	{
-//		HTR_LOG(Warning, "{} is Not Exist!", Path);
+//		KRS_LOG(Warning, "{} is Not Exist!", Path);
 //		return false;
 //	}
 //
@@ -296,7 +296,7 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 //		AActor* Actor = World->SpawnActor(Class);
 //		if (!Actor)
 //		{
-//			HTR_LOG(Warning, "Load: failed to spawn {}", ActorJson["Class"].get<FString>());
+//			KRS_LOG(Warning, "Load: failed to spawn {}", ActorJson["Class"].get<FString>());
 //			continue;
 //		}
 //		Actor->Serialize(ActorJson["Properties"], true);
@@ -318,13 +318,13 @@ bool FJsonArchive::LoadWorld(UWorld* World, const FString& Path)
 //
 //			if (!Component)
 //			{
-//				HTR_LOG(Warning, "Load: {} has no component {}", Class->Name, Name.ToString());
+//				KRS_LOG(Warning, "Load: {} has no component {}", Class->Name, Name.ToString());
 //				continue;
 //			}
 //
 //			if (Component->GetClass()->Name != ComponentJson["Class"].get<FString>())
 //			{
-//				HTR_LOG(Warning, "Load: component {} class mismatch", Name.ToString());
+//				KRS_LOG(Warning, "Load: component {} class mismatch", Name.ToString());
 //				continue;
 //			}
 //

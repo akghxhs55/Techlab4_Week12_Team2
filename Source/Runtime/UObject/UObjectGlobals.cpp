@@ -60,9 +60,9 @@ namespace
 //
 //    Object->SetName(Name);
 //
-//    //HTR_LOG(Info, "Create {}", Class->Name);
-//    //HTR_LOG(Info, "Total Allocation Bytes - {}", FEngineStatics::TotalAllocationBytes);
-//    //HTR_LOG(Info, "Total Allocation Count - {}", FEngineStatics::TotalAllocationCount);
+//    //KRS_LOG(Info, "Create {}", Class->Name);
+//    //KRS_LOG(Info, "Total Allocation Bytes - {}", FEngineStatics::TotalAllocationBytes);
+//    //KRS_LOG(Info, "Total Allocation Count - {}", FEngineStatics::TotalAllocationCount);
 //
 //    return Object;
 //}
@@ -168,7 +168,7 @@ UObject* StaticDuplicateObjectEx(FObjectDuplicationParameters& Parameters)
 			Dup->Serialize(Reader);
 		}
 		if (Reader.IsError())
-			HTR_LOG(Error, "StaticDuplicateObjectEx: read failed for {}", Source->GetName());
+			KRS_LOG(Error, "StaticDuplicateObjectEx: read failed for {}", Source->GetName());
 	}
 
 	const bool bDuplicateForPIE = HasFlag(Parameters.PortFlags, EPropertyPortFlags::PPF_DuplicateForPIE);
@@ -225,7 +225,7 @@ UObject* StaticAllocateObject(const UClass* InClass, UObject* InOuter, FName InN
 		Obj = StaticFindObjectFast(nullptr, InOuter, InName, EFindObjectFlags::ExactClass);
 		if (Obj && !Obj->GetClass()->IsChildOf(InClass))
 		{
-			HTR_LOG(Error, "Cannot replace existing object {} of a different class", InName.ToString());
+			KRS_LOG(Error, "Cannot replace existing object {} of a different class", InName.ToString());
 			return nullptr;
 		}
 	}

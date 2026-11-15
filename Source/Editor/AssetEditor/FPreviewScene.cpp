@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 #include "FPreviewScene.h"
-#include "Editor/HitoriEd/EditorEngine.h"
+#include "Editor/KurisuEd/EditorEngine.h"
 #include "Engine/World.h"
 
 #include "Runtime/Components/DirectionalLightComponent.h"

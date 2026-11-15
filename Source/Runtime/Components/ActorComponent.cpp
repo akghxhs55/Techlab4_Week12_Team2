@@ -76,7 +76,7 @@ void UActorComponent::SetAutoActivate(bool bNewAutoActivate)
 {
 	if (IsRegistered())
 	{
-		HTR_LOG(Warning, "SetAutoActivate: cannot change AutoActivate after component registration");
+		KRS_LOG(Warning, "SetAutoActivate: cannot change AutoActivate after component registration");
 		return;
 	}
 	bAutoActivate = bNewAutoActivate;
@@ -125,7 +125,7 @@ void UActorComponent::RegisterComponent()
 
 void UActorComponent::RegisterComponentWithWorld(UWorld* InWorld)
 {
-	if (IsRegistered()) { HTR_LOG(Info, "RegisterComponentWithWorld: {} Already registered. Aborting.", GetClass()->Name); return; }
+	if (IsRegistered()) { KRS_LOG(Info, "RegisterComponentWithWorld: {} Already registered. Aborting.", GetClass()->Name); return; }
 	if (!IsValid(InWorld)) { return; }
 
 	WorldPrivate = InWorld;

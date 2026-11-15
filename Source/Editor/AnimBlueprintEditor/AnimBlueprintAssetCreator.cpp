@@ -59,7 +59,7 @@ void FAnimBlueprintAssetCreator::ProcessCreateRequest()
 
     if (!AnimBlueprintFile::Write(Target, Data, Error))
     {
-        HTR_LOG(Warning, "Failed to create AnimBlueprint: {}", Error);
+        KRS_LOG(Warning, "Failed to create AnimBlueprint: {}", Error);
         const std::wstring Message = FPaths::FromUtf8(Error).wstring();
         MessageBoxW(Dialog.hwndOwner, Message.c_str(), L"Create Animation Blueprint", MB_OK | MB_ICONERROR);
         return;

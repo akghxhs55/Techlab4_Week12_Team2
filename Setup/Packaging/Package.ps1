@@ -9,17 +9,17 @@ $ErrorActionPreference = 'Stop'
 try {
     $engineRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     if ([string]::IsNullOrWhiteSpace($Project)) {
-        $Project = Get-ChildItem -LiteralPath $engineRoot -Filter *.hproject -File | Select-Object -First 1 -ExpandProperty FullName
+        $Project = Get-ChildItem -LiteralPath $engineRoot -Filter *.kproject -File | Select-Object -First 1 -ExpandProperty FullName
     }
     if ([string]::IsNullOrWhiteSpace($Project)) {
-        $defaultProject = Join-Path $engineRoot 'DefaultProject\DefaultProject.hproject'
+        $defaultProject = Join-Path $engineRoot 'DefaultProject\DefaultProject.kproject'
         if (Test-Path -LiteralPath $defaultProject -PathType Leaf) { $Project = $defaultProject }
     }
-    if ([string]::IsNullOrWhiteSpace($Project)) { throw 'No .hproject file selected.' }
+    if ([string]::IsNullOrWhiteSpace($Project)) { throw 'No .kproject file selected.' }
     $projectFile = (Resolve-Path -LiteralPath $Project).ProviderPath
     $projectRoot = Split-Path -Parent $projectFile
     $projectName = [IO.Path]::GetFileNameWithoutExtension($projectFile)
-    $solution = Join-Path $engineRoot 'Hitori.slnx'
+    $solution = Join-Path $engineRoot 'Kurisu.slnx'
     if (-not $SkipBuild) {
         if (-not (Test-Path -LiteralPath $solution)) {
             & (Join-Path $engineRoot 'SlnGenerator.bat') --no-pause
@@ -29,10 +29,10 @@ try {
         $msbuild = & $vswhere -latest -prerelease -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
         if (-not $msbuild) { throw 'MSBuild not found. Install the Visual Studio C++ workload.' }
         $env:VSLANG = '1033'
-        & $msbuild $solution -t:HitoriGame "-p:Configuration=$Configuration" -p:Platform=x64 -m -nologo -v:minimal
+        & $msbuild $solution -t:KurisuGame "-p:Configuration=$Configuration" -p:Platform=x64 -m -nologo -v:minimal
         if ($LASTEXITCODE -ne 0) { throw 'Game build failed.' }
     }
-    $gameExe = Join-Path $engineRoot "Build\Bin\$Configuration-windows-x86_64\HitoriGame.exe"
+    $gameExe = Join-Path $engineRoot "Build\Bin\$Configuration-windows-x86_64\KurisuGame.exe"
     if (-not (Test-Path -LiteralPath $gameExe -PathType Leaf)) { throw "Missing executable: $gameExe" }
     $packageRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'Build\Package'))
     $out = [IO.Path]::GetFullPath((Join-Path $packageRoot $projectName))

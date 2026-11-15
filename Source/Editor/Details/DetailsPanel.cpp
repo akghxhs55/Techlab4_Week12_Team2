@@ -1,5 +1,5 @@
 #include "EnginePCH.h"
-#include "Editor/HitoriEd/EditorHierarchy.h"
+#include "Editor/KurisuEd/EditorHierarchy.h"
 #include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/Details/DetailsPanel.h"
 #include "Editor/Details/PropertyEditor.h"
@@ -8,7 +8,7 @@
 #include <filesystem>
 
 #include "imgui_internal.h"
-#include "Editor/HitoriEd/EditorDragDrop.h"
+#include "Editor/KurisuEd/EditorDragDrop.h"
 #include "Components/PrimitiveComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Components/SkeletalMeshComponent.h"
@@ -42,8 +42,8 @@
 #include "GameFramework/Actor.h"
 #include "Core/EngineLog.h"
 
-#include "Editor/HitoriEd/EditorFileUtils.h"
-#include "Editor/HitoriEd/EditorUndo.h"
+#include "Editor/KurisuEd/EditorFileUtils.h"
+#include "Editor/KurisuEd/EditorUndo.h"
 #include "Script/LuaScriptManager.h"
 
 
@@ -134,7 +134,7 @@ namespace
 		if (!DrawnClass.empty())
 		{
 			ImGui::GetWindowDrawList()->AddText(
-				ImVec2(TextX, RowStart.y), IM_COL32(200, 200, 200, 255), DrawnClass.c_str());
+				ImVec2(TextX, RowStart.y), EditorColor::TextSecondary, DrawnClass.c_str());
 		}
 
 		if (bRowHovered && !ImGui::GetDragDropPayload() && (DisplayedLabel != FullLabel || DrawnClass != FullClass))
@@ -214,7 +214,7 @@ namespace
 			return {};
 
 		if (FPaths::FromUtf8(Key).is_absolute())
-			HTR_LOG(Warning, "[Lua] {} is outside the project. It is saved as an absolute path and will not be packaged.", Key);
+			KRS_LOG(Warning, "[Lua] {} is outside the project. It is saved as an absolute path and will not be packaged.", Key);
 		return Key;
 	}
 
@@ -249,7 +249,7 @@ namespace
 
 		std::error_code Ec;
 		if (bHasPath && !fs::exists(FLuaScriptManager::ToPath(Path), Ec))
-			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "File not found");
+			ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "File not found");
 
 		// 기존 파일 연결
 		if (ImGui::Button("Browse"))
@@ -453,7 +453,7 @@ namespace
 		}
 		else
 		{
-			ImGui::TextDisabled("(비어 있음)");
+			ImGui::TextDisabled("(Empty)");
 		}
 		ImGui::EndGroup();
 
@@ -1487,8 +1487,8 @@ namespace
 		const float AddWidth = FramePadding.x * 2.0f + PlusSize + PlusGap + ImGui::CalcTextSize(AddLabel).x + EditorStyle::Scale(4.0f);
 		ImGui::SameLine();
 		ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - AddWidth));
-		ImGui::PushStyleColor(ImGuiCol_Button, IM_COL32(34, 34, 38, 255));
-		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, IM_COL32(54, 46, 48, 255));
+		ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::BgElevated);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorColor::BgAccentHover);
 		const bool bAddClicked = ImGui::Button("##AddComponent", { AddWidth, ImGui::GetFrameHeight() });
 		ImGui::PopStyleColor(2);
 		{
@@ -1496,7 +1496,7 @@ namespace
 			const float CenterY = (Min.y + Max.y) * 0.5f;
 			const float PlusX = Min.x + FramePadding.x + PlusSize * 0.5f;
 			const float Thick = std::max(2.0f, EditorStyle::Scale(2.0f));
-			const ImU32 Crimson = IM_COL32(218, 64, 56, 255);
+			const ImU32 Crimson = EditorColor::AccentBright;
 			ImDrawList* DrawList = ImGui::GetWindowDrawList();
 			DrawList->AddRectFilled({ PlusX - PlusSize * 0.5f, CenterY - Thick * 0.5f }, { PlusX + PlusSize * 0.5f, CenterY + Thick * 0.5f }, Crimson);
 			DrawList->AddRectFilled({ PlusX - Thick * 0.5f, CenterY - PlusSize * 0.5f }, { PlusX + Thick * 0.5f, CenterY + PlusSize * 0.5f }, Crimson);
@@ -3183,7 +3183,7 @@ void FDetailsPanel::DrawCompoenetList(AActor* SelectedActor, UActorComponent*& O
         if (Component && !Component->IsHiddenInDetails()) ++RowCount;
     const float RowHeight = ImGui::GetFrameHeight();
     const float BoxHeight = std::clamp(static_cast<float>(RowCount), 3.0f, 10.0f) * RowHeight + ImGui::GetStyle().WindowPadding.y * 2.0f;
-    ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(14, 14, 17, 255));
+    ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorColor::BgDeepest);
     const bool bBoxVisible = ImGui::BeginChild("##ComponentTree", { 0.0f, BoxHeight },
         ImGuiChildFlags_Borders | ImGuiChildFlags_ResizeY);
     ImGui::PopStyleColor();
@@ -3395,7 +3395,7 @@ void FDetailsPanel::DrawComponentNameEditor(UActorComponent* Component, UActorCo
                     }
                 }
             }
-            else HTR_LOG(Warning, "A component with this name already exists in this actor.");
+            else KRS_LOG(Warning, "A component with this name already exists in this actor.");
         }
         EditingNameComponent = nullptr;
     }

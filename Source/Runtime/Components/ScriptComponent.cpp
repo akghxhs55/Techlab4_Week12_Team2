@@ -62,7 +62,7 @@ void UScriptComponent::StartScript()
 	Instance = new FLuaScriptInstance();
 	if (!Instance->Load(GetOwner(), ScriptPath))
 	{
-		HTR_LOG(Warning, "[Lua] {}.{} : script is not running ({})", GetOwner()->GetName(), GetName(), ScriptPath);
+		KRS_LOG(Warning, "[Lua] {}.{} : script is not running ({})", GetOwner()->GetName(), GetName(), ScriptPath);
 		return;
 	}
 	Instance->Call("BeginPlay");

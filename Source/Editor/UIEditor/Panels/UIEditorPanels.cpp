@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/UIEditor/Panels/UIEditorPanels.h"
+#include "Editor/EditorUI/EditorStyle.h"
 
 #include "Editor/Details/PropertyEditor.h"
 #include "UI/UserWidget.h"
@@ -139,12 +140,12 @@ void FUICanvasPanel::DrawContent()
 	ImDrawList* DL = ImGui::GetWindowDrawList();
 	const ImVec2 CanvasMax(CanvasMin.x + Size.x, CanvasMin.y + Size.y);
 	DL->AddImage(Preview->GetSRV(), CanvasMin, CanvasMax);
-	DL->AddRect(CanvasMin, CanvasMax, IM_COL32(90, 98, 110, 255));
+	DL->AddRect(CanvasMin, CanvasMax, EditorColor::BorderStrong);
 
 	const UWidget* Selected = Editor.GetSelected();
 	if (Selected && Selected != Editor.GetRoot())
 	{
-		const ImU32 Accent = IM_COL32(255, 170, 40, 255);
+		const ImU32 Accent = EditorColor::AccentBright;
 		const FUIRect& R = Selected->GetCachedRect();
 		DL->AddRect(ToScreen(R.X, R.Y), ToScreen(R.X + R.W, R.Y + R.H), Accent, 0.0f, 0, 2.0f);
 
@@ -162,7 +163,7 @@ void FUICanvasPanel::DrawContent()
 			if (A.X == A.Z && A.Y == A.W)
 				DL->AddQuad(ImVec2(A0.x, A0.y - 7), ImVec2(A0.x + 7, A0.y), ImVec2(A0.x, A0.y + 7), ImVec2(A0.x - 7, A0.y), Accent, 2.0f);
 			else
-				DL->AddRect(A0, A1, IM_COL32(255, 170, 40, 140));
+				DL->AddRect(A0, A1, EditorColor::WithAlpha(EditorColor::AccentBright, 140));
 		}
 	}
 

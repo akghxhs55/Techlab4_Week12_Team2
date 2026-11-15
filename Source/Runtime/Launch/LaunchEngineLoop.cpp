@@ -39,7 +39,7 @@ namespace
 	// 이 간격마다 FPS 평균을 갱신한다.
 	constexpr double FrameStatsWindowSeconds = 0.5;
 
-	// UE처럼 첫 인자로 프로젝트 파일을 받는다. "Path/To/Game.hproject" 또는 -project=Path/To/Game.hproject
+	// UE처럼 첫 인자로 프로젝트 파일을 받는다. "Path/To/Game.kproject" 또는 -project=Path/To/Game.kproject
 	std::filesystem::path FindProjectInCommandLine()
 	{
 		int32 Count = 0;
@@ -66,7 +66,7 @@ namespace
 	{
 		if (!FPaths::InitEngineDir())
 		{
-			MessageBoxW(nullptr, L"Cannot find the engine folder (EngineResources/Shaders).", L"크리스 엔진", MB_OK | MB_ICONERROR);
+			MessageBoxW(nullptr, L"Cannot find the engine folder (EngineResources/Shaders).", L"Kurisu Engine", MB_OK | MB_ICONERROR);
 			return false;
 		}
 
@@ -77,7 +77,7 @@ namespace
 		if (!FPaths::SetProject(ProjectFile, &Error))
 		{
 			const FString Msg = "Cannot open project:\n" + Error;
-			MessageBoxW(nullptr, std::wstring(Msg.begin(), Msg.end()).c_str(), L"크리스 엔진", MB_OK | MB_ICONERROR);
+			MessageBoxW(nullptr, std::wstring(Msg.begin(), Msg.end()).c_str(), L"Kurisu Engine", MB_OK | MB_ICONERROR);
 			return false;
 		}
 		return true;

@@ -1,7 +1,7 @@
 #include "EnginePCH.h"
 
-#include "Editor/HitoriEd/EditorEngine.h"
-#include "Editor/HitoriEd/Editor.h"
+#include "Editor/KurisuEd/EditorEngine.h"
+#include "Editor/KurisuEd/Editor.h"
 
 #include "Core/EngineStatics.h"
 #include "Core/EngineTimer.h"
@@ -36,8 +36,8 @@
 
 #include "Render/RenderCommand.h"
 #include "Editor/Outliner/OutlinerPanel.h"
-#include "Editor/HitoriEd/EditorFileUtils.h"
-#include "Editor/HitoriEd/EditorHierarchy.h"
+#include "Editor/KurisuEd/EditorFileUtils.h"
+#include "Editor/KurisuEd/EditorHierarchy.h"
 #include "Editor/Viewports/EditorViewportClient.h"
 #include "UObject/UObjectIterator.h"
 
@@ -123,7 +123,7 @@ FEngineConfig UEditorEngine::GetConfig() const
 	FEngineConfig Desc;
 	// 창 제목에 연 프로젝트 이름을 붙인다. Title은 포인터만 넘기므로 문자열을 static으로 둔다.
 	static std::wstring Title;
-	Title = L"크리스 엔진";
+	Title = L"Kurisu Engine";
 	if (FPaths::HasProject())
 		Title += L" - " + FPaths::ProjectFilePath().stem().wstring();
 	Desc.Title = Title.c_str();
@@ -135,7 +135,7 @@ FEngineConfig UEditorEngine::GetConfig() const
 	Desc.bCreateDepthBuffer = false;
 	Desc.bExitOnEscape = false;
 	// 파일이 없으면 검은 배경에 상태 텍스트만 표시된다.
-	Desc.SplashImage = "Engine/Splash/KrisSplash.png";
+	Desc.SplashImage = "Engine/Splash/KurisuSplash.png";
 	return Desc;
 }
 
@@ -198,7 +198,7 @@ void UEditorEngine::InitLevelEditorTab()
 
 	OutputLogPanel = LevelEditorTab->AddPanel<FOutputLogPanel>();
 	FLog::AddSink(OutputLogPanel);
-	HTR_LOG(Info, "Editor Initialize...");
+	KRS_LOG(Info, "Editor Initialize...");
 
 	// 테스트 코드 
 #ifdef ENGINE_DEBUG
@@ -214,19 +214,21 @@ void UEditorEngine::InitImGui()
 
 	FRenderDevice* RenderDevice = GetEngineLoop().GetRenderDevice();
 
-	HTR_LOG(Info, "Initialize ImGui...");
+	KRS_LOG(Info, "Initialize ImGui...");
 	ImGuiRenderer = MakeUnique<FImGuiRenderer>();
 	if (!ImGuiRenderer->Init(MainWindow->GetHandle(), RenderDevice->GetDevice(), RenderDevice->GetContext()))
 	{
-		HTR_LOG(Error, "Failed To Initialize ImGui!");
+		KRS_LOG(Error, "Failed To Initialize ImGui!");
 	}
-	HTR_LOG(Info, "Initialize ImGui Success!");
+	KRS_LOG(Info, "Initialize ImGui Success!");
 
 	// 기본 제목 표시줄을 없애고 ImGui 메인 메뉴 바를 제목 표시줄로 쓴다.
 	EditorTitleBar::Install(*MainWindow);
+	// 패널이 겹치거나 잘리지 않는 최소 크기.
+	MainWindow->SetMinSize(1024, 640);
 	// 엔진 콘텐츠에 로고 이미지가 있으면 제목 표시줄 왼쪽 위 칸에 그린다. 없으면 빈 칸으로 둔다.
 	{
-		const FString LogoPath = "Engine/Icons/KrisLogo.png";
+		const FString LogoPath = "Engine/Icons/KurisuLogoReverse.png";
 		std::error_code Ec;
 		if (std::filesystem::exists(FPaths::FromUtf8(FPaths::ResolveContentPath(LogoPath)), Ec))
 		{
@@ -525,8 +527,8 @@ void UEditorEngine::InitCommands()
 		[this]() { return ViewportsPanel ? ViewportsPanel->GetGridSpacing() : 1; });
 	LevelEditorToolbar.SetLocationSnapBinding(
 		[this]() { return ViewportsPanel ? ViewportsPanel->IsLocationSnapEnabled() : false; },
-		[this](bool bEnabled) { if (ViewportsPanel) ViewportsPanel->SetLocationSnapEnabled(bEnabled); },
-		[this]() { return ViewportsPanel ? ViewportsPanel->GetLocationSnapSize() : 1.0f; });
+		[this]() { return ViewportsPanel ? ViewportsPanel->GetLocationSnapSize() : 1.0f; },
+		[this]() { if (ViewportsPanel) ViewportsPanel->DrawSnapMenu(); });
 	LevelEditorToolbar.SetPlayModeBinding(
 		[this]() { return PlayMode; },
 		[this](EPlayModeType Mode) { PlayMode = Mode; },
@@ -1815,7 +1817,7 @@ void UEditorEngine::CreateNewScene()
 {
 	if (IsPlaying())
 	{
-		HTR_LOG(Warning, "Cannot create a new scene during PIE. Stop the play session first.");
+		KRS_LOG(Warning, "Cannot create a new scene during PIE. Stop the play session first.");
 		return;
 	}
 	if (!FEditorFileUtils::NewScene(EditorWorld))
@@ -1832,7 +1834,7 @@ void UEditorEngine::OpenScene()
 {
 	if (IsPlaying())
 	{
-		HTR_LOG(Warning, "Cannot open a scene during PIE. Stop the play session first.");
+		KRS_LOG(Warning, "Cannot open a scene during PIE. Stop the play session first.");
 		return;
 	}
 	if (!FEditorFileUtils::LoadScene(EditorWorld))
@@ -1850,7 +1852,7 @@ void UEditorEngine::OpenSceneFromPath(const FString& Path)
 {
 	if (IsPlaying())
 	{
-		HTR_LOG(Warning, "Cannot open a scene during PIE. Stop the play session first.");
+		KRS_LOG(Warning, "Cannot open a scene during PIE. Stop the play session first.");
 		return;
 	}
 	if (!FEditorFileUtils::LoadScene(EditorWorld, Path))
@@ -1868,7 +1870,7 @@ void UEditorEngine::SaveCurrentScene()
 {
 	if (IsPlaying())
 	{
-		HTR_LOG(Warning, "Cannot save during PIE. Stop the play session first.");
+		KRS_LOG(Warning, "Cannot save during PIE. Stop the play session first.");
 		return;
 	}
 	FEditorFileUtils::SaveScene(EditorWorld);
@@ -1879,7 +1881,7 @@ void UEditorEngine::SaveSceneAs()
 {
 	if (IsPlaying())
 	{
-		HTR_LOG(Warning, "Cannot save during PIE. Stop the play session first.");
+		KRS_LOG(Warning, "Cannot save during PIE. Stop the play session first.");
 		return;
 	}
 	FEditorFileUtils::SaveSceneAs(EditorWorld);

@@ -89,7 +89,7 @@ void AMyCharacter::DetectedHit(const FHitResult& Hit)
 	AActor* HitActor = Hit.HitComponent ? Hit.HitComponent->GetOwner() : nullptr;
 	if (AMyCharacter* HitCharacter = Cast<AMyCharacter>(HitActor))
 	{
-		HTR_LOG(Info, "[Attack] {} -> {}", GetName(), HitCharacter->GetName());
+		KRS_LOG(Info, "[Attack] {} -> {}", GetName(), HitCharacter->GetName());
 		HitCharacter->SetIsHit();
 	}
 }

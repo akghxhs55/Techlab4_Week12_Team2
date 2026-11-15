@@ -28,7 +28,7 @@ void FObjectProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value)
     // 불러온 객체가 프로퍼티가 기대하는 클래스가 아니면 되돌린다
     if (Slot.GetUnderlyingArchive().IsLoading() && Ref && PropertyClass && !Ref->IsA(PropertyClass))
     {
-        HTR_LOG(Warning, "Load: '{}' is not a {}, keeping default", Name, PropertyClass->Name);
+        KRS_LOG(Warning, "Load: '{}' is not a {}, keeping default", Name, PropertyClass->Name);
         Ref = Previous;
     }
 }
@@ -47,7 +47,7 @@ void FEnumProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value) c
         if (Enum->FromName(EntryName, Loaded))
             SetValue(Value, Loaded);
         else
-            HTR_LOG(Warning, "Load: '{}' has no enum entry '{}', keeping default", Name, EntryName);
+            KRS_LOG(Warning, "Load: '{}' has no enum entry '{}', keeping default", Name, EntryName);
     }
 }
 

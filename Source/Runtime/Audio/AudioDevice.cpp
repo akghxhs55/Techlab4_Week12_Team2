@@ -9,7 +9,7 @@ bool FAudioDevice::Init()
 {
 	bInitialized = Mixer.Init(MakeUnique<FAudioPlatformMiniaudio>(), FAudioStreamParams{});
 	if (bInitialized)
-		HTR_LOG(Info, "[Audio] Device opened ({} Hz)", Mixer.GetSampleRate());
+		KRS_LOG(Info, "[Audio] Device opened ({} Hz)", Mixer.GetSampleRate());
 	return bInitialized;
 }
 

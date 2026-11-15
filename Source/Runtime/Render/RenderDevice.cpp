@@ -37,7 +37,7 @@ FRenderDevice::FRenderDevice()
 
 	if (FAILED(hr))
 	{
-		HTR_LOG(Error, "Failed to Create D3D11Device & DeviceContext!");
+		KRS_LOG(Error, "Failed to Create D3D11Device & DeviceContext!");
 	}
 
 	// 오브젝트별 상수를 한 버퍼에 모아 두고 오프셋으로 바인딩하려면 D3D11.1 기능이 필요하다.
@@ -47,7 +47,7 @@ FRenderDevice::FRenderDevice()
 		if (SUCCEEDED(Device->CheckFeatureSupport(D3D11_FEATURE_D3D11_OPTIONS, &Options, sizeof(Options))))
 			bConstantBufferOffsetting = Options.ConstantBufferOffsetting == TRUE;
 	}
-	HTR_LOG(Info, "Constant buffer offsetting: {}", bConstantBufferOffsetting ? "on" : "off");
+	KRS_LOG(Info, "Constant buffer offsetting: {}", bConstantBufferOffsetting ? "on" : "off");
 
 	ComPtr<IDXGIDevice1> DXGIDevice;
 	if (SUCCEEDED(Device->QueryInterface(IID_PPV_ARGS(DXGIDevice.GetAddressOf()))))
@@ -202,14 +202,14 @@ TUniquePtr<FTexture2D> FRenderDevice::LoadDDSTexture(const FString& Path) {
 		Resource.GetAddressOf(),
 		nullptr) };
 	if (FAILED(LoadResult)) {
-		HTR_LOG(Error, "[Texture] DDS load failed: {} (hr=0x{:08X})", Path, static_cast<uint32>(LoadResult));
+		KRS_LOG(Error, "[Texture] DDS load failed: {} (hr=0x{:08X})", Path, static_cast<uint32>(LoadResult));
 		return nullptr;
 	}
 
 	ComPtr<ID3D11Texture2D> Texture{};
 	if (FAILED(Resource.As(&Texture))) 
 	{
-		HTR_LOG(Error, "[Texture] DDS is not a 2D texture: {}", Path);
+		KRS_LOG(Error, "[Texture] DDS is not a 2D texture: {}", Path);
 		return nullptr;
 	}
 
@@ -217,7 +217,7 @@ TUniquePtr<FTexture2D> FRenderDevice::LoadDDSTexture(const FString& Path) {
 	Texture->GetDesc(&Desc);
 	if (Desc.ArraySize != 1 || (Desc.MiscFlags & D3D11_RESOURCE_MISC_TEXTURECUBE) != 0) 
 	{
-		HTR_LOG(Error, "[Texture] DDS arrays and cubemaps are not supported by UTexture2D: {}", Path);
+		KRS_LOG(Error, "[Texture] DDS arrays and cubemaps are not supported by UTexture2D: {}", Path);
 		return nullptr;
 	}
 

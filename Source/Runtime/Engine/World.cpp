@@ -75,7 +75,7 @@ bool UWorld::Init()
 
 	if (!PersistentLevel)
 	{
-		HTR_LOG(Error, "Failed to create PersistentLevel");
+		KRS_LOG(Error, "Failed to create PersistentLevel");
 		return false;
 	}
 
@@ -118,7 +118,7 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 
 	if (!NewActor)
 	{
-		HTR_LOG(Error, "SpawnActor : Failed to create Actor");
+		KRS_LOG(Error, "SpawnActor : Failed to create Actor");
 		return nullptr;
 	}
 
@@ -301,7 +301,7 @@ void UWorld::ClearWorld()
 	Scene.RemoveAllLights();
 	Scene.RemoveAllDecals();
 	Scene.RemoveAllPrimitives();
-	HTR_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
+	KRS_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
 }
 
 // 메인 카메라 생성
@@ -314,7 +314,7 @@ void UWorld::CreateMainCamera()
 
 	if (!MainCamera)
 	{
-		HTR_LOG(Error, "Failed to create MainCamera");
+		KRS_LOG(Error, "Failed to create MainCamera");
 		return;
 	}
 
@@ -398,7 +398,7 @@ bool UWorld::DestroyActor(AActor* Actor)
 	// 4. Actor 삭제
 	delete Actor;
 
-	HTR_LOG(Info, "Destroy Actor : {} UUID {}", ActorName, ActorUUID);
+	KRS_LOG(Info, "Destroy Actor : {} UUID {}", ActorName, ActorUUID);
 
 	return true;
 }

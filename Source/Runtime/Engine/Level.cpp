@@ -99,14 +99,14 @@ void ULevel::Serialize(FStructuredArchive::FRecord Record)
 		UClass* Class = FindClass(ClassName);
 		if (!Class || !Class->IsChildOf(AActor::StaticClass()))
 		{
-			HTR_LOG(Warning, "Load: unknown actor class '{}', skipped", ClassName);
+			KRS_LOG(Warning, "Load: unknown actor class '{}', skipped", ClassName);
 			continue;
 		}
 		// 파일 안에 같은 이름이 또 있으면 그대로 생성할 때 앞서 만든 액터를 덮어쓰게 되므로 새 이름을 받는다
 		FName Name = ActorName.empty() ? NAME_None : FName(ActorName);
 		if (!Name.IsNone() && StaticFindObjectFast(nullptr, this, Name))
 		{
-			HTR_LOG(Warning, "Load: duplicate actor name '{}', renamed", ActorName);
+			KRS_LOG(Warning, "Load: duplicate actor name '{}', renamed", ActorName);
 			Name = NAME_None;
 		}
 		AActor* Actor = OwningWorld->SpawnActor(Class, Name);

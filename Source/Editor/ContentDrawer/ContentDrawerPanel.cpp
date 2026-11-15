@@ -6,7 +6,7 @@
 #include "Asset/AssetManager.h"
 #include "Asset/FbxImporter/FbxMeshBake.h"
 #include "Text/Font.h"
-#include "Editor/HitoriEd/EditorDragDrop.h"
+#include "Editor/KurisuEd/EditorDragDrop.h"
 #include "Animation/AnimSequenceFile.h"
 #include "Animation/BlendSpaceFile.h"
 #include "Animation/AnimBlueprintFile.h"
@@ -145,7 +145,7 @@ void FContentDrawerPanel::OnRender()
 			ImGui::InputText("Name", NewAssetName, sizeof(NewAssetName));
 			const fs::path Target = CurrentPath / (FString(NewAssetName) + ".widget");
 			const bool bExists = fs::exists(Target);
-			if (bExists) ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "A file with this name already exists.");
+			if (bExists) ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "A file with this name already exists.");
 
 			ImGui::BeginDisabled(bExists || NewAssetName[0] == '\0');
 			if (ImGui::Button("Create") && OnCreateWidget)
@@ -174,8 +174,8 @@ void FContentDrawerPanel::OnRender()
 			std::error_code ExistsError;
 			const bool bExists = !bInvalidName && fs::exists(Target, ExistsError);
 
-			if (bExists) ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "A file or folder with this name already exists.");
-			else if (bInvalidName && !FolderName.empty()) ImGui::TextColored(ImVec4(1, 0.4f, 0.4f, 1), "Invalid folder name.");
+			if (bExists) ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "A file or folder with this name already exists.");
+			else if (bInvalidName && !FolderName.empty()) ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "Invalid folder name.");
 
 			ImGui::BeginDisabled(bExists || bInvalidName);
 			if (ImGui::Button("Create") || (bEnter && !bExists && !bInvalidName))
@@ -187,7 +187,7 @@ void FContentDrawerPanel::OnRender()
 				}
 				else
 				{
-					HTR_LOG(Warning, "Failed to create folder {} : {}", FPaths::ToUtf8(Target), CreateError.message());
+					KRS_LOG(Warning, "Failed to create folder {} : {}", FPaths::ToUtf8(Target), CreateError.message());
 				}
 			}
 			ImGui::EndDisabled();

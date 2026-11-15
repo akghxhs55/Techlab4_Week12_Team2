@@ -6,7 +6,67 @@
 #include <imgui.h>
 #include <imgui_internal.h>
 
-// 공통 색상과 레이아웃 단위. 크기는 96 DPI를 기준으로 정의한다.
+// 에디터 UI 색 팔레트. 패널에서 색을 직접 적지 말고 여기 이름을 쓴다.
+// 컨셉: 딥 블랙 배경 계층 위에 적갈색 강조색 하나. 상태색(오류·경고·성공)과 분류색만 예외로 다른 색상을 쓴다.
+namespace EditorColor
+{
+    // 배경. 아래로 갈수록 밝다.
+    inline constexpr ImU32 BgDeepest = IM_COL32(13, 13, 16, 255);      // 창 바닥, 로그·목록 안쪽
+    inline constexpr ImU32 BgPanel = IM_COL32(18, 18, 21, 255);        // 패널, 사이드바
+    inline constexpr ImU32 BgRaised = IM_COL32(24, 24, 28, 255);       // 패널 위에 얹는 띠, 교차 행, 분할선
+    inline constexpr ImU32 BgElevated = IM_COL32(30, 30, 34, 255);     // 카드, 버튼, 타임라인 행
+    inline constexpr ImU32 BgElevatedAlt = IM_COL32(36, 36, 41, 255);  // BgElevated의 교차 행
+    inline constexpr ImU32 BgHeader = IM_COL32(42, 42, 47, 255);       // 눈금자, 빈 뷰포트
+    inline constexpr ImU32 BgAccentHover = IM_COL32(50, 40, 41, 255);  // 마우스를 올렸을 때의 붉은 기 도는 배경
+    inline constexpr ImU32 BgOverlay = IM_COL32(16, 16, 19, 238);      // 뷰포트 위에 뜨는 툴바
+    inline constexpr ImU32 Scrim = IM_COL32(0, 0, 0, 140);             // 뷰포트 위 통계 글자 뒤 어둠
+    inline constexpr ImU32 Transparent = IM_COL32(0, 0, 0, 0);
+
+    // 테두리
+    inline constexpr ImU32 Border = IM_COL32(46, 44, 48, 255);
+    inline constexpr ImU32 BorderStrong = IM_COL32(96, 92, 94, 255);
+
+    // 글자와 아이콘
+    inline constexpr ImU32 TextPrimary = IM_COL32(246, 244, 244, 255);
+    inline constexpr ImU32 TextSecondary = IM_COL32(205, 203, 204, 255);
+    inline constexpr ImU32 TextMuted = IM_COL32(165, 162, 165, 255);
+    inline constexpr ImU32 TextDisabled = IM_COL32(120, 120, 124, 255);
+    inline constexpr ImU32 Ink = IM_COL32(20, 20, 22, 255);            // 밝은 면 위의 어두운 선
+
+    // 강조색 (마키세 크리스 적갈색)
+    inline constexpr ImU32 Accent = IM_COL32(158, 51, 43, 255);
+    inline constexpr ImU32 AccentHover = IM_COL32(191, 69, 59, 255);
+    inline constexpr ImU32 AccentActive = IM_COL32(115, 33, 28, 255);
+    inline constexpr ImU32 AccentBright = IM_COL32(215, 86, 74, 255);  // 선택 테두리, 재생 헤드처럼 가는 선
+    inline constexpr ImU32 AccentDim = IM_COL32(96, 36, 32, 255);      // 구분선, 약한 테두리
+    inline constexpr ImU32 AccentText = IM_COL32(235, 128, 86, 255);   // 어두운 배경 위 강조 글자
+
+    // 상태
+    inline constexpr ImU32 Error = IM_COL32(242, 97, 87, 255);
+    inline constexpr ImU32 Warning = IM_COL32(236, 186, 74, 255);
+    inline constexpr ImU32 Success = IM_COL32(112, 196, 124, 255);
+    inline constexpr ImU32 SuccessDim = IM_COL32(30, 84, 46, 255);
+
+    // 종류를 구분하는 색. 강조색과 헷갈리지 않게 다른 색상을 쓴다.
+    inline constexpr ImU32 CategoryBlue = IM_COL32(90, 190, 230, 255);
+    inline constexpr ImU32 CategoryPurple = IM_COL32(170, 120, 220, 255);
+
+    // 제목 표시줄 닫기 버튼. Windows 기본 색을 따른다.
+    inline constexpr ImU32 CloseHover = IM_COL32(232, 17, 35, 255);
+    inline constexpr ImU32 CloseHeld = IM_COL32(241, 112, 122, 255);
+
+    // 반투명 흰색. 밝게 덮는 하이라이트와 틴트에 쓴다.
+    constexpr ImU32 White(int Alpha) { return IM_COL32(255, 255, 255, Alpha); }
+    // 팔레트 색의 불투명도만 바꾼다.
+    constexpr ImU32 WithAlpha(ImU32 Color, int Alpha)
+    {
+        return (Color & ~IM_COL32_A_MASK) | (static_cast<ImU32>(Alpha) << IM_COL32_A_SHIFT);
+    }
+    // ImVec4를 받는 API(TextColored 등)용 변환.
+    inline ImVec4 ToVec4(ImU32 Color) { return ImGui::ColorConvertU32ToFloat4(Color); }
+}
+
+// 공통 스타일 함수와 레이아웃 단위. 크기는 96 DPI를 기준으로 정의한다.
 namespace EditorStyle
 {
     inline float Scale(float Value) { return Value * ImGui::GetStyle().FontScaleDpi; }
@@ -62,8 +122,8 @@ namespace EditorStyle
     {
         if (!bSelected) return;
         ImGui::PushStyleColor(ImGuiCol_Button, ImGui::GetStyleColorVec4(ImGuiCol_CheckboxSelectedBg));
-        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.75f, 0.27f, 0.23f, 1.0f));
-        ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.45f, 0.13f, 0.11f, 1.0f));
+        ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorColor::AccentHover);
+        ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorColor::AccentActive);
     }
 
     inline void PopSelectedButton(bool bSelected) { if (bSelected) ImGui::PopStyleColor(3); }
@@ -103,10 +163,10 @@ namespace EditorStyle
         ImGuiStyle& style = ImGui::GetStyle();
         ImVec4* colors = style.Colors;
 
-        // Accent (마키세 크리스 적갈색)
-        const ImVec4 Accent = ImVec4(0.62f, 0.20f, 0.17f, 1.00f);
-        const ImVec4 AccentHover = ImVec4(0.75f, 0.27f, 0.23f, 1.00f);
-        const ImVec4 AccentActive = ImVec4(0.45f, 0.13f, 0.11f, 1.00f);
+        // 강조색은 팔레트에서 가져온다.
+        const ImVec4 Accent = EditorColor::ToVec4(EditorColor::Accent);
+        const ImVec4 AccentHover = EditorColor::ToVec4(EditorColor::AccentHover);
+        const ImVec4 AccentActive = EditorColor::ToVec4(EditorColor::AccentActive);
 
         // Text
         colors[ImGuiCol_Text] =

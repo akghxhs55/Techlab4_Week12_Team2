@@ -1,7 +1,7 @@
 #include "EnginePCH.h"
 #include "Launch/EntryPoint.h"
 #include "Core/Misc/Paths.h"
-#include "Editor/HitoriEd/EditorEngine.h"
+#include "Editor/KurisuEd/EditorEngine.h"
 #include "Editor/ProjectBrowser/ProjectBrowser.h"
 
 UClass* GetEngineClass() { return UEditorEngine::StaticClass(); }

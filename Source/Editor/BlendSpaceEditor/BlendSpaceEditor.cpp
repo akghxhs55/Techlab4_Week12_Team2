@@ -27,7 +27,7 @@ bool FBlendSpaceEditor::InitializeResources()
     const FString& PreviewPath = BlendSpace->GetPreviewMeshPath();
     if (PreviewPath.empty())
     {
-        HTR_LOG(Warning, "BlendSpace has no preview mesh: {}", GetAssetPath());
+        KRS_LOG(Warning, "BlendSpace has no preview mesh: {}", GetAssetPath());
         return false;
     }
 
@@ -37,7 +37,7 @@ bool FBlendSpaceEditor::InitializeResources()
 
     if (!Mesh)
     {
-        HTR_LOG(Warning, "BlendSpace preview mesh failed: {} ({})", PreviewPath, Error);
+        KRS_LOG(Warning, "BlendSpace preview mesh failed: {} ({})", PreviewPath, Error);
         return false;
     }
 

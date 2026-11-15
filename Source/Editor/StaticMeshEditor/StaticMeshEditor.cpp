@@ -2,7 +2,7 @@
 #include "Editor/StaticMeshEditor/StaticMeshEditor.h"
 #include "StaticMeshEditorTab.h"
 #include "Components/StaticMeshComponent.h"
-#include "Editor/HitoriEd/EditorEngine.h"
+#include "Editor/KurisuEd/EditorEngine.h"
 #include "Launch/LaunchEngineLoop.h"
 #include "Engine/World.h"
 #include "Math/BoxSphereBounds.h"

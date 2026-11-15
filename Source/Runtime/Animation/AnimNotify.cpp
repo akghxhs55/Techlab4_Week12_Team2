@@ -26,7 +26,7 @@ void UAnimNotify_PlaySound::Notify(USkeletalMeshComponent* MeshComp, const UAnim
 	USoundWave* Sound = UAssetManager::Get().LoadSound(SoundPath);
 	if (!Sound)
 	{
-		HTR_LOG(Warning, "AnimNotify_PlaySound: sound load failed: {}", SoundPath);
+		KRS_LOG(Warning, "AnimNotify_PlaySound: sound load failed: {}", SoundPath);
 		return;
 	}
 

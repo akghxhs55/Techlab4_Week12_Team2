@@ -43,6 +43,9 @@ namespace ViewportToolbarWidgets
     // [아이콘][라벨][v] 버튼 폭. 라벨이 없으면 아이콘만 둔다.
     inline float IconButtonWidth(const char* Label, bool bChevron)
     {
+        // 기즈모 버튼은 UE처럼 정사각형으로, 텍스트 드롭다운은 내용 폭으로 배치한다.
+        if ((!Label || !*Label) && !bChevron)
+            return ImMax(ImGui::GetFrameHeight(), IconSize());
         const float Pad = ImGui::GetStyle().FramePadding.x;
         const float Gap = EditorStyle::Scale(5.0f);
         float Width = Pad * 2.0f + IconSize();
@@ -60,11 +63,12 @@ namespace ViewportToolbarWidgets
         const bool bEnabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) == 0;
         const ImU32 Color = TextColor(bEnabled);
         const float Gap = EditorStyle::Scale(5.0f);
-        float X = Pos.x + ImGui::GetStyle().FramePadding.x;
+        const bool bIconOnly = (!Label || !*Label) && !bChevron;
+        float X = Pos.x + (bIconOnly ? (Width - IconSize()) * 0.5f : ImGui::GetStyle().FramePadding.x);
         const float CenterY = Pos.y + Height * 0.5f;
         if (const ImTextureID Texture = GetIcon(Icon); Texture != ImTextureID_Invalid)
             DrawList->AddImage(Texture, { X, CenterY - IconSize() * 0.5f }, { X + IconSize(), CenterY + IconSize() * 0.5f },
-                { 0, 0 }, { 1, 1 }, bEnabled ? IM_COL32(220, 220, 220, 255) : IM_COL32(120, 120, 120, 255));
+                { 0, 0 }, { 1, 1 }, bEnabled ? EditorColor::TextSecondary : EditorColor::TextDisabled);
         X += IconSize();
         if (Label && *Label)
         {
@@ -86,7 +90,7 @@ namespace ViewportToolbarWidgets
         ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { Pad, Pad });
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { Pad, Pad });
         ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(2.0f));
-        ImGui::PushStyleColor(ImGuiCol_ChildBg, IM_COL32(16, 16, 18, 238));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorColor::BgOverlay);
         return ImGui::BeginChild(Id, Size, ImGuiChildFlags_AlwaysUseWindowPadding,
             ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
     }
@@ -165,21 +169,21 @@ namespace ViewportToolbarWidgets
         {
             // UE처럼 선택된 항목은 흰 점, 나머지는 어두운 점
             DrawList->AddCircleFilled({ MarkX, CenterY }, EditorStyle::Scale(3.0f),
-                bSelected ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 20, 255));
+                bSelected ? EditorColor::TextPrimary : EditorColor::Ink);
         }
         else if (Indicator == EIndicator::Check)
         {
             const float Half = EditorStyle::Scale(6.0f);
             const ImVec2 Min{ MarkX - Half, CenterY - Half }, Max{ MarkX + Half, CenterY + Half };
-            DrawList->AddRectFilled(Min, Max, IM_COL32(20, 20, 20, 255), EditorStyle::Scale(2.0f));
+            DrawList->AddRectFilled(Min, Max, EditorColor::Ink, EditorStyle::Scale(2.0f));
             if (bSelected)
                 ImGui::RenderCheckMark(DrawList, { Min.x + EditorStyle::Scale(2.0f), Min.y + EditorStyle::Scale(2.0f) },
-                    IM_COL32(240, 240, 240, 255), Half * 2.0f - EditorStyle::Scale(4.0f));
+                    EditorColor::TextPrimary, Half * 2.0f - EditorStyle::Scale(4.0f));
         }
         float X = Pos.x + Indent;
         if (const ImTextureID Texture = GetIcon(Icon); Texture != ImTextureID_Invalid)
             DrawList->AddImage(Texture, { X, CenterY - IconSize() * 0.5f }, { X + IconSize(), CenterY + IconSize() * 0.5f },
-                { 0, 0 }, { 1, 1 }, IM_COL32(200, 200, 200, 255));
+                { 0, 0 }, { 1, 1 }, EditorColor::TextSecondary);
         if (Icon) X += IconSize() + Gap;
         DrawList->AddText({ X, CenterY - ImGui::GetTextLineHeight() * 0.5f }, Color, Label);
         return bClicked;

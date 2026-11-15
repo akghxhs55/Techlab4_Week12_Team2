@@ -65,7 +65,7 @@ public:
 		}
 		catch (const json::exception&)
 		{
-			HTR_LOG(Warning, "Load: expected {}, got {}, keeping default", TypeName, Value->type_name());
+			KRS_LOG(Warning, "Load: expected {}, got {}, keeping default", TypeName, Value->type_name());
 			return false;
 		}
 	}

@@ -132,7 +132,7 @@ void USkeletalMeshComponent::SetBoneSpaceTransforms(const FCompactPose& Pose)
 {
 	if (Pose.GetNumBones() != GetBones().Num())
 	{
-		HTR_LOG(Warning, "SetBoneSpaceTransforms: pose has {} bones, mesh has {}.", Pose.GetNumBones(), GetBones().Num());
+		KRS_LOG(Warning, "SetBoneSpaceTransforms: pose has {} bones, mesh has {}.", Pose.GetNumBones(), GetBones().Num());
 		return;
 	}
 #if defined(_DEBUG)
@@ -141,7 +141,7 @@ void USkeletalMeshComponent::SetBoneSpaceTransforms(const FCompactPose& Pose)
 		const FQuat& Q = Pose[i].Rotation;
 		const float LenSq = Q.X * Q.X + Q.Y * Q.Y + Q.Z * Q.Z + Q.W * Q.W;
 		if (std::abs(LenSq - 1.0f) > 1e-3f)
-			HTR_LOG(Warning, "Pose bone {} rotation not normalized (|q|^2 = {})", i, LenSq);
+			KRS_LOG(Warning, "Pose bone {} rotation not normalized (|q|^2 = {})", i, LenSq);
 	}
 #endif
 	BoneSpaceTransforms = Pose.GetBones();
@@ -262,7 +262,7 @@ void USkeletalMeshComponent::SerializeSingleAnimation(FStructuredArchive::FRecor
 		: static_cast<UAnimationAsset*>(UAssetManager::LoadAnimSequence(Path));
 	if (!Loaded)
 	{
-		HTR_LOG(Warning, "SkeletalMeshComponent: single animation not found: {}", Path);
+		KRS_LOG(Warning, "SkeletalMeshComponent: single animation not found: {}", Path);
 		return;
 	}
 
@@ -291,7 +291,7 @@ void USkeletalMeshComponent::SetAnimation(UAnimationAsset* NewAnimToPlay)
 {
 	if (NewAnimToPlay && !Cast<UAnimSequence>(NewAnimToPlay) && !Cast<UBlendSpace1D>(NewAnimToPlay))
 	{
-		HTR_LOG(Warning, "SetAnimation: unsupported animation asset type");
+		KRS_LOG(Warning, "SetAnimation: unsupported animation asset type");
 		return;
 	}
     AnimBlueprintPath.clear();
@@ -545,7 +545,7 @@ bool USkeletalMeshComponent::ReloadAnimBlueprint()
 
     if (!SetAnimBlueprint(Path))
     {
-        HTR_LOG(Warning, "AnimBlueprint load failed: {} ({})", Path, AnimBlueprintError);
+        KRS_LOG(Warning, "AnimBlueprint load failed: {} ({})", Path, AnimBlueprintError);
         return false;
     }
 

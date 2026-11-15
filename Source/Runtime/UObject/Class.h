@@ -32,9 +32,9 @@ public:
 	// FStructuredArchive (UE: UStruct::SerializeTaggedProperties)
 	void SerializeTaggedProperties(FStructuredArchive::FSlot Slot, void* Data) const;
 
-	// HHT가 만드는 코드: InClass->AddProperty<decltype(ThisClass::Speed)>("Speed", offsetof(ThisClass, Speed), CPF_Edit);
-	// 프로퍼티 클래스는 멤버 타입으로 고른다(TPropertyTypeFor). UPROPERTY(Type=LinearColor)면 HHT가 두 번째 인자로 직접 넘긴다.
-	// 만든 프로퍼티를 돌려주므로 HHT는 meta를 ->Meta = ...로 이어서 넣는다.
+	// KHT가 만드는 코드: InClass->AddProperty<decltype(ThisClass::Speed)>("Speed", offsetof(ThisClass, Speed), CPF_Edit);
+	// 프로퍼티 클래스는 멤버 타입으로 고른다(TPropertyTypeFor). UPROPERTY(Type=LinearColor)면 KHT가 두 번째 인자로 직접 넘긴다.
+	// 만든 프로퍼티를 돌려주므로 KHT는 meta를 ->Meta = ...로 이어서 넣는다.
 	template <typename T, typename TPropertyClass = typename TPropertyTypeFor<T>::Type>
 	TPropertyClass* AddProperty(const FString& InName, uint32 InOffset, uint32 InFlags = CPF_Default)
 	{
@@ -65,7 +65,7 @@ public:
 				static_assert(TEnumInfo<T>::bReflected, "An enum used as a UPROPERTY needs UENUM().");
 				if constexpr (TEnumInfo<T>::bReflected)
 				{
-					// Get이 템플릿인 이유는 HHT가 만든 TEnumInfo의 주석 참고
+					// Get이 템플릿인 이유는 KHT가 만든 TEnumInfo의 주석 참고
 					Property->Enum = TEnumInfo<T>::template Get<>();
 				}
 				Property->ElementSize = sizeof(T);
@@ -118,11 +118,11 @@ public:
 	T* GetDefaultObject() const
 	{
 		UObject* Ret = GetDefaultObject();
-		assert(Ret && Ret->IsA(T::StaticClass()) && "추상 클래스이거나 T의 자식이 아닌 클래스");
+		assert(Ret && Ret->IsA(T::StaticClass()) && "Class is abstract or not a child of T");
 		return static_cast<T*>(Ret);
 	}
 
-	// HHT가 만드는 코드: InClass->AddFunction<&ThisClass::Foo>("Foo", FUNC_ScriptCallable);
+	// KHT가 만드는 코드: InClass->AddFunction<&ThisClass::Foo>("Foo", FUNC_ScriptCallable);
 	template <auto Func>
 	void AddFunction(const FString& InName, uint32 InFlags)
 	{

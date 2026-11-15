@@ -72,7 +72,7 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 
 		hr = Device->CreateShaderResourceView(Texture.Get(), bTypelessDepth ? &SrvDesc : nullptr, SRV.GetAddressOf());
 		if (FAILED(hr))
-			HTR_LOG(Error, "[Texture2D] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
+			KRS_LOG(Error, "[Texture2D] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)hr);
 	}
 
 	if ((InDesc.BindFlags & D3D11_BIND_RENDER_TARGET) &&
@@ -80,7 +80,7 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 	{
 		hr = Device->CreateRenderTargetView(Texture.Get(), nullptr, RTV.GetAddressOf());
 		if (FAILED(hr))
-			HTR_LOG(Error, "[Texture2D] CreateRenderTargetView failed (hr=0x{:08X})", (uint32)hr);
+			KRS_LOG(Error, "[Texture2D] CreateRenderTargetView failed (hr=0x{:08X})", (uint32)hr);
 	}
 
 	if (InDesc.BindFlags & D3D11_BIND_DEPTH_STENCIL)
@@ -91,7 +91,7 @@ void FTexture2D::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DESC& I
 
 		hr = Device->CreateDepthStencilView(Texture.Get(), bTypelessDepth ? &DsvDesc : nullptr, DSV.GetAddressOf());
 		if (FAILED(hr))
-			HTR_LOG(Error, "[Texture2D] CreateDepthStencilView failed (hr=0x{:08X})", (uint32)hr);
+			KRS_LOG(Error, "[Texture2D] CreateDepthStencilView failed (hr=0x{:08X})", (uint32)hr);
 	}
 }
 
@@ -198,7 +198,7 @@ void FTexture2DArray::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DE
 		const HRESULT Result = Device->CreateShaderResourceView(Texture.Get(), &Desc, SRV.GetAddressOf());
 		if (FAILED(Result))
 		{
-			HTR_LOG(Error, "[Texture2DArray] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)Result);
+			KRS_LOG(Error, "[Texture2DArray] CreateShaderResourceView failed (hr=0x{:08X})", (uint32)Result);
 		}
 	}
 
@@ -219,7 +219,7 @@ void FTexture2DArray::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DE
 		HRESULT Result = Device->CreateRenderTargetView(Texture.Get(), &Desc, RTV.GetAddressOf());
 		if (FAILED(Result))
 		{
-			HTR_LOG(Error, "[Texture2DArray] CreateRenderTargetView failed (hr=0x{:08X})", (uint32)Result);
+			KRS_LOG(Error, "[Texture2DArray] CreateRenderTargetView failed (hr=0x{:08X})", (uint32)Result);
 		}
 
 		RTVs.SetNum(InDesc.ArraySize);
@@ -238,7 +238,7 @@ void FTexture2DArray::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DE
 			Result = Device->CreateRenderTargetView(Texture.Get(), &Desc, RTVs[Slice].GetAddressOf());
 			if (FAILED(Result))
 			{
-				HTR_LOG(Error, "[Texture2DArray] CreateRenderTargetView slice={} failed (hr=0x{:08X})", Slice, (uint32)Result);
+				KRS_LOG(Error, "[Texture2DArray] CreateRenderTargetView slice={} failed (hr=0x{:08X})", Slice, (uint32)Result);
 			}
 		}
 	}
@@ -259,7 +259,7 @@ void FTexture2DArray::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DE
 		HRESULT Result = Device->CreateDepthStencilView(Texture.Get(), &Desc, DSV.GetAddressOf());
 		if (FAILED(Result))
 		{
-			HTR_LOG(Error, "[Texture2DArray] CreateDepthStencilView failed (hr=0x{:08X})", (uint32)Result);
+			KRS_LOG(Error, "[Texture2DArray] CreateDepthStencilView failed (hr=0x{:08X})", (uint32)Result);
 		}
 
 		DSVs.SetNum(InDesc.ArraySize);
@@ -278,7 +278,7 @@ void FTexture2DArray::CreateViews(ID3D11Device* Device, const D3D11_TEXTURE2D_DE
 			Result = Device->CreateDepthStencilView(Texture.Get(), &Desc, DSVs[Slice].GetAddressOf());
 			if (FAILED(Result))
 			{
-				HTR_LOG(Error, "[Texture2DArray] CreateDepthStencilView slice={} failed (hr=0x{:08X})", Slice, (uint32)Result);
+				KRS_LOG(Error, "[Texture2DArray] CreateDepthStencilView slice={} failed (hr=0x{:08X})", Slice, (uint32)Result);
 			}
 		}
 	}

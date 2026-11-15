@@ -56,16 +56,16 @@ FSwapchain::FSwapchain(FRenderDevice* InRenderDevice, FWindow* InWindow)
 	// 플래그 조합을 거부하는 드라이버가 있으므로 Tearing 없이 한 번 더 시도한다.
 	if (FAILED(hr) && bAllowTearing)
 	{
-		HTR_LOG(Warning, "Swapchain creation with ALLOW_TEARING failed. Retrying without it.");
+		KRS_LOG(Warning, "Swapchain creation with ALLOW_TEARING failed. Retrying without it.");
 		bAllowTearing = false;
 		Desc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
 		hr = RenderDevice->GetFactory()->CreateSwapChain(RenderDevice->GetDevice(), &Desc, Swapchain.GetAddressOf());
 	}
 
 	if (FAILED(hr))
-		HTR_LOG(Error, "Failed To Create Swapchain!");
+		KRS_LOG(Error, "Failed To Create Swapchain!");
 	else
-		HTR_LOG(Info, "Swapchain created. Tearing {}", bAllowTearing ? "allowed" : "not allowed");
+		KRS_LOG(Info, "Swapchain created. Tearing {}", bAllowTearing ? "allowed" : "not allowed");
 
 	CreateBackbuffer();
 }
