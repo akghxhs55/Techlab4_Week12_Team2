@@ -456,12 +456,34 @@ void FContentDrawerPanel::RenderContents()
 				EditorStyle::Scale(7.0f),
 				ImGui::GetColorU32(ImGuiCol_Text));
 
+			std::string ProjectLabel = "Kurisu";
+			if (FPaths::HasProject())
+			{
+				const std::string Stem = FPaths::ToUtf8(FPaths::ProjectFilePath().stem());
+				if (!Stem.empty())
+				{
+					ProjectLabel = Stem;
+				}
+				else if (!FPaths::ProjectName().empty())
+				{
+					ProjectLabel = FPaths::ProjectName();
+				}
+			}
+
 			ImGui::SameLine(0.0f, EditorStyle::Scale(4.0f));
 			ImGui::AlignTextToFramePadding();
-			ImGui::TextUnformatted("Kurisu");
-
 			const float ToggleSize = ImGui::GetFrameHeight();
-			ImGui::SameLine(ImMax(0.0f, ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ToggleSize));
+			const float TextStartLocalX = ImGui::GetCursorPosX();
+			const float TextAvailW = ImGui::GetContentRegionAvail().x;
+			const float ToggleLocalX = TextStartLocalX + ImMax(0.0f, TextAvailW - ToggleSize);
+			const ImVec2 TextScreenPos = ImGui::GetCursorScreenPos();
+			const float TextMaxScreenX = TextScreenPos.x + ImMax(0.0f, TextAvailW - ToggleSize - EditorStyle::Scale(4.0f));
+
+			ImGui::PushClipRect(TextScreenPos, ImVec2(TextMaxScreenX, HeaderPos.y + HeaderHeight), true);
+			ImGui::TextUnformatted(ProjectLabel.c_str());
+			ImGui::PopClipRect();
+
+			ImGui::SameLine(ToggleLocalX);
 
 			const ImTextureID SearchIcon = ViewportToolbarWidgets::GetIcon("Search");
 			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);

@@ -85,7 +85,7 @@ private:
 	FContentDrawerPanel* DrawerContentPanel = nullptr;
 	FOutputLogPanel* DrawerLogPanel = nullptr;
 	EBottomDrawer ActiveDrawer = EBottomDrawer::None;
-	float DrawerHeight = 320.0f;
+	float DrawerHeight = 480.0f;
 	bool bDrawerOpenedThisFrame = false;
 	bool bResizingDrawer = false;
 	bool bDrawerFocused = false;
