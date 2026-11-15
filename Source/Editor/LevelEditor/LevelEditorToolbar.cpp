@@ -141,28 +141,31 @@ void FLevelEditorToolbar::DrawPlacementGroup()
 
 void FLevelEditorToolbar::DrawPlayGroup()
 {
+	// 20px 아이콘 + 사방 4px: 배치 드롭다운과 높이는 같고, 재생 컨트롤은 정사각형이다.
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, { EditorStyle::Scale(4.0f), EditorStyle::Scale(4.0f) });
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { EditorStyle::Scale(2.0f), EditorStyle::Scale(4.0f) });
+	ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+	ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::Transparent);
 	BeginToolbarGroup();
 
-	// 같은 자리에 Play/Pause/Resume을 모두 넘긴다. IsVisible이 참인 하나만 그려진다.
-	// SameLine은 "그려졌을 때만" 붙여야 빈 간격이 생기지 않는다.
-	bool bFirst = true;
-	auto Button = [&](const char* Id, const FEditorCommand& Command)
-		{
-			if (!Command.IsVisibleNow())
-				return;
-			if (!bFirst) ImGui::SameLine();
-			EditorCommandUI::ToolbarButton(Id, Command);
-			bFirst = false;
-		};
+	// 먼저 이번 프레임의 버튼을 확정한다. Pause 클릭 직후 Resume까지 그리면 묶음 폭이 순간적으로 바뀐다.
+	TArray<const FEditorCommand*> VisibleCommands;
+	for (const FEditorCommand& Command : Commands)
+		if (Command.IsVisibleNow()) VisibleCommands.Add(&Command);
 
-	for (auto Command : Commands)
+	bool bFirst = true;
+	for (const FEditorCommand* Command : VisibleCommands)
 	{
-		Button(Command.Label, Command);
+		if (!bFirst) ImGui::SameLine();
+		EditorCommandUI::ToolbarButton(Command->Label, *Command);
+		bFirst = false;
 	}
 	if (!bFirst) ImGui::SameLine();
 	DrawPlayModeMenu();
 
 	EndToolbarGroup();
+	ImGui::PopStyleColor();
+	ImGui::PopStyleVar(3);
 }
 
 void FLevelEditorToolbar::DrawPlayModeMenu()
@@ -175,7 +178,7 @@ void FLevelEditorToolbar::DrawPlayModeMenu()
 	ImGui::BeginDisabled(!bCanChange);
 	// UE처럼 Play 그룹 끝의 ⋮ 버튼으로 실행 위치를 고른다.
 	const ImVec2 ButtonSize = EditorCommandUI::GetToolbarButtonSize();
-	if (ImGui::Button("##PlayModeMenu", { EditorStyle::Scale(16.0f), ButtonSize.y }))
+	if (ImGui::Button("##PlayModeMenu", { EditorStyle::Scale(20.0f), ButtonSize.y }))
 		ImGui::OpenPopup("PlayModePopup");
 	{
 		const ImVec2 Min = ImGui::GetItemRectMin(), Max = ImGui::GetItemRectMax();

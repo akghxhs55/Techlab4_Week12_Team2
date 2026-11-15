@@ -256,6 +256,9 @@ bool EditorTitleBar::DrawMenuBar(const std::function<void()>& DrawMenus)
 	if (!GInstalled) return false;
 
 	// Draw가 만든 띠 창에 이어서 그린다. 같은 프레임에 같은 이름으로 Begin하면 내용이 덧붙는다.
+	// BeginMenuBar의 글자 기준선과 클릭 영역도 띠 높이를 계산할 때와 같은 여백을 사용한다.
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+		ImVec2(ImGui::GetStyle().FramePadding.x, EditorStyle::Scale(MenuFramePaddingY)));
 	const bool bVisible = ImGui::Begin(TitleBarWindowName, nullptr, TitleBarFlags);
 	if (bVisible && ImGui::BeginMenuBar())
 	{
@@ -284,6 +287,7 @@ bool EditorTitleBar::DrawMenuBar(const std::function<void()>& DrawMenus)
 	}
 
 	ImGui::End();
+	ImGui::PopStyleVar();
 	return true;
 }
 
