@@ -16,6 +16,7 @@ public:
 	bool Init() override;
 	void Tick(float DeltaTime) override;
 	void OnRender() override;
+	void RenderContents();
 	const char* GetPanelName() const override { return "Content Drawer"; }
 	void RenderFolderTree(const fs::path& Path, fs::path& SelectedPath);
 

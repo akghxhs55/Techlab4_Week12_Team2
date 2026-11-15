@@ -80,7 +80,15 @@ void FContentDrawerPanel::Tick(float DeltaTime)
 
 void FContentDrawerPanel::OnRender()
 {
-	ImGui::Begin("Content Drawer", GetOpenFlag());
+	if (ImGui::Begin("Content Drawer", GetOpenFlag()))
+	{
+		RenderContents();
+	}
+	ImGui::End();
+}
+
+void FContentDrawerPanel::RenderContents()
+{
 	std::error_code Error;
 
 	if (!fs::is_directory(CurrentPath, Error))
@@ -93,7 +101,6 @@ void FContentDrawerPanel::OnRender()
 	if (!fs::is_directory(AssetRootPath, Error))
 	{
 		ImGui::TextUnformatted("Asset folder is unavailable.");
-		ImGui::End();
 		return;
 	}
 
@@ -381,7 +388,6 @@ void FContentDrawerPanel::OnRender()
     AnimBlueprintCreator.ProcessCreateRequest();
 
 	ImGui::EndChild();
-	ImGui::End();
 }
 
 void FContentDrawerPanel::RenderNavigationBar()

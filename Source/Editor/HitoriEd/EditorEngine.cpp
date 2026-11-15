@@ -197,6 +197,7 @@ void UEditorEngine::InitLevelEditorTab()
 	LevelEditorTab->SetIsPackagingQuery([this]() { return Packager.IsRunning(); });
 
 	OutputLogPanel = LevelEditorTab->AddPanel<FOutputLogPanel>();
+	OutputLogPanel->SetOpen(false);
 	FLog::AddSink(OutputLogPanel);
 	HTR_LOG(Info, "Editor Initialize...");
 
@@ -278,6 +279,8 @@ void UEditorEngine::InitPanels()
 
 	ViewportsPanel = LevelEditorTab->AddPanel<FViewportsPanel>();
 	ContentDrawerPanel = LevelEditorTab->AddPanel<FContentDrawerPanel>();
+	ContentDrawerPanel->SetOpen(false);
+	LevelEditorTab->SetDrawerPanels(ContentDrawerPanel, OutputLogPanel);
 
 	EditorSettings = MakeUnique<FEditorSettingsManager>();
 	EditorSettings->Init();
