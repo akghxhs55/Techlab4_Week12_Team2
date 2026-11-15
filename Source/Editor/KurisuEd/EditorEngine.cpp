@@ -197,6 +197,7 @@ void UEditorEngine::InitLevelEditorTab()
 	LevelEditorTab->SetIsPackagingQuery([this]() { return Packager.IsRunning(); });
 
 	OutputLogPanel = LevelEditorTab->AddPanel<FOutputLogPanel>();
+	OutputLogPanel->SetOpen(false);
 	FLog::AddSink(OutputLogPanel);
 	KRS_LOG(Info, "Editor Initialize...");
 
@@ -280,6 +281,8 @@ void UEditorEngine::InitPanels()
 
 	ViewportsPanel = LevelEditorTab->AddPanel<FViewportsPanel>();
 	ContentDrawerPanel = LevelEditorTab->AddPanel<FContentDrawerPanel>();
+	ContentDrawerPanel->SetOpen(false);
+	LevelEditorTab->SetDrawerPanels(ContentDrawerPanel, OutputLogPanel);
 
 	EditorSettings = MakeUnique<FEditorSettingsManager>();
 	EditorSettings->Init();
@@ -301,6 +304,7 @@ void UEditorEngine::InitPanels()
 
 	// .scene 더블클릭 → 레벨 에디터에 그 씬을 연다
 	ContentDrawerPanel->SetOpenSceneCallback([this](const FString& Path) { OpenSceneFromPath(Path); });
+	ContentDrawerPanel->SetImportFbxCallback([](EFbxImportMode Mode) { FEditorFileUtils::ImportFbx(Mode); });
 
 	ContentDrawerPanel->SetBlendSpaceCreatedCallback([this](const FString& Path) { EditorManager->OpenEditor(Path); });
     ContentDrawerPanel->SetAnimBlueprintCreatedCallback([this](const FString& Path) { EditorManager->OpenEditor(Path); });

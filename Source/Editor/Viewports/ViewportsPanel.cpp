@@ -57,6 +57,7 @@ void FViewportsPanel::Tick(float DeltaTime)
 {
 	(void)DeltaTime;
 	if (Gizmo && bFocused && IsHovered() && !ImGui::GetIO().WantTextInput &&
+		!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt && !ImGui::GetIO().KeyShift &&
 		(!GameViewportClient || ActiveViewIndex != GameViewportIndex) &&
 		FInputSystem::IsKeyPressed(EKeyCode::Space))
 		Gizmo->SetMode(static_cast<EGizmoMode>((static_cast<int>(Gizmo->GetMode()) + 1) % 3));

@@ -108,7 +108,16 @@ void FOutputLogPanel::OnRender()
 	using namespace ViewportToolbarWidgets;
 	ImGui::SetNextWindowSize(ImVec2(520, 600), ImGuiCond_FirstUseEver);
 
-	ImGui::Begin("Output Log", GetOpenFlag());
+	if (ImGui::Begin("Output Log", GetOpenFlag()))
+	{
+		RenderContents();
+	}
+	ImGui::End();
+}
+
+void FOutputLogPanel::RenderContents()
+{
+	using namespace ViewportToolbarWidgets;
 	const ImGuiStyle& Style = ImGui::GetStyle();
 	bool CopyToClipboard = false;
 
@@ -269,8 +278,6 @@ void FOutputLogPanel::OnRender()
 		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
 
 	//////////////////////////////////////////////////////////
-
-	ImGui::End();
 }
 
 bool FOutputLogPanel::PassVerbosity(ELogVerbosity Verbosity) const

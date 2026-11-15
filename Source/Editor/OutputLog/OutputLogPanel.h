@@ -31,6 +31,7 @@ public:
 	bool Init() override;
 	void Tick(float DeltaTime)override;
 	void OnRender() override;
+	void RenderContents();
 	const char* GetPanelName() const override { return "Output Log"; }
 
 	void ClearLog();
