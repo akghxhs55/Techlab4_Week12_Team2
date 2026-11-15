@@ -485,6 +485,76 @@ namespace
 		FName ExternalParentActorName;
 		FName ExternalParentCompName;
 	};
+
+	// ---- 9. 복합 커맨드 (다중 선택 변환/삭제/복제/편집) ----
+	class FCompositeUndoCommand final : public IEditorUndoCommand
+	{
+	public:
+		FCompositeUndoCommand(
+			FString InDesc,
+			TArray<TUniquePtr<IEditorUndoCommand>> InCommands,
+			TArray<FName> InUndoSelectActors,
+			TArray<FName> InRedoSelectActors)
+			: Description(std::move(InDesc))
+			, Commands(std::move(InCommands))
+			, UndoSelectActors(std::move(InUndoSelectActors))
+			, RedoSelectActors(std::move(InRedoSelectActors))
+		{
+		}
+
+		const char* GetDescription() const override { return Description.c_str(); }
+
+		void Undo(UEditorEngine& Editor) override
+		{
+			for (int32 i = Commands.Num() - 1; i >= 0; --i)
+			{
+				if (Commands[i])
+				{
+					Commands[i]->Undo(Editor);
+				}
+			}
+			ApplySelection(Editor, UndoSelectActors);
+		}
+
+		void Redo(UEditorEngine& Editor) override
+		{
+			for (int32 i = 0; i < Commands.Num(); ++i)
+			{
+				if (Commands[i])
+				{
+					Commands[i]->Redo(Editor);
+				}
+			}
+			ApplySelection(Editor, RedoSelectActors);
+		}
+
+	private:
+		static void ApplySelection(UEditorEngine& Editor, const TArray<FName>& Names)
+		{
+			if (Names.IsEmpty())
+			{
+				return;
+			}
+			UWorld* World = Editor.GetEditorWorld();
+			TArray<AActor*> Actors;
+			for (const FName& Name : Names)
+			{
+				if (AActor* Actor = EditorUndoUtils::FindActorByName(World, Name))
+				{
+					Actors.Add(Actor);
+				}
+			}
+			if (!Actors.IsEmpty())
+			{
+				Editor.SelectActorsForUndo(Actors);
+			}
+		}
+
+		FString Description;
+		TArray<TUniquePtr<IEditorUndoCommand>> Commands;
+		TArray<FName> UndoSelectActors;
+		TArray<FName> RedoSelectActors;
+	};
 }
 
 void FEditorUndoHistory::Push(TUniquePtr<IEditorUndoCommand> Command)
@@ -878,5 +948,18 @@ namespace EditorUndoUtils
 			NewRootName,
 			ExternalParentActorName,
 			ExternalParentCompName);
+	}
+
+	TUniquePtr<IEditorUndoCommand> MakeCompositeCommand(
+		const char* Description,
+		TArray<TUniquePtr<IEditorUndoCommand>> Commands,
+		TArray<FName> UndoSelectActorNames,
+		TArray<FName> RedoSelectActorNames)
+	{
+		return MakeUnique<FCompositeUndoCommand>(
+			Description ? Description : "Multi Edit",
+			std::move(Commands),
+			std::move(UndoSelectActorNames),
+			std::move(RedoSelectActorNames));
 	}
 }

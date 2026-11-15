@@ -13,7 +13,9 @@ class USceneComponent;
 class FEditorUndoHistory;
 
 using SelectionCallback = std::function<void(USceneComponent*)>;
+using MultiSelectionCallback = std::function<void(const TArray<AActor*>&)>;
 using DeleteActorCallback = std::function<void(AActor*)>;
+using DeleteActorsCallback = std::function<void(const TArray<AActor*>&)>;
 
 class FOutlinerPanel : public IEditorPanel
 {
@@ -21,8 +23,10 @@ public:
     FOutlinerPanel() = default;
     ~FOutlinerPanel() = default;
 
-    void SetSelectionCallback(SelectionCallback InCallback) { Callback = InCallback; }
-    void SetDeleteActorCallback(DeleteActorCallback InCallback) { DeleteCallback = InCallback;}
+    void SetSelectionCallback(SelectionCallback InCallback) { Callback = std::move(InCallback); }
+    void SetMultiSelectionCallback(MultiSelectionCallback InCallback) { MultiCallback = std::move(InCallback); }
+    void SetDeleteActorCallback(DeleteActorCallback InCallback) { DeleteCallback = std::move(InCallback); }
+    void SetDeleteActorsCallback(DeleteActorsCallback InCallback) { MultiDeleteCallback = std::move(InCallback); }
     void SetUndoHistory(FEditorUndoHistory* InHistory) { UndoHistory = InHistory; }
 
 public:
@@ -35,20 +39,31 @@ public:
 
     void DrawActors(ULevel* Level);
     void DrawActorNode(AActor* Actor);
-    void SelectActor(AActor* Actor);
+    void SelectActor(AActor* Actor, bool bAdditiveToggle = false, bool bRangeSelect = false);
+    void SelectActors(const TArray<AActor*>& Actors);
 
     AActor* GetSelectedActor() const;
+    const TArray<AActor*>& GetSelectedActors() const { return SelectedActors; }
+    bool IsActorSelected(const AActor* Actor) const;
 	bool IsFocused() const { return bFocused; }
 
 
 private:
+    void NotifySelectionChanged();
+    void PruneInvalidSelections(ULevel* Level);
+
     UWorld* World = nullptr;
-    UObject* SelectedObject = nullptr;
+    TArray<AActor*> SelectedActors;
+    AActor* SelectionAnchorActor = nullptr;
+    TArray<AActor*> VisibleActorOrder;
 
     SelectionCallback Callback;
+    MultiSelectionCallback MultiCallback;
     DeleteActorCallback DeleteCallback;
+    DeleteActorsCallback MultiDeleteCallback;
     FEditorUndoHistory* UndoHistory = nullptr;
     AActor* PendingDeleteActor = nullptr;
+    TArray<AActor*> PendingDeleteActors;
 	bool bFocused = false;
 	AActor* RenamingActor = nullptr;
 	char RenameBuffer[256] = {};

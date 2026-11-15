@@ -37,6 +37,7 @@
 #include "Render/RenderCommand.h"
 #include "Editor/Outliner/OutlinerPanel.h"
 #include "Editor/HitoriEd/EditorFileUtils.h"
+#include "Editor/HitoriEd/EditorHierarchy.h"
 #include "Editor/Viewports/EditorViewportClient.h"
 #include "UObject/UObjectIterator.h"
 
@@ -320,6 +321,31 @@ void UEditorEngine::InitPanels()
 
 	OutlinerPanel = LevelEditorTab->AddPanel<FOutlinerPanel>();
 	OutlinerPanel->SetWorld(GetActiveWorld());
+	OutlinerPanel->SetMultiSelectionCallback(
+		[this](const TArray<AActor*>& SelectedActors)
+		{
+			AActor* Primary = SelectedActors.IsEmpty() ? nullptr : SelectedActors.Last();
+			USceneComponent* Root = Primary ? Primary->GetRootComponent() : nullptr;
+			Gizmo->SetTarget(Root, true);
+			DetailsPanel->SetTargets(SelectedActors);
+
+			TArray<UPrimitiveComponent*> Primitives;
+			for (AActor* Actor : SelectedActors)
+			{
+				if (!Actor)
+				{
+					continue;
+				}
+				for (UActorComponent* C : Actor->GetComponents())
+				{
+					if (UPrimitiveComponent* Prim = Cast<UPrimitiveComponent>(C))
+					{
+						Primitives.Add(Prim);
+					}
+				}
+			}
+			Outline->SetTargets(Primitives);
+		});
 	OutlinerPanel->SetSelectionCallback(
 		[this](USceneComponent* Root)
 		{
@@ -364,6 +390,12 @@ void UEditorEngine::InitPanels()
 		[this](AActor* Actor)
 		{
 			DeleteActor(Actor);
+		}
+	);
+	OutlinerPanel->SetDeleteActorsCallback(
+		[this](const TArray<AActor*>& Actors)
+		{
+			DeleteActors(Actors);
 		}
 	);
 	DetailsPanel->SetDeleteComponentCallback(
@@ -520,7 +552,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 	FStatOverlay::Tick(DeltaTime);
 
 	if (!ImGui::GetIO().WantTextInput && FInputSystem::IsKeyPressed(EKeyCode::Delete))
-		DeleteActor(OutlinerPanel->GetSelectedActor());
+		DeleteActors(OutlinerPanel->GetSelectedActors());
 
 	// 뷰포트 레이아웃과 에디터 카메라를 갱신한다. 패널의 요청(레이아웃 변경, 분할선 드래그)을 적용하고,
 	// 어느 View 위에 마우스가 있는지 찾아 활성 View를 정한 뒤 View마다 카메라 입력을 처리한다.
@@ -694,31 +726,79 @@ void UEditorEngine::Tick(const float DeltaTime)
 				if (FInputSystem::IsKeyPressed(EKeyCode::C)) CopySelectedActor();
 				if (FInputSystem::IsKeyPressed(EKeyCode::V)) PasteActor();
 				if (FInputSystem::IsKeyPressed(EKeyCode::D))
-					if (AActor* Actor = OutlinerPanel->GetSelectedActor())
+				{
+					const TArray<AActor*> Selected = OutlinerPanel->GetSelectedActors();
+					TArray<AActor*> Duplicates;
+					for (AActor* Actor : Selected)
+					{
 						if (AActor* Duplicate = EditorWorld->DuplicateActor(Actor))
 						{
-							OutlinerPanel->SelectActor(Duplicate);
-							if (!IsPlaying() && UndoHistory.CanRecord())
+							Duplicates.Add(Duplicate);
+						}
+					}
+					if (!Duplicates.IsEmpty())
+					{
+						OutlinerPanel->SelectActors(Duplicates);
+						if (!IsPlaying() && UndoHistory.CanRecord())
+						{
+							TArray<TUniquePtr<IEditorUndoCommand>> Cmds;
+							TArray<FName> DupNames;
+							for (AActor* Dup : Duplicates)
 							{
 								FActorUndoSnapshot Snapshot;
-								if (EditorUndoUtils::CaptureActorSnapshot(Duplicate, Snapshot))
+								if (EditorUndoUtils::CaptureActorSnapshot(Dup, Snapshot))
 								{
-									UndoHistory.Push(EditorUndoUtils::MakeActorCreateDeleteCommand("Duplicate Actor", std::move(Snapshot), true));
+									DupNames.Add(Dup->GetFName());
+									Cmds.Add(EditorUndoUtils::MakeActorCreateDeleteCommand("Duplicate Actor", std::move(Snapshot), true));
 								}
 							}
+							if (Cmds.Num() == 1)
+							{
+								UndoHistory.Push(std::move(Cmds[0]));
+							}
+							else if (Cmds.Num() > 1)
+							{
+								UndoHistory.Push(EditorUndoUtils::MakeCompositeCommand("Duplicate Actors", std::move(Cmds), {}, DupNames));
+							}
 						}
+					}
+				}
 			}
 			else if (!ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt &&
 				CapturedViewportIndex == -1 && FInputSystem::IsKeyPressed(EKeyCode::F))
 			{
-				if (AActor* Actor = OutlinerPanel->GetSelectedActor())
+				const TArray<AActor*>& Selected = OutlinerPanel->GetSelectedActors();
+				if (!Selected.IsEmpty())
+				{
 					if (auto* Client = ViewportsPanel->GetViewportClient(ViewportsPanel->GetActiveViewIndex()))
 					{
-						FBox Box;
-						FVector Origin = Actor->GetActorLocation(), Extent(0.5f, 0.5f, 0.5f);
-						if (Actor->TryGetActorBounds(Box)) { Origin = (Box.Min + Box.Max) * 0.5f; Extent = (Box.Max - Box.Min) * 0.5f; }
-						Client->FocusOnBounds({ Origin, Extent, Extent.Size() }, true);
+						FBox CombinedBox(FVector(FLT_MAX, FLT_MAX, FLT_MAX), FVector(-FLT_MAX, -FLT_MAX, -FLT_MAX));
+						bool bHasValid = false;
+						for (AActor* Actor : Selected)
+						{
+							if (!Actor) continue;
+							FBox Box;
+							if (!Actor->TryGetActorBounds(Box))
+							{
+								const FVector Loc = Actor->GetActorLocation();
+								Box = FBox(Loc - FVector(0.5f, 0.5f, 0.5f), Loc + FVector(0.5f, 0.5f, 0.5f));
+							}
+							CombinedBox.Min.X = FMath::Min(CombinedBox.Min.X, Box.Min.X);
+							CombinedBox.Min.Y = FMath::Min(CombinedBox.Min.Y, Box.Min.Y);
+							CombinedBox.Min.Z = FMath::Min(CombinedBox.Min.Z, Box.Min.Z);
+							CombinedBox.Max.X = FMath::Max(CombinedBox.Max.X, Box.Max.X);
+							CombinedBox.Max.Y = FMath::Max(CombinedBox.Max.Y, Box.Max.Y);
+							CombinedBox.Max.Z = FMath::Max(CombinedBox.Max.Z, Box.Max.Z);
+							bHasValid = true;
+						}
+						if (bHasValid)
+						{
+							const FVector Origin = (CombinedBox.Min + CombinedBox.Max) * 0.5f;
+							const FVector Extent = (CombinedBox.Max - CombinedBox.Min) * 0.5f;
+							Client->FocusOnBounds({ Origin, Extent, Extent.Size() }, true);
+						}
 					}
+				}
 			}
 		}
 
@@ -1064,37 +1144,160 @@ void UEditorEngine::UpdateGizmoAndPicking()
 
 	USceneComponent* PreDragTarget = (!bTrackingGizmoDrag && Gizmo) ? Gizmo->GetTarget() : nullptr;
 	const bool bWasUsingGizmo = Gizmo && Gizmo->IsUsing();
-	FTransform PreDragTransform;
-	bool bPreDragHasLightRadius = false;
-	float PreDragLightRadius = 0.0f;
-	if (PreDragTarget)
+	TArray<FGizmoDragEntry> CandidateEntries;
+	FVector PreDragPrimaryWorldLoc = FVector(0, 0, 0);
+	FQuat PreDragPrimaryWorldQuat = FQuat::Identity();
+	FVector PreDragPrimaryScale = FVector(1, 1, 1);
+	if (PreDragTarget && PreDragTarget->GetOwner())
 	{
-		PreDragTransform = PreDragTarget->GetTransform();
+		PreDragPrimaryWorldLoc = PreDragTarget->GetWorldLocation();
+		PreDragPrimaryWorldQuat = PreDragTarget->GetWorldRotation().Quaternion();
+		PreDragPrimaryScale = PreDragTarget->GetRelativeScale3D();
+
+		FGizmoDragEntry PrimaryEntry;
+		PrimaryEntry.ActorName = PreDragTarget->GetOwner()->GetFName();
+		PrimaryEntry.CompName = PreDragTarget->GetFName();
+		PrimaryEntry.StartTransform = PreDragTarget->GetTransform();
+		PrimaryEntry.StartWorldLocation = PreDragPrimaryWorldLoc;
+		PrimaryEntry.StartWorldQuat = PreDragPrimaryWorldQuat;
+		PrimaryEntry.bIsPrimary = true;
 		if (ULocalLightComponent* Light = Cast<ULocalLightComponent>(PreDragTarget))
 		{
-			bPreDragHasLightRadius = true;
-			PreDragLightRadius = Light->GetAttenuationRadius();
+			PrimaryEntry.bHasLightRadius = true;
+			PrimaryEntry.StartLightRadius = Light->GetAttenuationRadius();
+		}
+		CandidateEntries.Add(PrimaryEntry);
+
+		if (OutlinerPanel && OutlinerPanel->GetSelectedActors().Num() > 1)
+		{
+			const TArray<AActor*>& Selected = OutlinerPanel->GetSelectedActors();
+			auto HasSelectedAncestor = [&Selected](AActor* Actor) -> bool
+			{
+				for (AActor* Parent = EditorHierarchy::GetParentActor(Actor); Parent; Parent = EditorHierarchy::GetParentActor(Parent))
+				{
+					if (Selected.Find(Parent) != INDEX_NONE)
+					{
+						return true;
+					}
+				}
+				return false;
+			};
+
+			for (AActor* SiblingActor : Selected)
+			{
+				if (!SiblingActor || SiblingActor == PreDragTarget->GetOwner() || HasSelectedAncestor(SiblingActor))
+				{
+					continue;
+				}
+				USceneComponent* SiblingRoot = SiblingActor->GetRootComponent();
+				if (!SiblingRoot)
+				{
+					continue;
+				}
+
+				FGizmoDragEntry Entry;
+				Entry.ActorName = SiblingActor->GetFName();
+				Entry.CompName = SiblingRoot->GetFName();
+				Entry.StartTransform = SiblingRoot->GetTransform();
+				Entry.StartWorldLocation = SiblingRoot->GetWorldLocation();
+				Entry.StartWorldQuat = SiblingRoot->GetWorldRotation().Quaternion();
+				Entry.bIsPrimary = false;
+				if (ULocalLightComponent* Light = Cast<ULocalLightComponent>(SiblingRoot))
+				{
+					Entry.bHasLightRadius = true;
+					Entry.StartLightRadius = Light->GetAttenuationRadius();
+				}
+				CandidateEntries.Add(Entry);
+			}
 		}
 	}
 
 	const FVector2 LocalMousePosition = ViewportsPanel->GetLocalMousePosition();
-	ViewClient->UpdateGizmoAndPicking(Gizmo.get(), LocalMousePosition, [this](AActor* SelectedActor) {
-		OutlinerPanel->SelectActor(SelectedActor);
+	ViewClient->UpdateGizmoAndPicking(Gizmo.get(), LocalMousePosition, [this](AActor* SelectedActor, bool bCtrlToggle) {
+		OutlinerPanel->SelectActor(SelectedActor, bCtrlToggle);
 		});
 
 	const bool bIsUsingNow = Gizmo && Gizmo->IsUsing();
-	if (!bTrackingGizmoDrag && !bWasUsingGizmo && bIsUsingNow && PreDragTarget && PreDragTarget->GetOwner() && !IsPlaying() && UndoHistory.CanRecord())
+	if (!bTrackingGizmoDrag && !bWasUsingGizmo && bIsUsingNow && !CandidateEntries.IsEmpty() && !IsPlaying())
 	{
 		bTrackingGizmoDrag = true;
-		GizmoDragActorName = PreDragTarget->GetOwner()->GetFName();
-		GizmoDragCompName = PreDragTarget->GetFName();
-		GizmoDragStartTransform = PreDragTransform;
-		bGizmoDragHasLightRadius = bPreDragHasLightRadius;
-		GizmoDragStartLightRadius = PreDragLightRadius;
+		GizmoDragMode = Gizmo->GetMode();
+		GizmoDragPrimaryStartWorldLoc = PreDragPrimaryWorldLoc;
+		GizmoDragPrimaryStartWorldQuat = PreDragPrimaryWorldQuat;
+		GizmoDragPrimaryStartScale = PreDragPrimaryScale;
+		GizmoDragEntries = std::move(CandidateEntries);
+	}
+
+	if (bTrackingGizmoDrag && bIsUsingNow)
+	{
+		ApplyMultiActorGizmoDelta();
 	}
 	else if (bTrackingGizmoDrag && !bIsUsingNow)
 	{
 		FinishGizmoDragUndo();
+	}
+}
+
+void UEditorEngine::ApplyMultiActorGizmoDelta()
+{
+	if (!bTrackingGizmoDrag || GizmoDragEntries.Num() <= 1 || !Gizmo || !EditorWorld)
+	{
+		return;
+	}
+
+	USceneComponent* Primary = Gizmo->GetTarget();
+	if (!Primary)
+	{
+		return;
+	}
+
+	const FVector PrimaryWorldLoc = Primary->GetWorldLocation();
+	const FQuat PrimaryWorldQuat = Primary->GetWorldRotation().Quaternion();
+	const FVector PrimaryScale = Primary->GetRelativeScale3D();
+
+	const FVector DeltaLoc = PrimaryWorldLoc - GizmoDragPrimaryStartWorldLoc;
+	const FQuat DeltaQuat = PrimaryWorldQuat * GizmoDragPrimaryStartWorldQuat.Inverse();
+	auto CalcAxisScale = [](float EntryStart, float PrimaryStart, float PrimaryNow) -> float
+	{
+		if (std::abs(PrimaryStart) > 1e-4f)
+		{
+			return EntryStart * (PrimaryNow / PrimaryStart);
+		}
+		return EntryStart + (PrimaryNow - PrimaryStart);
+	};
+
+	for (const FGizmoDragEntry& Entry : GizmoDragEntries)
+	{
+		if (Entry.bIsPrimary)
+		{
+			continue;
+		}
+		USceneComponent* Sibling = Cast<USceneComponent>(
+			EditorUndoUtils::FindComponentByNames(EditorWorld, Entry.ActorName, Entry.CompName));
+		if (!Sibling)
+		{
+			continue;
+		}
+
+		if (GizmoDragMode == EGizmoMode::Location)
+		{
+			Sibling->SetWorldLocation(Entry.StartWorldLocation + DeltaLoc, false);
+		}
+		else if (GizmoDragMode == EGizmoMode::Rotation)
+		{
+			const FVector Offset = Entry.StartWorldLocation - GizmoDragPrimaryStartWorldLoc;
+			const FVector NewLoc = GizmoDragPrimaryStartWorldLoc + DeltaQuat.RotateVector(Offset);
+			const FRotator NewRot = (DeltaQuat * Entry.StartWorldQuat).ToFRotator();
+			Sibling->SetWorldLocationAndRotation(NewLoc, NewRot, false);
+		}
+		else if (GizmoDragMode == EGizmoMode::Scale)
+		{
+			FVector NewScale(
+				CalcAxisScale(Entry.StartTransform.Scale.X, GizmoDragPrimaryStartScale.X, PrimaryScale.X),
+				CalcAxisScale(Entry.StartTransform.Scale.Y, GizmoDragPrimaryStartScale.Y, PrimaryScale.Y),
+				CalcAxisScale(Entry.StartTransform.Scale.Z, GizmoDragPrimaryStartScale.Z, PrimaryScale.Z));
+			Sibling->SetRelativeScale3D(NewScale);
+		}
 	}
 }
 
@@ -1105,52 +1308,69 @@ void UEditorEngine::FinishGizmoDragUndo()
 		return;
 	}
 	bTrackingGizmoDrag = false;
+	TArray<FGizmoDragEntry> Entries = std::move(GizmoDragEntries);
+	GizmoDragEntries.Reset();
 
 	if (IsPlaying() || !UndoHistory.CanRecord() || !EditorWorld)
 	{
 		return;
 	}
 
-	USceneComponent* Target = Cast<USceneComponent>(
-		EditorUndoUtils::FindComponentByNames(EditorWorld, GizmoDragActorName, GizmoDragCompName));
-	if (!Target || !Target->GetOwner())
+	TArray<TUniquePtr<IEditorUndoCommand>> Commands;
+	TArray<FName> SelectedNames;
+	for (const FGizmoDragEntry& Entry : Entries)
 	{
-		return;
-	}
-
-	const FTransform& NewTransform = Target->GetTransform();
-	const bool bTransformChanged =
-		GizmoDragStartTransform.Location.X != NewTransform.Location.X ||
-		GizmoDragStartTransform.Location.Y != NewTransform.Location.Y ||
-		GizmoDragStartTransform.Location.Z != NewTransform.Location.Z ||
-		GizmoDragStartTransform.Scale.X != NewTransform.Scale.X ||
-		GizmoDragStartTransform.Scale.Y != NewTransform.Scale.Y ||
-		GizmoDragStartTransform.Scale.Z != NewTransform.Scale.Z ||
-		GizmoDragStartTransform.Rotation.X != NewTransform.Rotation.X ||
-		GizmoDragStartTransform.Rotation.Y != NewTransform.Rotation.Y ||
-		GizmoDragStartTransform.Rotation.Z != NewTransform.Rotation.Z ||
-		GizmoDragStartTransform.Rotation.W != NewTransform.Rotation.W;
-
-	float NewLightRadius = GizmoDragStartLightRadius;
-	bool bRadiusChanged = false;
-	if (bGizmoDragHasLightRadius)
-	{
-		if (ULocalLightComponent* Light = Cast<ULocalLightComponent>(Target))
+		USceneComponent* Target = Cast<USceneComponent>(
+			EditorUndoUtils::FindComponentByNames(EditorWorld, Entry.ActorName, Entry.CompName));
+		if (!Target || !Target->GetOwner())
 		{
-			NewLightRadius = Light->GetAttenuationRadius();
-			bRadiusChanged = (NewLightRadius != GizmoDragStartLightRadius);
+			continue;
+		}
+
+		const FTransform& NewTransform = Target->GetTransform();
+		const bool bTransformChanged =
+			Entry.StartTransform.Location.X != NewTransform.Location.X ||
+			Entry.StartTransform.Location.Y != NewTransform.Location.Y ||
+			Entry.StartTransform.Location.Z != NewTransform.Location.Z ||
+			Entry.StartTransform.Scale.X != NewTransform.Scale.X ||
+			Entry.StartTransform.Scale.Y != NewTransform.Scale.Y ||
+			Entry.StartTransform.Scale.Z != NewTransform.Scale.Z ||
+			Entry.StartTransform.Rotation.X != NewTransform.Rotation.X ||
+			Entry.StartTransform.Rotation.Y != NewTransform.Rotation.Y ||
+			Entry.StartTransform.Rotation.Z != NewTransform.Rotation.Z ||
+			Entry.StartTransform.Rotation.W != NewTransform.Rotation.W;
+
+		float NewLightRadius = Entry.StartLightRadius;
+		bool bRadiusChanged = false;
+		if (Entry.bHasLightRadius)
+		{
+			if (ULocalLightComponent* Light = Cast<ULocalLightComponent>(Target))
+			{
+				NewLightRadius = Light->GetAttenuationRadius();
+				bRadiusChanged = (NewLightRadius != Entry.StartLightRadius);
+			}
+		}
+
+		if (bTransformChanged || bRadiusChanged)
+		{
+			SelectedNames.Add(Entry.ActorName);
+			Commands.Add(EditorUndoUtils::MakeTransformCommand(
+				Target,
+				Entry.StartTransform,
+				NewTransform,
+				Entry.bHasLightRadius,
+				Entry.StartLightRadius,
+				NewLightRadius));
 		}
 	}
 
-	if (bTransformChanged || bRadiusChanged)
+	if (Commands.Num() == 1)
 	{
-		UndoHistory.Push(EditorUndoUtils::MakeTransformCommand(
-			Target,
-			GizmoDragStartTransform,
-			NewTransform,
-			bGizmoDragHasLightRadius,
-			GizmoDragStartLightRadius,
-			NewLightRadius));
+		UndoHistory.Push(std::move(Commands[0]));
+	}
+	else if (Commands.Num() > 1)
+	{
+		UndoHistory.Push(EditorUndoUtils::MakeCompositeCommand("Transform Actors", std::move(Commands), SelectedNames, SelectedNames));
 	}
 }
 
@@ -1258,6 +1478,7 @@ void UEditorEngine::Redo()
 void UEditorEngine::SelectActorForUndo(AActor* Actor, UActorComponent* Component)
 {
 	bTrackingGizmoDrag = false;
+	GizmoDragEntries.Reset();
 	if (!Actor)
 	{
 		if (Gizmo) Gizmo->SetTarget(nullptr);
@@ -1274,6 +1495,16 @@ void UEditorEngine::SelectActorForUndo(AActor* Actor, UActorComponent* Component
 	if (Component && DetailsPanel)
 	{
 		DetailsPanel->SelectComponent(Component);
+	}
+}
+
+void UEditorEngine::SelectActorsForUndo(const TArray<AActor*>& Actors)
+{
+	bTrackingGizmoDrag = false;
+	GizmoDragEntries.Reset();
+	if (OutlinerPanel)
+	{
+		OutlinerPanel->SelectActors(Actors);
 	}
 }
 
@@ -1296,6 +1527,55 @@ void UEditorEngine::DeleteComponentForUndo(UActorComponent* Component)
 	DetailsPanel->SelectComponent(nullptr);
 	Outline->SetTarget(nullptr);
 	Component->GetOwner()->DestroyComponent(Component);
+}
+
+void UEditorEngine::DeleteActors(const TArray<AActor*>& Actors)
+{
+	if (Actors.IsEmpty())
+		return;
+	if (IsPlaying() && !bIsPaused && !IsSimulatingInEditor())
+		return;
+
+	TArray<AActor*> ToDelete = Actors;
+	if (ToDelete.Num() == 1)
+	{
+		DeleteActor(ToDelete[0]);
+		return;
+	}
+
+	const bool bCanRecord = !IsPlaying() && UndoHistory.CanRecord();
+	TArray<TUniquePtr<IEditorUndoCommand>> Cmds;
+	TArray<FName> DeletedNames;
+	for (AActor* Actor : ToDelete)
+	{
+		if (!Actor) continue;
+		if (bCanRecord)
+		{
+			FActorUndoSnapshot Snapshot;
+			if (EditorUndoUtils::CaptureActorSnapshot(Actor, Snapshot))
+			{
+				DeletedNames.Add(Actor->GetFName());
+				Cmds.Add(EditorUndoUtils::MakeActorCreateDeleteCommand("Delete Actor", std::move(Snapshot), false));
+			}
+		}
+	}
+
+	for (AActor* Actor : ToDelete)
+	{
+		if (Actor)
+		{
+			DeleteActorForUndo(Actor);
+		}
+	}
+
+	if (Cmds.Num() == 1)
+	{
+		UndoHistory.Push(std::move(Cmds[0]));
+	}
+	else if (Cmds.Num() > 1)
+	{
+		UndoHistory.Push(EditorUndoUtils::MakeCompositeCommand("Delete Actors", std::move(Cmds), DeletedNames, {}));
+	}
 }
 
 void UEditorEngine::DeleteActor(AActor* Actor)

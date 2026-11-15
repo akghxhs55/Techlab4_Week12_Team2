@@ -1577,6 +1577,1073 @@ namespace
 			ImGui::EndPopup();
 		}
 	}
+
+	// ---- 다중 선택 공통 프로퍼티 편집 도우미 ----
+	TArray<UClass*> GetCommonClassChain(const TArray<UObject*>& Objects)
+	{
+		TArray<UClass*> Common;
+		if (Objects.IsEmpty() || !Objects[0])
+		{
+			return Common;
+		}
+
+		auto BuildChain = [](UClass* Leaf) -> TArray<UClass*>
+		{
+			TArray<UClass*> Temp;
+			for (UClass* C = Leaf; C; C = C->Super)
+			{
+				Temp.Add(C);
+			}
+			TArray<UClass*> Result;
+			for (auto It = Temp.rbegin(); It != Temp.rend(); ++It)
+			{
+				Result.Add(*It);
+			}
+			return Result;
+		};
+
+		Common = BuildChain(Objects[0]->GetClass());
+		for (int32 i = 1; i < Objects.Num(); ++i)
+		{
+			if (!Objects[i])
+			{
+				Common.Empty();
+				return Common;
+			}
+			const TArray<UClass*> Chain = BuildChain(Objects[i]->GetClass());
+			int32 MatchLen = 0;
+			const int32 Limit = (std::min)(Common.Num(), Chain.Num());
+			while (MatchLen < Limit && Common[MatchLen] == Chain[MatchLen])
+			{
+				++MatchLen;
+			}
+			while (Common.Num() > MatchLen)
+			{
+				Common.RemoveAt(Common.Num() - 1);
+			}
+		}
+		return Common;
+	}
+
+	bool DrawMultiAxisControl(
+		const FString& Label,
+		float& Value,
+		bool bMixed,
+		float Speed,
+		float MinValue,
+		float MaxValue,
+		float ResetValue,
+		FVector4 Color)
+	{
+		bool bChanged = false;
+		const float LineHeight = ImGui::GetFrameHeight();
+		const ImVec4 BtnColor(Color.X, Color.Y, Color.Z, Color.W);
+		const ImVec2 ButtonSize = { LineHeight + EditorStyle::Scale(2.0f), LineHeight };
+
+		ImGui::PushStyleColor(ImGuiCol_Button, BtnColor);
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4{ BtnColor.x + 0.1f, BtnColor.y + 0.1f, BtnColor.z + 0.1f, 1.0f });
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4{ BtnColor.x - 0.1f, BtnColor.y - 0.1f, BtnColor.z - 0.1f, 1.0f });
+		if (ImGui::Button(Label.c_str(), ButtonSize))
+		{
+			Value = ResetValue;
+			bChanged = true;
+		}
+		ImGui::PopStyleColor(3);
+
+		ImGui::SameLine();
+		const FString DragId = "##" + Label;
+		bChanged |= ImGui::DragFloat(DragId.c_str(), &Value, Speed, MinValue, MaxValue, bMixed ? "---" : "%.2f");
+		return bChanged;
+	}
+
+	bool DrawMultiVector3Controller(
+		const FString& Label,
+		float Values[3],
+		const bool Mixed[3],
+		bool OutAxisChanged[3],
+		float ResetValue,
+		float ColumnWidth)
+	{
+		OutAxisChanged[0] = OutAxisChanged[1] = OutAxisChanged[2] = false;
+		ImGuiIO& IO = ImGui::GetIO();
+		auto BoldFont = IO.FontDefault ? IO.FontDefault : IO.Fonts->Fonts[0];
+		const ImGuiTableFlags Flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
+
+		bool bAnyChanged = false;
+		ImGui::PushID(Label.c_str());
+		if (ImGui::BeginTable(Label.c_str(), 2, Flags))
+		{
+			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, EditorStyle::Scale(ColumnWidth));
+			ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthStretch);
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted(Label.c_str());
+
+			ImGui::TableSetColumnIndex(1);
+			const float Gap = EditorStyle::Scale(2.0f);
+			const float ButtonWidth = ImGui::GetFrameHeight() + EditorStyle::Scale(2.0f);
+			const float Available = ImGui::GetContentRegionAvail().x;
+			const bool bStackAxes = Available < EditorStyle::Scale(210.0f);
+			const float ValueWidth = bStackAxes
+				? ImMax(1.0f, Available - ButtonWidth - Gap)
+				: ImMax(3.0f, Available - 3.0f * ButtonWidth - 5.0f * Gap);
+			ImGui::PushMultiItemsWidths(bStackAxes ? 1 : 3, ValueWidth);
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ Gap, ImGui::GetStyle().ItemSpacing.y });
+			ImGui::PushFont(BoldFont);
+
+			OutAxisChanged[0] = DrawMultiAxisControl("X", Values[0], Mixed[0], 0.1f, 0.0f, 0.0f, ResetValue, { 0.8f, 0.1f, 0.1f, 1.0f });
+			ImGui::PopItemWidth();
+
+			if (bStackAxes) ImGui::PushItemWidth(ValueWidth); else ImGui::SameLine();
+			OutAxisChanged[1] = DrawMultiAxisControl("Y", Values[1], Mixed[1], 0.1f, 0.0f, 0.0f, ResetValue, { 0.1f, 0.8f, 0.1f, 1.0f });
+			ImGui::PopItemWidth();
+
+			if (bStackAxes) ImGui::PushItemWidth(ValueWidth); else ImGui::SameLine();
+			OutAxisChanged[2] = DrawMultiAxisControl("Z", Values[2], Mixed[2], 0.1f, 0.0f, 0.0f, ResetValue, { 0.1f, 0.1f, 0.8f, 1.0f });
+			ImGui::PopItemWidth();
+
+			bAnyChanged = OutAxisChanged[0] || OutAxisChanged[1] || OutAxisChanged[2];
+
+			ImGui::PopFont();
+			ImGui::PopStyleVar();
+			ImGui::EndTable();
+		}
+		ImGui::PopID();
+		return bAnyChanged;
+	}
+
+	bool DrawMultiPropertyRow(
+		const TArray<UObject*>& Objects,
+		const TArray<void*>& Containers,
+		const FProperty& Property,
+		ImFont* CustomFont);
+
+	bool DrawMultiPropertyValue(
+		const TArray<UObject*>& Objects,
+		const TArray<void*>& ValuePtrs,
+		const FProperty& Property,
+		const char* Label,
+		ImFont* CustomFont)
+	{
+		if (Objects.IsEmpty() || ValuePtrs.Num() != Objects.Num())
+		{
+			return false;
+		}
+		constexpr float FloatEps = 1e-4f;
+
+		if (const FFloatProperty* FloatProp = CastField<FFloatProperty>(&Property))
+		{
+			const float First = FloatProp->GetPropertyValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				if (std::abs(FloatProp->GetPropertyValue(ValuePtrs[i]) - First) > FloatEps)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			float Val = First;
+			const FDragSettings Drag = GetDragSettings(FloatProp->Meta, 0.1f);
+			if (ImGui::DragFloat(Label, &Val, Drag.Speed, Drag.Min, Drag.Max, bMixed ? "Multiple Values" : "%.3f"))
+			{
+				ClampToMeta(&Val, 1, FloatProp->Meta);
+				for (void* Ptr : ValuePtrs)
+				{
+					FloatProp->GetPropertyValue(Ptr) = Val;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FIntProperty* IntProp = CastField<FIntProperty>(&Property))
+		{
+			const int32 First = IntProp->GetPropertyValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				if (IntProp->GetPropertyValue(ValuePtrs[i]) != First)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			int32 Val = First;
+			const FPropertyMeta& Meta = IntProp->Meta;
+			const FDragSettings Drag = GetDragSettings(Meta, 1.0f);
+			if (ImGui::DragInt(Label, &Val, Drag.Speed, ToIntBound(Drag.Min), ToIntBound(Drag.Max), bMixed ? "Multiple Values" : "%d"))
+			{
+				if (Meta.HasClamp())
+				{
+					Val = ToIntBound(std::clamp(static_cast<float>(Val), Meta.ClampMin, Meta.ClampMax));
+				}
+				for (void* Ptr : ValuePtrs)
+				{
+					IntProp->GetPropertyValue(Ptr) = Val;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FUInt32Property* UIntProp = CastField<FUInt32Property>(&Property))
+		{
+			const uint32 First = UIntProp->GetPropertyValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				if (UIntProp->GetPropertyValue(ValuePtrs[i]) != First)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			uint32 Val = First;
+			const FPropertyMeta& Meta = UIntProp->Meta;
+			const FDragSettings Drag = GetDragSettings(Meta, 1.0f);
+			const uint32 Min = ToUIntBound(Drag.Min);
+			const uint32 Max = Drag.Min < Drag.Max ? ToUIntBound(Drag.Max) : UINT_MAX;
+			if (ImGui::DragScalar(Label, ImGuiDataType_U32, &Val, Drag.Speed, &Min, &Max, bMixed ? "Multiple Values" : "%u"))
+			{
+				if (Meta.HasClamp())
+				{
+					Val = ToUIntBound(std::clamp(static_cast<float>(Val), Meta.ClampMin, Meta.ClampMax));
+				}
+				for (void* Ptr : ValuePtrs)
+				{
+					UIntProp->GetPropertyValue(Ptr) = Val;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FBoolProperty* BoolProp = CastField<FBoolProperty>(&Property))
+		{
+			bool bAllTrue = true;
+			bool bAllFalse = true;
+			for (void* Ptr : ValuePtrs)
+			{
+				const bool V = BoolProp->GetPropertyValue(Ptr);
+				bAllTrue &= V;
+				bAllFalse &= !V;
+			}
+			const bool bMixed = !(bAllTrue || bAllFalse);
+			bool DisplayVal = bAllTrue;
+			ImGui::PushItemFlag(ImGuiItemFlags_MixedValue, bMixed);
+			const bool bClicked = ImGui::Checkbox(Label, &DisplayVal);
+			ImGui::PopItemFlag();
+			if (bClicked)
+			{
+				const bool NewVal = !bAllTrue;
+				for (void* Ptr : ValuePtrs)
+				{
+					BoolProp->GetPropertyValue(Ptr) = NewVal;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FEnumProperty* EnumProp = CastField<FEnumProperty>(&Property))
+		{
+			const FEnumInfo* EnumInfo = EnumProp->Enum;
+			if (!EnumInfo)
+			{
+				ImGui::TextDisabled("(No enum info)");
+				return false;
+			}
+			const int64 First = EnumProp->GetValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				if (EnumProp->GetValue(ValuePtrs[i]) != First)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			bool bChanged = false;
+			const FString Preview = bMixed ? "Multiple Values" : EnumInfo->ToName(First);
+			if (ImGui::BeginCombo(Label, Preview.c_str()))
+			{
+				for (const FEnumEntry& Entry : EnumInfo->Entries)
+				{
+					if (Entry.bHidden) continue;
+					const bool bSelected = !bMixed && Entry.Value == First;
+					if (ImGui::Selectable(Entry.Name.c_str(), bSelected) && (bMixed || !bSelected))
+					{
+						for (void* Ptr : ValuePtrs)
+						{
+							EnumProp->SetValue(Ptr, Entry.Value);
+						}
+						bChanged = true;
+					}
+					if (bSelected) ImGui::SetItemDefaultFocus();
+				}
+				ImGui::EndCombo();
+			}
+			return bChanged;
+		}
+
+		if (const FVectorProperty* VecProp = CastField<FVectorProperty>(&Property))
+		{
+			const FVector& First = VecProp->GetPropertyValue(ValuePtrs[0]);
+			float Vals[3] = { First.X, First.Y, First.Z };
+			bool Mixed[3] = { false, false, false };
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				const FVector& V = VecProp->GetPropertyValue(ValuePtrs[i]);
+				if (std::abs(V.X - First.X) > FloatEps) Mixed[0] = true;
+				if (std::abs(V.Y - First.Y) > FloatEps) Mixed[1] = true;
+				if (std::abs(V.Z - First.Z) > FloatEps) Mixed[2] = true;
+			}
+			bool AxisChanged[3] = {};
+			if (DrawMultiVector3Controller(Property.Name, Vals, Mixed, AxisChanged, 0.0f, 55.0f))
+			{
+				for (void* Ptr : ValuePtrs)
+				{
+					FVector& V = VecProp->GetPropertyValue(Ptr);
+					if (AxisChanged[0]) V.X = Vals[0];
+					if (AxisChanged[1]) V.Y = Vals[1];
+					if (AxisChanged[2]) V.Z = Vals[2];
+					ClampToMeta(V.V, 3, VecProp->Meta);
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FRotatorProperty* RotProp = CastField<FRotatorProperty>(&Property))
+		{
+			const FRotator& First = RotProp->GetPropertyValue(ValuePtrs[0]);
+			float Vals[3] = { First.Roll, First.Pitch, First.Yaw };
+			bool Mixed[3] = { false, false, false };
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				const FRotator& R = RotProp->GetPropertyValue(ValuePtrs[i]);
+				if (std::abs(R.Roll - First.Roll) > FloatEps) Mixed[0] = true;
+				if (std::abs(R.Pitch - First.Pitch) > FloatEps) Mixed[1] = true;
+				if (std::abs(R.Yaw - First.Yaw) > FloatEps) Mixed[2] = true;
+			}
+			bool AxisChanged[3] = {};
+			if (DrawMultiVector3Controller(Property.Name, Vals, Mixed, AxisChanged, 0.0f, 55.0f))
+			{
+				ClampToMeta(Vals, 3, RotProp->Meta);
+				for (void* Ptr : ValuePtrs)
+				{
+					FRotator& R = RotProp->GetPropertyValue(Ptr);
+					if (AxisChanged[0]) R.Roll = Vals[0];
+					if (AxisChanged[1]) R.Pitch = Vals[1];
+					if (AxisChanged[2]) R.Yaw = Vals[2];
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FVector4Property* Vec4Prop = CastField<FVector4Property>(&Property))
+		{
+			const FVector4& First = Vec4Prop->GetPropertyValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				const FVector4& V = Vec4Prop->GetPropertyValue(ValuePtrs[i]);
+				if (std::abs(V.X - First.X) > FloatEps || std::abs(V.Y - First.Y) > FloatEps ||
+					std::abs(V.Z - First.Z) > FloatEps || std::abs(V.W - First.W) > FloatEps)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			FVector4 Val = First;
+			const FDragSettings Drag = GetDragSettings(Vec4Prop->Meta, 0.1f);
+			if (ImGui::DragFloat4(Label, &Val.X, Drag.Speed, Drag.Min, Drag.Max, bMixed ? "Multiple Values" : "%.3f"))
+			{
+				ClampToMeta(&Val.X, 4, Vec4Prop->Meta);
+				for (void* Ptr : ValuePtrs)
+				{
+					Vec4Prop->GetPropertyValue(Ptr) = Val;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FColorProperty* ColorProp = CastField<FColorProperty>(&Property))
+		{
+			const FColor& First = ColorProp->GetPropertyValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				const FColor& C = ColorProp->GetPropertyValue(ValuePtrs[i]);
+				if (C.R != First.R || C.G != First.G || C.B != First.B || C.A != First.A)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			float V[4] = { First.R / 255.f, First.G / 255.f, First.B / 255.f, First.A / 255.f };
+			const bool bChanged = ImGui::ColorEdit4(Label, V);
+			if (bMixed) ImGui::TextDisabled("(Multiple Values)");
+			if (bChanged)
+			{
+				const FColor NewC(
+					uint8(V[0] * 255.f + 0.5f), uint8(V[1] * 255.f + 0.5f),
+					uint8(V[2] * 255.f + 0.5f), uint8(V[3] * 255.f + 0.5f));
+				for (void* Ptr : ValuePtrs)
+				{
+					ColorProp->GetPropertyValue(Ptr) = NewC;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FLinearColorProperty* LinColorProp = CastField<FLinearColorProperty>(&Property))
+		{
+			const FLinearColor& First = LinColorProp->GetPropertyValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				const FLinearColor& C = LinColorProp->GetPropertyValue(ValuePtrs[i]);
+				if (std::abs(C.RGBA[0] - First.RGBA[0]) > FloatEps || std::abs(C.RGBA[1] - First.RGBA[1]) > FloatEps ||
+					std::abs(C.RGBA[2] - First.RGBA[2]) > FloatEps || std::abs(C.RGBA[3] - First.RGBA[3]) > FloatEps)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			FLinearColor Val = First;
+			const bool bChanged = ImGui::ColorEdit4(Label, Val.RGBA);
+			if (bMixed) ImGui::TextDisabled("(Multiple Values)");
+			if (bChanged)
+			{
+				for (void* Ptr : ValuePtrs)
+				{
+					LinColorProp->GetPropertyValue(Ptr) = Val;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FStrProperty* StrProp = CastField<FStrProperty>(&Property))
+		{
+			const FString& First = StrProp->GetPropertyValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				if (StrProp->GetPropertyValue(ValuePtrs[i]) != First)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			char Buffer[256] = {};
+			if (!bMixed)
+			{
+				strncpy_s(Buffer, First.c_str(), sizeof(Buffer) - 1);
+			}
+			if (CustomFont) ImGui::PushFont(CustomFont);
+			const ImGuiInputTextFlags TextFlags = bMixed ? ImGuiInputTextFlags_EnterReturnsTrue : ImGuiInputTextFlags_None;
+			const bool bChanged = ImGui::InputTextWithHint(Label, bMixed ? "Multiple Values (Enter)" : "", Buffer, sizeof(Buffer), TextFlags);
+			if (CustomFont) ImGui::PopFont();
+			if (bChanged)
+			{
+				const FString NewStr(Buffer);
+				for (void* Ptr : ValuePtrs)
+				{
+					StrProp->GetPropertyValue(Ptr) = NewStr;
+				}
+				return true;
+			}
+			return false;
+		}
+
+		if (const FTransformProperty* TransformProp = CastField<FTransformProperty>(&Property))
+		{
+			static TMap<const void*, FRotationConversionCache> MultiRotationCaches;
+			const FTransform& First = TransformProp->GetPropertyValue(ValuePtrs[0]);
+			const FRotator FirstRot = MultiRotationCaches[ValuePtrs[0]].QuatToRotator(First.Rotation);
+
+			float Loc[3] = { First.Location.X, First.Location.Y, First.Location.Z };
+			float Rot[3] = { FirstRot.Roll, FirstRot.Pitch, FirstRot.Yaw };
+			float Scale[3] = { First.Scale.X, First.Scale.Y, First.Scale.Z };
+			bool LocMixed[3] = { false, false, false };
+			bool RotMixed[3] = { false, false, false };
+			bool ScaleMixed[3] = { false, false, false };
+
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				const FTransform& T = TransformProp->GetPropertyValue(ValuePtrs[i]);
+				const FRotator R = MultiRotationCaches[ValuePtrs[i]].QuatToRotator(T.Rotation);
+				if (std::abs(T.Location.X - First.Location.X) > FloatEps) LocMixed[0] = true;
+				if (std::abs(T.Location.Y - First.Location.Y) > FloatEps) LocMixed[1] = true;
+				if (std::abs(T.Location.Z - First.Location.Z) > FloatEps) LocMixed[2] = true;
+
+				if (std::abs(R.Roll - FirstRot.Roll) > FloatEps) RotMixed[0] = true;
+				if (std::abs(R.Pitch - FirstRot.Pitch) > FloatEps) RotMixed[1] = true;
+				if (std::abs(R.Yaw - FirstRot.Yaw) > FloatEps) RotMixed[2] = true;
+
+				if (std::abs(T.Scale.X - First.Scale.X) > FloatEps) ScaleMixed[0] = true;
+				if (std::abs(T.Scale.Y - First.Scale.Y) > FloatEps) ScaleMixed[1] = true;
+				if (std::abs(T.Scale.Z - First.Scale.Z) > FloatEps) ScaleMixed[2] = true;
+			}
+
+			ImGui::PushID(Property.Name.c_str());
+			bool bChanged = false;
+			bool LocChanged[3] = {};
+			if (DrawMultiVector3Controller("Location", Loc, LocMixed, LocChanged, 0.0f, 55.0f))
+			{
+				for (void* Ptr : ValuePtrs)
+				{
+					FTransform& T = TransformProp->GetPropertyValue(Ptr);
+					if (LocChanged[0]) T.Location.X = Loc[0];
+					if (LocChanged[1]) T.Location.Y = Loc[1];
+					if (LocChanged[2]) T.Location.Z = Loc[2];
+				}
+				bChanged = true;
+			}
+
+			bool RotChanged[3] = {};
+			if (DrawMultiVector3Controller("Rotation", Rot, RotMixed, RotChanged, 0.0f, 55.0f))
+			{
+				for (void* Ptr : ValuePtrs)
+				{
+					FTransform& T = TransformProp->GetPropertyValue(Ptr);
+					FRotationConversionCache& Cache = MultiRotationCaches[Ptr];
+					FRotator Euler = Cache.QuatToRotator(T.Rotation);
+					if (RotChanged[0]) Euler.Roll = Rot[0];
+					if (RotChanged[1]) Euler.Pitch = Rot[1];
+					if (RotChanged[2]) Euler.Yaw = Rot[2];
+					T.Rotation = Cache.RotatorToQuat(Euler);
+				}
+				bChanged = true;
+			}
+
+			bool ScaleChanged[3] = {};
+			if (DrawMultiVector3Controller("Scale", Scale, ScaleMixed, ScaleChanged, 1.0f, 55.0f))
+			{
+				for (void* Ptr : ValuePtrs)
+				{
+					FTransform& T = TransformProp->GetPropertyValue(Ptr);
+					if (ScaleChanged[0]) T.Scale.X = Scale[0];
+					if (ScaleChanged[1]) T.Scale.Y = Scale[1];
+					if (ScaleChanged[2]) T.Scale.Z = Scale[2];
+				}
+				bChanged = true;
+			}
+			ImGui::PopID();
+			return bChanged;
+		}
+
+		if (const FObjectProperty* ObjectProp = CastField<FObjectProperty>(&Property))
+		{
+			UObject* First = ObjectProp->GetPropertyValue(ValuePtrs[0]);
+			bool bMixed = false;
+			for (int32 i = 1; i < ValuePtrs.Num(); ++i)
+			{
+				if (ObjectProp->GetPropertyValue(ValuePtrs[i]) != First)
+				{
+					bMixed = true;
+					break;
+				}
+			}
+			const UClass* PropertyClass = ObjectProp->PropertyClass;
+			if (PropertyClass == UStaticMesh::StaticClass())
+			{
+				UStaticMesh* Current = bMixed ? nullptr : Cast<UStaticMesh>(First);
+				const FString CurrentPath = Current ? Current->GetPath() : "";
+				const FString Preview = bMixed ? "Multiple Values" : (Current ? GetAssetDisplayName(CurrentPath) : "None");
+				ImGui::SetNextItemWidth(-1.0f);
+				bool bPicked = false;
+				if (ImGui::BeginCombo("##MultiStaticMesh", Preview.c_str()))
+				{
+					auto ApplyMesh = [&](UStaticMesh* NewMesh)
+					{
+						for (int32 i = 0; i < Objects.Num(); ++i)
+						{
+							if (UStaticMeshComponent* MeshComp = Cast<UStaticMeshComponent>(Objects[i]))
+								MeshComp->SetStaticMesh(NewMesh);
+							else
+								ObjectProp->GetPropertyValue(ValuePtrs[i]) = NewMesh;
+						}
+						bPicked = true;
+					};
+					if (ImGui::Selectable("None", !bMixed && Current == nullptr) && (bMixed || Current != nullptr))
+					{
+						ApplyMesh(nullptr);
+					}
+					for (TObjectIterator<UStaticMesh> Itr; Itr; ++Itr)
+					{
+						const bool bSelected = !bMixed && (*Itr == Current);
+						const FString ItemPath = Itr->GetPath();
+						ImGui::PushID(*Itr);
+						if (ImGui::Selectable(GetAssetDisplayName(ItemPath).c_str(), bSelected))
+						{
+							ApplyMesh(*Itr);
+						}
+						if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ItemPath.c_str());
+						ImGui::PopID();
+					}
+					for (const FString& ItemPath : UAssetManager::GetUnloadedAssetPaths(EAssetType::StaticMesh))
+					{
+						ImGui::PushID(ItemPath.c_str());
+						if (ImGui::Selectable(GetAssetDisplayName(ItemPath).c_str(), false))
+						{
+							if (UStaticMesh* Mesh = UAssetManager::GetAssetByPath<UStaticMesh>(ItemPath))
+								ApplyMesh(Mesh);
+						}
+						if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ItemPath.c_str());
+						ImGui::PopID();
+					}
+					ImGui::EndCombo();
+				}
+				return bPicked;
+			}
+			else if (PropertyClass == UFont::StaticClass())
+			{
+				UFont* Current = bMixed ? nullptr : Cast<UFont>(First);
+				const FString Preview = bMixed ? "Multiple Values" : (Current ? GetAssetDisplayName(Current->GetPath()) : "None");
+				ImGui::SetNextItemWidth(-1.0f);
+				bool bPicked = false;
+				if (ImGui::BeginCombo("##MultiFont", Preview.c_str()))
+				{
+					auto ApplyFont = [&](UFont* NewFont)
+					{
+						for (int32 i = 0; i < Objects.Num(); ++i)
+						{
+							if (UTextRenderComponent* TextComp = Cast<UTextRenderComponent>(Objects[i]))
+								TextComp->SetFont(NewFont);
+							else
+								ObjectProp->GetPropertyValue(ValuePtrs[i]) = NewFont;
+						}
+						bPicked = true;
+					};
+					for (TObjectIterator<UFont> Itr; Itr; ++Itr)
+					{
+						const bool bSelected = !bMixed && (*Itr == Current);
+						const FString ItemPath = Itr->GetPath();
+						ImGui::PushID(*Itr);
+						if (ImGui::Selectable(GetAssetDisplayName(ItemPath).c_str(), bSelected))
+							ApplyFont(*Itr);
+						if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ItemPath.c_str());
+						ImGui::PopID();
+					}
+					for (const FString& ItemPath : UAssetManager::GetUnloadedAssetPaths(EAssetType::Font))
+					{
+						ImGui::PushID(ItemPath.c_str());
+						if (ImGui::Selectable(GetAssetDisplayName(ItemPath).c_str(), false))
+						{
+							if (UFont* Font = UAssetManager::GetAssetByPath<UFont>(ItemPath))
+								ApplyFont(Font);
+						}
+						if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ItemPath.c_str());
+						ImGui::PopID();
+					}
+					ImGui::EndCombo();
+				}
+				return bPicked;
+			}
+			else if (PropertyClass == UTexture2D::StaticClass())
+			{
+				UTexture2D* Current = bMixed ? nullptr : Cast<UTexture2D>(First);
+				return DrawTexturePicker(Current, Label,
+					[&](UTexture2D* Picked)
+					{
+						for (void* Ptr : ValuePtrs)
+						{
+							ObjectProp->GetPropertyValue(Ptr) = Picked;
+						}
+					});
+			}
+			else
+			{
+				ImGui::TextDisabled(bMixed ? "Multiple Values" : "(Object)");
+			}
+			return false;
+		}
+
+		if (const FStructProperty* StructProp = CastField<FStructProperty>(&Property))
+		{
+			ImGui::Indent();
+			ImGui::PushID(Label);
+
+			TArray<const UStruct*> StructChain;
+			for (const UStruct* Struct = StructProp->Struct; Struct; Struct = Struct->GetSuperStruct())
+			{
+				StructChain.Add(Struct);
+			}
+
+			bool bChanged = false;
+			for (auto It = StructChain.rbegin(); It != StructChain.rend(); ++It)
+			{
+				for (const FProperty* Member : (*It)->GetProperties())
+				{
+					if (!Member->HasAnyFlags(CPF_Edit)) continue;
+					const bool bReadOnly = Member->HasAnyFlags(CPF_EditConst);
+					if (bReadOnly) ImGui::BeginDisabled();
+					bChanged |= DrawMultiPropertyRow(Objects, ValuePtrs, *Member, CustomFont);
+					if (bReadOnly) ImGui::EndDisabled();
+				}
+			}
+
+			ImGui::PopID();
+			ImGui::Unindent();
+			return bChanged;
+		}
+
+		ImGui::TextDisabled("(Unsupported %s)", Property.GetClass()->GetName());
+		return false;
+	}
+
+	bool DrawMultiPropertyRow(
+		const TArray<UObject*>& Objects,
+		const TArray<void*>& Containers,
+		const FProperty& Property,
+		ImFont* CustomFont)
+	{
+		TArray<void*> ValuePtrs;
+		ValuePtrs.Reserve(Containers.Num());
+		for (void* Container : Containers)
+		{
+			ValuePtrs.Add(Property.ContainerPtrToValuePtr(Container));
+		}
+
+		const FString Label = "##" + Property.Name;
+		const char* DisplayName = Property.Name.c_str();
+		const bool bUsesFullWidthController = Property.IsA<FVectorProperty>() || Property.IsA<FRotatorProperty>();
+
+		if (!bUsesFullWidthController)
+		{
+			const float StartX = ImGui::GetCursorPosX();
+			const float AvailableWidth = ImGui::GetContentRegionAvail().x;
+			const float LabelWidth = AvailableWidth * 0.45f;
+			const bool bInline = !Property.IsA<FTransformProperty>() && !Property.IsA<FStructProperty>()
+				&& AvailableWidth >= EditorStyle::Scale(260.0f) && ImGui::CalcTextSize(DisplayName).x < LabelWidth;
+
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextWrapped("%s", DisplayName);
+			if (bInline)
+			{
+				ImGui::SameLine();
+				ImGui::SetCursorPosX(StartX + LabelWidth);
+			}
+			ImGui::SetNextItemWidth(-1.0f);
+		}
+
+		return DrawMultiPropertyValue(Objects, ValuePtrs, Property, Label.c_str(), CustomFont);
+	}
+
+	void DrawMultiProperties(const TArray<UObject*>& Objects, ImFont* CustomFont)
+	{
+		if (Objects.IsEmpty())
+		{
+			return;
+		}
+
+		const TArray<UClass*> CommonChain = GetCommonClassChain(Objects);
+		for (UClass* Class : CommonChain)
+		{
+			bool bHasVisibleProperty = false;
+			for (const FProperty* Property : Class->GetProperties())
+			{
+				if (Property->HasAnyFlags(CPF_Edit))
+				{
+					bHasVisibleProperty = true;
+					break;
+				}
+			}
+			if (!bHasVisibleProperty) continue;
+
+			ImGui::PushID(Class->Name.c_str());
+			if (ImGui::CollapsingHeader(Class->Name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
+			{
+				TArray<void*> Containers;
+				Containers.Reserve(Objects.Num());
+				for (UObject* Obj : Objects)
+				{
+					Containers.Add(Obj);
+				}
+
+				for (const FProperty* Property : Class->GetProperties())
+				{
+					if (!Property->HasAnyFlags(CPF_Edit)) continue;
+					const bool bReadOnly = Property->HasAnyFlags(CPF_EditConst);
+					if (bReadOnly) ImGui::BeginDisabled();
+					if (DrawMultiPropertyRow(Objects, Containers, *Property, CustomFont))
+					{
+						for (UObject* Obj : Objects)
+						{
+							Obj->PostEditChangeProperty(*Property);
+						}
+					}
+					if (bReadOnly) ImGui::EndDisabled();
+				}
+			}
+			ImGui::PopID();
+		}
+	}
+
+	void DrawMultiSkeletalMeshSlot(const TArray<USkinnedMeshComponent*>& Comps)
+	{
+		if (Comps.IsEmpty()) return;
+		USkeletalMesh* First = Comps[0]->GetSkeletalMesh();
+		bool bMixed = false;
+		for (int32 i = 1; i < Comps.Num(); ++i)
+		{
+			if (Comps[i]->GetSkeletalMesh() != First)
+			{
+				bMixed = true;
+				break;
+			}
+		}
+
+		const FString CurrentPath = (!bMixed && First) ? First->GetPath() : "";
+		const FString Preview = bMixed ? "Multiple Values"
+			: (First ? (CurrentPath.empty() ? First->GetName() : GetAssetDisplayName(CurrentPath)) : "None");
+		ImGui::SetNextItemWidth(-1.0f);
+		if (!ImGui::BeginCombo("##MultiSkeletalMesh", Preview.c_str()))
+		{
+			return;
+		}
+		auto ApplyAll = [&](USkeletalMesh* Mesh)
+		{
+			for (USkinnedMeshComponent* Comp : Comps)
+			{
+				Comp->SetSkeletalMesh(Mesh);
+			}
+		};
+		if (ImGui::Selectable("None", !bMixed && First == nullptr)) ApplyAll(nullptr);
+		for (TObjectIterator<USkeletalMesh> Itr; Itr; ++Itr)
+		{
+			const FString Path = Itr->GetPath();
+			if (Path.empty()) continue;
+			const bool bSelected = !bMixed && (*Itr == First);
+			ImGui::PushID(*Itr);
+			if (ImGui::Selectable(GetAssetDisplayName(Path).c_str(), bSelected)) ApplyAll(*Itr);
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", Path.c_str());
+			ImGui::PopID();
+		}
+		for (const FString& ItemPath : UAssetManager::GetUnloadedAssetPaths(EAssetType::SkeletalMesh))
+		{
+			ImGui::PushID(ItemPath.c_str());
+			if (ImGui::Selectable(GetAssetDisplayName(ItemPath).c_str(), false))
+			{
+				if (USkeletalMesh* Mesh = UAssetManager::GetAssetByPath<USkeletalMesh>(ItemPath))
+					ApplyAll(Mesh);
+			}
+			if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", ItemPath.c_str());
+			ImGui::PopID();
+		}
+		ImGui::EndCombo();
+	}
+
+	void DrawMultiMaterialSlots(const TArray<UMeshComponent*>& MeshComps, int32 NumSlots)
+	{
+		if (MeshComps.IsEmpty() || NumSlots <= 0) return;
+		if (!ImGui::CollapsingHeader("Materials", ImGuiTreeNodeFlags_DefaultOpen)) return;
+
+		for (int32 Slot = 0; Slot < NumSlots; ++Slot)
+		{
+			ImGui::PushID(Slot);
+			const FString SlotLabel = std::format("[{}] {}", Slot, MeshComps[0]->GetMaterialSlotName(Slot));
+			const bool bOpen = ImGui::TreeNode(SlotLabel.c_str());
+
+			bool bAnyOverride = false;
+			for (UMeshComponent* MC : MeshComps)
+			{
+				if (MC->GetOverrideMaterial(Slot) != nullptr)
+				{
+					bAnyOverride = true;
+					break;
+				}
+			}
+
+			ImGui::SameLine();
+			if (bAnyOverride)
+			{
+				ImGui::TextDisabled("Override");
+				ImGui::SameLine();
+				if (ImGui::SmallButton("Reset"))
+				{
+					for (UMeshComponent* MC : MeshComps)
+					{
+						MC->SetMaterial(Slot, nullptr);
+					}
+				}
+			}
+			else
+			{
+				ImGui::TextDisabled("Default");
+			}
+
+			if (bOpen)
+			{
+				if (ImGui::BeginTable("MultiMaterialProperties", 2))
+				{
+					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, EditorStyle::Scale(110.0f));
+					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+
+					auto DrawTexRow = [&](int32 TexSlot, const char* RowLabel)
+					{
+						UMaterial* FirstEff = MeshComps[0]->GetMaterial(Slot);
+						UTexture2D* FirstTex = (FirstEff && FirstEff->Textures.IsValidIndex(TexSlot)) ? FirstEff->Textures[TexSlot] : nullptr;
+						bool bTexMixed = false;
+						for (int32 i = 1; i < MeshComps.Num(); ++i)
+						{
+							UMaterial* Eff = MeshComps[i]->GetMaterial(Slot);
+							UTexture2D* Tex = (Eff && Eff->Textures.IsValidIndex(TexSlot)) ? Eff->Textures[TexSlot] : nullptr;
+							if (Tex != FirstTex) { bTexMixed = true; break; }
+						}
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						ImGui::TextUnformatted(RowLabel);
+						ImGui::TableSetColumnIndex(1);
+						ImGui::PushID(TexSlot);
+						DrawTexturePicker(bTexMixed ? nullptr : FirstTex, "##MultiTex",
+							[&](UTexture2D* Picked)
+							{
+								for (UMeshComponent* MC : MeshComps)
+								{
+									UMaterial* Eff = MC->GetMaterial(Slot);
+									UMaterial* Over = MC->GetOverrideMaterial(Slot);
+									SetMaterialTexture(MC, Slot, TexSlot, Picked, Eff, Over);
+								}
+							});
+						ImGui::PopID();
+					};
+					DrawTexRow(0, "Texture");
+					DrawTexRow(1, "Normal Map");
+
+					UMaterial* FirstEff = MeshComps[0]->GetMaterial(Slot);
+					const FVector4 FirstColor = FirstEff ? FirstEff->BaseColor : FVector4(1, 1, 1, 1);
+					float FirstShininess = FirstEff ? FirstEff->Shininess : 32.0f;
+					FVector2 FirstUV = FirstEff ? FirstEff->UVScrollSpeed : FVector2();
+					int FirstSampler = FirstEff ? static_cast<int>(FirstEff->SamplerState) : 0;
+					int FirstBlend = FirstEff ? static_cast<int>(FirstEff->BlendState) : 0;
+
+					bool bColorMixed = false, bShininessMixed = false, bUVMixed = false, bSamplerMixed = false, bBlendMixed = false;
+					for (int32 i = 1; i < MeshComps.Num(); ++i)
+					{
+						UMaterial* E = MeshComps[i]->GetMaterial(Slot);
+						const FVector4 C = E ? E->BaseColor : FVector4(1, 1, 1, 1);
+						const float S = E ? E->Shininess : 32.0f;
+						const FVector2 UV = E ? E->UVScrollSpeed : FVector2();
+						const int Sm = E ? static_cast<int>(E->SamplerState) : 0;
+						const int Bl = E ? static_cast<int>(E->BlendState) : 0;
+						if (std::abs(C.X - FirstColor.X) > 1e-4f || std::abs(C.Y - FirstColor.Y) > 1e-4f ||
+							std::abs(C.Z - FirstColor.Z) > 1e-4f || std::abs(C.W - FirstColor.W) > 1e-4f) bColorMixed = true;
+						if (std::abs(S - FirstShininess) > 1e-4f) bShininessMixed = true;
+						if (std::abs(UV.X - FirstUV.X) > 1e-4f || std::abs(UV.Y - FirstUV.Y) > 1e-4f) bUVMixed = true;
+						if (Sm != FirstSampler) bSamplerMixed = true;
+						if (Bl != FirstBlend) bBlendMixed = true;
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Base Color");
+					ImGui::TableSetColumnIndex(1);
+					ImGui::SetNextItemWidth(-1.0f);
+					FVector4 ColorVal = FirstColor;
+					if (ImGui::ColorEdit4("##MultiBaseColor", &ColorVal.X))
+					{
+						for (UMeshComponent* MC : MeshComps)
+						{
+							if (UMaterial* Over = EnsureMaterialOverride(MC, Slot, MC->GetMaterial(Slot), MC->GetOverrideMaterial(Slot)))
+								Over->BaseColor = ColorVal;
+						}
+					}
+					if (bColorMixed) ImGui::TextDisabled("(Multiple Values)");
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Shininess");
+					ImGui::TableSetColumnIndex(1);
+					ImGui::SetNextItemWidth(-1.0f);
+					float ShininessVal = FirstShininess;
+					if (ImGui::DragFloat("##MultiShininess", &ShininessVal, 0.5f, 1.0f, 256.0f, bShininessMixed ? "Multiple Values" : "%.3f"))
+					{
+						for (UMeshComponent* MC : MeshComps)
+						{
+							if (UMaterial* Over = EnsureMaterialOverride(MC, Slot, MC->GetMaterial(Slot), MC->GetOverrideMaterial(Slot)))
+								Over->Shininess = ShininessVal;
+						}
+					}
+
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("UV Scroll");
+					ImGui::TableSetColumnIndex(1);
+					ImGui::SetNextItemWidth(-1.0f);
+					FVector2 UVVal = FirstUV;
+					if (ImGui::DragFloat2("##MultiUVScroll", &UVVal.X, 0.01f, 0.0f, 0.0f, bUVMixed ? "Multiple Values" : "%.3f"))
+					{
+						for (UMeshComponent* MC : MeshComps)
+						{
+							if (UMaterial* Over = EnsureMaterialOverride(MC, Slot, MC->GetMaterial(Slot), MC->GetOverrideMaterial(Slot)))
+								Over->UVScrollSpeed = UVVal;
+						}
+					}
+
+					const char* SamplerItems[] = { "Linear Clamp", "Linear Wrap" };
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Sampler");
+					ImGui::TableSetColumnIndex(1);
+					ImGui::SetNextItemWidth(-1.0f);
+					if (ImGui::BeginCombo("##MultiSampler", bSamplerMixed ? "Multiple Values" : SamplerItems[FirstSampler]))
+					{
+						for (int i = 0; i < IM_ARRAYSIZE(SamplerItems); ++i)
+						{
+							const bool bSel = !bSamplerMixed && FirstSampler == i;
+							if (ImGui::Selectable(SamplerItems[i], bSel))
+							{
+								for (UMeshComponent* MC : MeshComps)
+								{
+									if (UMaterial* Over = EnsureMaterialOverride(MC, Slot, MC->GetMaterial(Slot), MC->GetOverrideMaterial(Slot)))
+										Over->SamplerState = static_cast<ESamplerState>(i);
+								}
+							}
+						}
+						ImGui::EndCombo();
+					}
+
+					const char* BlendItems[] = { "Opaque", "Alpha Blend" };
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					ImGui::Text("Blend Mode");
+					ImGui::TableSetColumnIndex(1);
+					ImGui::SetNextItemWidth(-1.0f);
+					if (ImGui::BeginCombo("##MultiBlend", bBlendMixed ? "Multiple Values" : BlendItems[FirstBlend]))
+					{
+						for (int i = 0; i < IM_ARRAYSIZE(BlendItems); ++i)
+						{
+							const bool bSel = !bBlendMixed && FirstBlend == i;
+							if (ImGui::Selectable(BlendItems[i], bSel))
+							{
+								for (UMeshComponent* MC : MeshComps)
+								{
+									if (UMaterial* Over = EnsureMaterialOverride(MC, Slot, MC->GetMaterial(Slot), MC->GetOverrideMaterial(Slot)))
+										Over->BlendState = static_cast<EBlendState>(i);
+								}
+							}
+						}
+						ImGui::EndCombo();
+					}
+
+					ImGui::EndTable();
+				}
+				ImGui::TreePop();
+			}
+			ImGui::PopID();
+			ImGui::Separator();
+		}
+	}
 }
 
 // UI 에디터처럼 다른 패널도 같은 속성 편집 UI를 쓰도록 위 함수들을 공개한다.
@@ -1687,54 +2754,61 @@ void FDetailsPanel::CommitPendingObjectEdit()
 	}
 	bPendingEditCommit = false;
 
-	if (!UndoHistory || !UndoHistory->CanRecord() || !World)
+	TArray<FPendingObjectEditSnapshot> Snapshots = std::move(PendingEditSnapshots);
+	PendingEditSnapshots.Empty();
+
+	if (!UndoHistory || !UndoHistory->CanRecord() || !World || Snapshots.IsEmpty())
 	{
-		PendingActorBeforeBytes.Empty();
-		PendingCompBeforeBytes.Empty();
 		return;
 	}
 
-	AActor* Actor = EditorUndoUtils::FindActorByName(World, TrackedActorName);
-	if (!Actor)
+	TArray<TUniquePtr<IEditorUndoCommand>> Commands;
+	TArray<FName> EditedActorNames;
+	for (FPendingObjectEditSnapshot& Snap : Snapshots)
 	{
-		PendingActorBeforeBytes.Empty();
-		PendingCompBeforeBytes.Empty();
-		return;
-	}
-
-	TArray<uint8> AfterActorBytes;
-	if (!PendingActorBeforeBytes.IsEmpty() &&
-		EditorUndoUtils::CaptureObjectBytes(Actor, AfterActorBytes) &&
-		!(AfterActorBytes == PendingActorBeforeBytes))
-	{
-		UndoHistory->Push(EditorUndoUtils::MakeObjectBytesCommand(
-			"Edit Actor Property",
-			TrackedActorName,
-			FName(),
-			std::move(PendingActorBeforeBytes),
-			std::move(AfterActorBytes)));
-	}
-
-	if (!TrackedComponentName.IsNone() && !PendingCompBeforeBytes.IsEmpty())
-	{
-		if (UActorComponent* Comp = Actor->FindComponentByName(TrackedComponentName))
+		if (Snap.BeforeBytes.IsEmpty())
 		{
-			TArray<uint8> AfterCompBytes;
-			if (EditorUndoUtils::CaptureObjectBytes(Comp, AfterCompBytes) &&
-				!(AfterCompBytes == PendingCompBeforeBytes))
+			continue;
+		}
+		AActor* Actor = EditorUndoUtils::FindActorByName(World, Snap.ActorName);
+		if (!Actor)
+		{
+			continue;
+		}
+		UObject* TargetObj = Snap.ComponentName.IsNone()
+			? static_cast<UObject*>(Actor)
+			: static_cast<UObject*>(Actor->FindComponentByName(Snap.ComponentName));
+		if (!TargetObj)
+		{
+			continue;
+		}
+
+		TArray<uint8> AfterBytes;
+		if (EditorUndoUtils::CaptureObjectBytes(TargetObj, AfterBytes) && !(AfterBytes == Snap.BeforeBytes))
+		{
+			if (EditedActorNames.Find(Snap.ActorName) == INDEX_NONE)
 			{
-				UndoHistory->Push(EditorUndoUtils::MakeObjectBytesCommand(
-					"Edit Component Property",
-					TrackedActorName,
-					TrackedComponentName,
-					std::move(PendingCompBeforeBytes),
-					std::move(AfterCompBytes)));
+				EditedActorNames.Add(Snap.ActorName);
 			}
+			const char* Desc = Snap.ComponentName.IsNone() ? "Edit Actor Property" : "Edit Component Property";
+			Commands.Add(EditorUndoUtils::MakeObjectBytesCommand(
+				Desc,
+				Snap.ActorName,
+				Snap.ComponentName,
+				std::move(Snap.BeforeBytes),
+				std::move(AfterBytes)));
 		}
 	}
 
-	PendingActorBeforeBytes.Empty();
-	PendingCompBeforeBytes.Empty();
+	if (Commands.Num() == 1)
+	{
+		UndoHistory->Push(std::move(Commands[0]));
+	}
+	else if (Commands.Num() > 1)
+	{
+		UndoHistory->Push(EditorUndoUtils::MakeCompositeCommand(
+			"Edit Multiple Properties", std::move(Commands), EditedActorNames, EditedActorNames));
+	}
 }
 
 void FDetailsPanel::OnRender()
@@ -1744,7 +2818,169 @@ void FDetailsPanel::OnRender()
 	ImGui::Begin("Details", GetOpenFlag());
 	bFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
 
-	if (TargetActor)
+	if (TargetActors.Num() > 1)
+	{
+		TArray<UObject*> ActorObjs;
+		TArray<UObject*> RootCompObjs;
+		TArray<FPendingObjectEditSnapshot> FrameBefore;
+		for (AActor* Actor : TargetActors)
+		{
+			if (!Actor) continue;
+			ActorObjs.Add(Actor);
+			USceneComponent* Root = Actor->GetRootComponent();
+			while (Root && Root->IsHiddenInDetails())
+			{
+				Root = Root->GetAttachParent();
+			}
+			if (Root)
+			{
+				RootCompObjs.Add(Root);
+			}
+		}
+
+		// 다중 선택 대상 집합이 이전 대기 편집과 다르면 먼저 커밋한다.
+		if (bPendingEditCommit)
+		{
+			bool bMatchesTracked = true;
+			for (const FPendingObjectEditSnapshot& Snap : PendingEditSnapshots)
+			{
+				if (Snap.ComponentName.IsNone())
+				{
+					bool bFound = false;
+					for (AActor* A : TargetActors)
+					{
+						if (A && A->GetFName() == Snap.ActorName) { bFound = true; break; }
+					}
+					if (!bFound) { bMatchesTracked = false; break; }
+				}
+			}
+			if (!bMatchesTracked) CommitPendingObjectEdit();
+		}
+
+		const bool bAllInWorld = [&]()
+		{
+			for (AActor* A : TargetActors)
+			{
+				if (!A || A->GetWorld() != World) return false;
+			}
+			return true;
+		}();
+		const bool bCanCaptureBefore = UndoHistory && UndoHistory->CanRecord() && bAllInWorld &&
+			!bPendingEditCommit &&
+			(bFocused || ImGui::IsWindowHovered(ImGuiHoveredFlags_RootAndChildWindows) ||
+			 ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId));
+
+		if (bCanCaptureBefore)
+		{
+			for (AActor* A : TargetActors)
+			{
+				if (!A) continue;
+				FPendingObjectEditSnapshot ActorSnap;
+				ActorSnap.ActorName = A->GetFName();
+				if (EditorUndoUtils::CaptureObjectBytes(A, ActorSnap.BeforeBytes))
+				{
+					FrameBefore.Add(std::move(ActorSnap));
+				}
+				USceneComponent* Root = A->GetRootComponent();
+				while (Root && Root->IsHiddenInDetails()) Root = Root->GetAttachParent();
+				if (Root)
+				{
+					FPendingObjectEditSnapshot CompSnap;
+					CompSnap.ActorName = A->GetFName();
+					CompSnap.ComponentName = Root->GetFName();
+					if (EditorUndoUtils::CaptureObjectBytes(Root, CompSnap.BeforeBytes))
+					{
+						FrameBefore.Add(std::move(CompSnap));
+					}
+				}
+			}
+		}
+
+		const TArray<UClass*> CommonActorClasses = GetCommonClassChain(ActorObjs);
+		const char* CommonActorTypeName = !CommonActorClasses.IsEmpty() ? CommonActorClasses.Last()->Name.c_str() : "AActor";
+		ImGui::Text("%d Actors Selected (%s)", TargetActors.Num(), CommonActorTypeName);
+		if (ImGui::IsItemHovered())
+		{
+			ImGui::BeginTooltip();
+			const int32 ShowLimit = (std::min)(TargetActors.Num(), 12);
+			for (int32 i = 0; i < ShowLimit; ++i)
+			{
+				if (TargetActors[i]) ImGui::TextUnformatted(TargetActors[i]->GetName().c_str());
+			}
+			if (TargetActors.Num() > ShowLimit)
+			{
+				ImGui::TextDisabled("... +%d more", TargetActors.Num() - ShowLimit);
+			}
+			ImGui::EndTooltip();
+		}
+		ImGui::Separator();
+
+		ImGui::PushID("MultiActorProperties");
+		DrawMultiProperties(ActorObjs, CustomFont);
+		ImGui::PopID();
+
+		if (RootCompObjs.Num() == ActorObjs.Num() && !RootCompObjs.IsEmpty())
+		{
+			ImGui::PushID("MultiComponentProperties");
+			ImGui::SeparatorText("Shared Component Properties");
+			DrawMultiProperties(RootCompObjs, CustomFont);
+
+			TArray<USkinnedMeshComponent*> SkinnedComps;
+			TArray<UMeshComponent*> MeshComps;
+			int32 MinMaterialSlots = INT_MAX;
+			for (UObject* Obj : RootCompObjs)
+			{
+				if (USkinnedMeshComponent* Sk = Cast<USkinnedMeshComponent>(Obj))
+				{
+					SkinnedComps.Add(Sk);
+				}
+				if (UMeshComponent* MC = Cast<UMeshComponent>(Obj))
+				{
+					MeshComps.Add(MC);
+					MinMaterialSlots = (std::min)(MinMaterialSlots, MC->GetNumMaterials());
+				}
+			}
+			if (SkinnedComps.Num() == RootCompObjs.Num())
+			{
+				ImGui::TextUnformatted("Skeletal Mesh");
+				DrawMultiSkeletalMeshSlot(SkinnedComps);
+			}
+			if (MeshComps.Num() == RootCompObjs.Num() && MinMaterialSlots > 0 && MinMaterialSlots != INT_MAX)
+			{
+				DrawMultiMaterialSlots(MeshComps, MinMaterialSlots);
+			}
+			ImGui::PopID();
+		}
+
+		if (bCanCaptureBefore && !FrameBefore.IsEmpty())
+		{
+			bool bAnyChanged = false;
+			for (const FPendingObjectEditSnapshot& Snap : FrameBefore)
+			{
+				AActor* A = EditorUndoUtils::FindActorByName(World, Snap.ActorName);
+				UObject* TargetObj = A ? (Snap.ComponentName.IsNone()
+					? static_cast<UObject*>(A)
+					: static_cast<UObject*>(A->FindComponentByName(Snap.ComponentName))) : nullptr;
+				TArray<uint8> AfterBytes;
+				if (TargetObj && EditorUndoUtils::CaptureObjectBytes(TargetObj, AfterBytes) && !(AfterBytes == Snap.BeforeBytes))
+				{
+					bAnyChanged = true;
+					break;
+				}
+			}
+			if (bAnyChanged)
+			{
+				PendingEditSnapshots = std::move(FrameBefore);
+				bPendingEditCommit = true;
+			}
+		}
+
+		if (bPendingEditCommit && !ImGui::IsAnyItemActive())
+		{
+			CommitPendingObjectEdit();
+		}
+	}
+	else if (TargetActor)
 	{
 		// 빌보드처럼 디테일에 숨겨진 컴포넌트가 선택되면 노출되는 부모로 올린다.
 		// (예: 라이트는 빌보드를 클릭해서 고르지만 수치는 SpotLight 쪽에 있다)
@@ -1762,9 +2998,17 @@ void FDetailsPanel::OnRender()
 
 		const FName CurrentActorName = TargetActor->GetFName();
 		const FName CurrentCompName = TargetComponent ? TargetComponent->GetFName() : FName();
-		if (bPendingEditCommit && (TrackedActorName != CurrentActorName || TrackedComponentName != CurrentCompName))
+		if (bPendingEditCommit)
 		{
-			CommitPendingObjectEdit();
+			const bool bMatchesSingle = PendingEditSnapshots.Num() <= 2 && !PendingEditSnapshots.IsEmpty()
+				&& PendingEditSnapshots[0].ActorName == CurrentActorName
+				&& (PendingEditSnapshots.Num() == 1
+					? (PendingEditSnapshots[0].ComponentName == FName() || PendingEditSnapshots[0].ComponentName == CurrentCompName)
+					: (PendingEditSnapshots[1].ComponentName == CurrentCompName));
+			if (!bMatchesSingle)
+			{
+				CommitPendingObjectEdit();
+			}
 		}
 
 		const bool bCanCaptureBefore = UndoHistory && UndoHistory->CanRecord() && TargetActor->GetWorld() == World &&
@@ -1842,10 +3086,15 @@ void FDetailsPanel::OnRender()
 
 			if (!(FrameAfterActorBytes == FrameBeforeActorBytes) || !(FrameAfterCompBytes == FrameBeforeCompBytes))
 			{
-				TrackedActorName = CurrentActorName;
-				TrackedComponentName = CurrentCompName;
-				PendingActorBeforeBytes = std::move(FrameBeforeActorBytes);
-				PendingCompBeforeBytes = std::move(FrameBeforeCompBytes);
+				PendingEditSnapshots.Empty();
+				if (!(FrameAfterActorBytes == FrameBeforeActorBytes))
+				{
+					PendingEditSnapshots.Add({ CurrentActorName, FName(), std::move(FrameBeforeActorBytes) });
+				}
+				if (TargetComponent && !(FrameAfterCompBytes == FrameBeforeCompBytes))
+				{
+					PendingEditSnapshots.Add({ CurrentActorName, CurrentCompName, std::move(FrameBeforeCompBytes) });
+				}
 				bPendingEditCommit = true;
 			}
 		}

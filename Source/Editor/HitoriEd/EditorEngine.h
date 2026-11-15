@@ -67,6 +67,7 @@ public:
 	// 위젯 에디터가 미리보기 텍스처를 그릴 때 쓴다. 초기화 전에는 nullptr이다.
 	FUIRenderer* GetUIRenderer() const { return UIRenderer.get(); }
 	void DeleteActor(AActor* Actor);
+	void DeleteActors(const TArray<AActor*>& Actors);
 	void DeleteComponent(UActorComponent* Component);
 
 	void Undo();
@@ -78,6 +79,7 @@ public:
 	FEditorUndoHistory& GetUndoHistory() { return UndoHistory; }
 	UWorld* GetEditorWorld() const { return EditorWorld; }
 	void SelectActorForUndo(AActor* Actor, UActorComponent* Component = nullptr);
+	void SelectActorsForUndo(const TArray<AActor*>& Actors);
 	void DeleteActorForUndo(AActor* Actor);
 	void DeleteComponentForUndo(UActorComponent* Component);
 
@@ -239,18 +241,31 @@ private:
 	bool bIsSimulatingInEditor = false;
 
 	void ResetSceneSelection();
+	void ApplyMultiActorGizmoDelta();
 	void FinishGizmoDragUndo();
 	void CopySelectedActor();
 	void PasteActor();
 	TUniquePtr<AActor> ActorClipboard;
 
+	struct FGizmoDragEntry
+	{
+		FName ActorName;
+		FName CompName;
+		FTransform StartTransform;
+		FVector StartWorldLocation = FVector(0, 0, 0);
+		FQuat StartWorldQuat = FQuat::Identity();
+		bool bIsPrimary = false;
+		bool bHasLightRadius = false;
+		float StartLightRadius = 0.0f;
+	};
+
 	FEditorUndoHistory UndoHistory;
 	bool bTrackingGizmoDrag = false;
-	FName GizmoDragActorName;
-	FName GizmoDragCompName;
-	FTransform GizmoDragStartTransform;
-	bool bGizmoDragHasLightRadius = false;
-	float GizmoDragStartLightRadius = 0.0f;
+	EGizmoMode GizmoDragMode = EGizmoMode::Location;
+	FVector GizmoDragPrimaryStartWorldLoc = FVector(0, 0, 0);
+	FQuat GizmoDragPrimaryStartWorldQuat = FQuat::Identity();
+	FVector GizmoDragPrimaryStartScale = FVector(1, 1, 1);
+	TArray<FGizmoDragEntry> GizmoDragEntries;
 
 	void CreateNewScene();
 	void OpenScene();

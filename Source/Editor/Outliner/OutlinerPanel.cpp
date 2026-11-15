@@ -163,6 +163,21 @@ void FOutlinerPanel::OnRender()
     }
 
     // Actors 순회가 완전히 끝난 뒤 삭제
+    if (!PendingDeleteActors.IsEmpty())
+    {
+        if (MultiDeleteCallback)
+        {
+            MultiDeleteCallback(PendingDeleteActors);
+        }
+        else if (DeleteCallback)
+        {
+            for (AActor* Target : PendingDeleteActors)
+            {
+                DeleteCallback(Target);
+            }
+        }
+        PendingDeleteActors.Reset();
+    }
     if (PendingDeleteActor)
     {
         if (DeleteCallback)
@@ -179,6 +194,9 @@ void FOutlinerPanel::DrawActors(ULevel* Level)
 {
     if (!Level)
         return;
+
+    PruneInvalidSelections(Level);
+    VisibleActorOrder.Reset();
 
     const TArray<AActor*>& Actors = Level->GetActors();
 
@@ -201,6 +219,8 @@ void FOutlinerPanel::DrawActorNode(AActor* Actor)
     if (!Actor)
         return;
 
+    VisibleActorOrder.Add(Actor);
+
     const FString ActorName = Actor->GetName();
 
     const auto* Children = ActorChildren.Find(Actor);
@@ -216,16 +236,21 @@ void FOutlinerPanel::DrawActorNode(AActor* Actor)
     ImGui::TableSetColumnIndex(0);
 
     // Actor 선택 시 UI 선택 상태
-    if (SelectedObject == Actor)
+    if (IsActorSelected(Actor))
         Flags |= ImGuiTreeNodeFlags_Selected;
 
     const ImVec2 RowStart = ImGui::GetCursorScreenPos();
     const bool bOpen = ImGui::TreeNodeEx(Actor, Flags, "%s", RenamingActor == Actor ? "" : ActorName.c_str());
 
-    // UI에서 Actor 클릭
+    // UI에서 Actor 클릭 (Ctrl: 개별 토글, Shift: 범위 선택)
     // Select on release so dragging an actor does not replace the destination
     // actor's component list in Details halfway through a cross-panel drag.
     if (ImGui::IsItemHovered() && ImGui::IsMouseReleased(ImGuiMouseButton_Left) && !ImGui::GetDragDropPayload())
+    {
+        const ImGuiIO& IO = ImGui::GetIO();
+        SelectActor(Actor, IO.KeyCtrl, IO.KeyShift);
+    }
+    if (ImGui::IsItemClicked(ImGuiMouseButton_Right) && !IsActorSelected(Actor))
     {
         SelectActor(Actor);
     }
@@ -250,12 +275,15 @@ void FOutlinerPanel::DrawActorNode(AActor* Actor)
     }
     if (ImGui::BeginPopupContextItem())
     {
-		if (ImGui::MenuItem("Rename", "F2")) bRename = true;
+		if (ImGui::MenuItem("Rename", "F2", false, SelectedActors.Num() <= 1)) bRename = true;
         if (ImGui::MenuItem("Detach from Parent", nullptr, false, EditorHierarchy::GetParentActor(Actor) != nullptr))
         { PendingAttachChild = Actor->GetRootComponent(); bPendingDetach = true; }
         if (ImGui::MenuItem("Delete"))
         {
-            PendingDeleteActor = Actor; // 여기서는 바로 삭제 X
+            if (SelectedActors.Num() > 1 && IsActorSelected(Actor))
+                PendingDeleteActors = SelectedActors;
+            else
+                PendingDeleteActor = Actor; // 여기서는 바로 삭제 X
         }
 
         ImGui::EndPopup();
@@ -316,32 +344,159 @@ void FOutlinerPanel::DrawActorNode(AActor* Actor)
     }
 }
 
-// 선택 Object 변경
-void FOutlinerPanel::SelectActor(AActor* Actor)
+void FOutlinerPanel::NotifySelectionChanged()
 {
-    if (!Actor)
+    AActor* Primary = GetSelectedActor();
+    USceneComponent* Scene = Primary ? Cast<USceneComponent>(Primary->GetRootComponent()) : nullptr;
+
+    if (MultiCallback)
     {
-        RenamingActor = nullptr;
-        SelectedObject = nullptr;
+        MultiCallback(SelectedActors);
+    }
+    else if (Callback)
+    {
+        Callback(Scene);
+    }
+}
 
-        if (Callback)
-            Callback(nullptr);
-
+void FOutlinerPanel::PruneInvalidSelections(ULevel* Level)
+{
+    if (!Level || SelectedActors.IsEmpty())
+    {
+        if (Level && SelectionAnchorActor && Level->GetActors().Find(SelectionAnchorActor) == INDEX_NONE)
+        {
+            SelectionAnchorActor = nullptr;
+        }
         return;
     }
 
-    SelectedObject = Actor;
-
-    HTR_LOG(Info, "{} UUID {} is selected", SelectedObject->GetName(), SelectedObject->GetUUID());
-
-    USceneComponent* Scene = Cast<USceneComponent>(Actor->GetRootComponent());
-
-    if (Callback)
-        Callback(Scene);
+    const TArray<AActor*>& Actors = Level->GetActors();
+    bool bRemoved = false;
+    for (int32 i = SelectedActors.Num() - 1; i >= 0; --i)
+    {
+        AActor* Sel = SelectedActors[i];
+        if (!Sel || Actors.Find(Sel) == INDEX_NONE)
+        {
+            SelectedActors.RemoveAt(i);
+            bRemoved = true;
+        }
+    }
+    if (SelectionAnchorActor && Actors.Find(SelectionAnchorActor) == INDEX_NONE)
+    {
+        SelectionAnchorActor = SelectedActors.IsEmpty() ? nullptr : SelectedActors[0];
+    }
+    if (bRemoved)
+    {
+        NotifySelectionChanged();
+    }
 }
 
+// 선택 Object 변경
+void FOutlinerPanel::SelectActor(AActor* Actor, bool bAdditiveToggle, bool bRangeSelect)
+{
+    if (bRangeSelect && Actor)
+    {
+        AActor* Anchor = SelectionAnchorActor ? SelectionAnchorActor : GetSelectedActor();
+        const int32 AnchorIdx = Anchor ? VisibleActorOrder.Find(Anchor) : INDEX_NONE;
+        const int32 TargetIdx = VisibleActorOrder.Find(Actor);
+        if (AnchorIdx != INDEX_NONE && TargetIdx != INDEX_NONE)
+        {
+            RenamingActor = nullptr;
+            if (!bAdditiveToggle)
+            {
+                SelectedActors.Reset();
+            }
+            const int32 Lo = (std::min)(AnchorIdx, TargetIdx);
+            const int32 Hi = (std::max)(AnchorIdx, TargetIdx);
+            for (int32 i = Lo; i <= Hi; ++i)
+            {
+                AActor* Candidate = VisibleActorOrder[i];
+                if (Candidate && Candidate != Actor && SelectedActors.Find(Candidate) == INDEX_NONE)
+                {
+                    SelectedActors.Add(Candidate);
+                }
+            }
+            // 마지막에 클릭된 액터가 주 선택(Primary)이 되도록 뒤에 둔다.
+            const int32 PrevIdx = SelectedActors.Find(Actor);
+            if (PrevIdx != INDEX_NONE)
+            {
+                SelectedActors.RemoveAt(PrevIdx);
+            }
+            SelectedActors.Add(Actor);
+            if (!SelectionAnchorActor)
+            {
+                SelectionAnchorActor = Anchor ? Anchor : Actor;
+            }
+            NotifySelectionChanged();
+            return;
+        }
+    }
+
+    if (bAdditiveToggle)
+    {
+        if (!Actor)
+        {
+            return;
+        }
+
+        RenamingActor = nullptr;
+        const int32 ExistingIdx = SelectedActors.Find(Actor);
+        if (ExistingIdx != INDEX_NONE)
+        {
+            SelectedActors.RemoveAt(ExistingIdx);
+        }
+        else
+        {
+            SelectedActors.Add(Actor);
+            HTR_LOG(Info, "{} UUID {} is selected (Multi: {})", Actor->GetName(), Actor->GetUUID(), SelectedActors.Num());
+        }
+        SelectionAnchorActor = Actor;
+        NotifySelectionChanged();
+        return;
+    }
+
+    if (!Actor)
+    {
+        RenamingActor = nullptr;
+        SelectedActors.Reset();
+        SelectionAnchorActor = nullptr;
+        NotifySelectionChanged();
+        return;
+    }
+
+    if (RenamingActor && RenamingActor != Actor)
+    {
+        RenamingActor = nullptr;
+    }
+    SelectedActors.Reset();
+    SelectedActors.Add(Actor);
+    SelectionAnchorActor = Actor;
+
+    HTR_LOG(Info, "{} UUID {} is selected", Actor->GetName(), Actor->GetUUID());
+    NotifySelectionChanged();
+}
+
+void FOutlinerPanel::SelectActors(const TArray<AActor*>& Actors)
+{
+    RenamingActor = nullptr;
+    SelectedActors.Reset();
+    for (AActor* Actor : Actors)
+    {
+        if (Actor && SelectedActors.Find(Actor) == INDEX_NONE)
+        {
+            SelectedActors.Add(Actor);
+        }
+    }
+    SelectionAnchorActor = SelectedActors.IsEmpty() ? nullptr : SelectedActors[0];
+    NotifySelectionChanged();
+}
+
+bool FOutlinerPanel::IsActorSelected(const AActor* Actor) const
+{
+    return Actor && SelectedActors.Find(const_cast<AActor*>(Actor)) != INDEX_NONE;
+}
 
 AActor* FOutlinerPanel::GetSelectedActor() const
 {
-    return Cast<AActor>(SelectedObject);
+    return SelectedActors.IsEmpty() ? nullptr : SelectedActors[SelectedActors.Num() - 1];
 }

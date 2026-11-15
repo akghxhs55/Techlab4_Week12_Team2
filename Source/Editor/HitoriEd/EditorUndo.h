@@ -151,4 +151,10 @@ namespace EditorUndoUtils
 		FName NewRootName,
 		FName ExternalParentActorName,
 		FName ExternalParentCompName);
+
+	TUniquePtr<IEditorUndoCommand> MakeCompositeCommand(
+		const char* Description,
+		TArray<TUniquePtr<IEditorUndoCommand>> Commands,
+		TArray<FName> UndoSelectActorNames = {},
+		TArray<FName> RedoSelectActorNames = {});
 }

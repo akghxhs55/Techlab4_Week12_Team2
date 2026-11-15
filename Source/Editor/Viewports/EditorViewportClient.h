@@ -105,10 +105,10 @@ public:
 		int32 WheelDelta, float MoveSpeed, float MouseSensitivity,
 		float MouseX = 0.0f, float MouseY = 0.0f, bool bLeftDrag = false);
 
-	// 기즈모 조작과 피킹 처리
+	// 기즈모 조작과 피킹 처리 (두 번째 인자는 Ctrl 다중 선택 토글 여부)
 	void
 		UpdateGizmoAndPicking(FGizmo* InGizmo, const FVector2& LocalMousePosition,
-			const std::function<void(AActor*)>& OnSelectActor);
+			const std::function<void(AActor*, bool)>& OnSelectActor);
 
 	// 행렬 계산
 	FMatrix GetViewMatrix() const;

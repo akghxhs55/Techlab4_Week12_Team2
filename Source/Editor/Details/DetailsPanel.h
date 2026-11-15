@@ -31,7 +31,37 @@ public:
 
 	void SetTarget(AActor* InTargetActor) 
 	{ 
-		if (TargetActor != InTargetActor)
+		TArray<AActor*> Single;
+		if (InTargetActor)
+		{
+			Single.Add(InTargetActor);
+		}
+		SetTargets(Single);
+	}
+	void SetTargets(const TArray<AActor*>& InTargetActors)
+	{
+		TArray<AActor*> Filtered;
+		for (AActor* Actor : InTargetActors)
+		{
+			if (Actor && Filtered.Find(Actor) == INDEX_NONE)
+			{
+				Filtered.Add(Actor);
+			}
+		}
+
+		bool bSame = (Filtered.Num() == TargetActors.Num());
+		if (bSame)
+		{
+			for (int32 i = 0; i < Filtered.Num(); ++i)
+			{
+				if (Filtered[i] != TargetActors[i])
+				{
+					bSame = false;
+					break;
+				}
+			}
+		}
+		if (!bSame)
 		{
 			CommitPendingObjectEdit();
 			EditingNameComponent = nullptr;
@@ -39,8 +69,10 @@ public:
 			PendingDeleteComponent = nullptr;
 			PendingDragComponent = PendingDroppedComponent = nullptr;
 		}
-		TargetActor = InTargetActor;
-		TargetComponent = InTargetActor ? InTargetActor->GetRootComponent() : nullptr;
+
+		TargetActors = std::move(Filtered);
+		TargetActor = TargetActors.IsEmpty() ? nullptr : TargetActors.Last();
+		TargetComponent = TargetActor ? TargetActor->GetRootComponent() : nullptr;
 	}
 	void SetTargetComponent(UActorComponent* InTargetComponent)
 	{
@@ -60,10 +92,7 @@ public:
 		if (World != InWorld)
 		{
 			bPendingEditCommit = false;
-			PendingActorBeforeBytes.Empty();
-			PendingCompBeforeBytes.Empty();
-			TrackedActorName = FName();
-			TrackedComponentName = FName();
+			PendingEditSnapshots.Empty();
 		}
 		World = InWorld;
 	}
@@ -89,12 +118,17 @@ private:
 	bool bFocused = false;
 	ImFont* CustomFont = nullptr;
 
-	bool bPendingEditCommit = false;
-	FName TrackedActorName;
-	FName TrackedComponentName;
-	TArray<uint8> PendingActorBeforeBytes;
-	TArray<uint8> PendingCompBeforeBytes;
+	struct FPendingObjectEditSnapshot
+	{
+		FName ActorName;
+		FName ComponentName;
+		TArray<uint8> BeforeBytes;
+	};
 
+	bool bPendingEditCommit = false;
+	TArray<FPendingObjectEditSnapshot> PendingEditSnapshots;
+
+	TArray<AActor*> TargetActors;
 	AActor* TargetActor = nullptr;
 	UActorComponent* TargetComponent = nullptr;
 	DetailsSelectionCallback Callback;
