@@ -4,6 +4,7 @@
 
 #include <cctype>
 #include <fstream>
+#include <map>
 
 #include <d3d11.h>
 #include <dxgi.h>
@@ -354,6 +355,8 @@ namespace
 		};
 
 		TArray<fs::path> Recent;
+		// 경로로 캐시하므로 목록에서 항목을 제거해도 다른 프로젝트 이미지와 섞이지 않는다.
+		std::map<fs::path, ComPtr<ID3D11ShaderResourceView>> Thumbnails;
 		int32 SelectedRecent = -1;
 		EPage ActivePage = EPage::Home;
 		ImTextureID LogoTexture = ImTextureID_Invalid;
@@ -361,14 +364,23 @@ namespace
 		ImTextureID MyProjectsIcon = ImTextureID_Invalid;
 		ImTextureID SignatureTexture = ImTextureID_Invalid;
 		ImVec2 SignatureSize = {};
+		ImTextureID BackgroundTexture = ImTextureID_Invalid;
+		ImVec2 BackgroundSize = {};
 		char NameBuffer[64] = {};
 		char LocationBuffer[1024] = {};
 		FString Error;
 		fs::path Chosen;
 
-		void Init()
+		void Init(ID3D11Device* Device)
 		{
 			Recent = RecentProjects::Load();
+			for (const fs::path& Project : Recent)
+			{
+				const fs::path Thumbnail = Project.parent_path() / FPaths::ProjectThumbnailRelativePath;
+				std::error_code Ec;
+				if (fs::is_regular_file(Thumbnail, Ec))
+					Thumbnails.emplace(Project, CreateLogoTexture(Device, FPaths::ToUtf8(Thumbnail)));
+			}
 			SelectedRecent = Recent.Num() > 0 ? 0 : -1;
 			const fs::path Location = DefaultProjectLocation();
 			CopyToBuffer(FPaths::ToUtf8(fs::path(Location).make_preferred()), LocationBuffer, sizeof(LocationBuffer));
@@ -521,7 +533,24 @@ namespace
 				EditorColor::BgRaised, EditorColor::BgPanel,
 				EditorColor::BgDeepest, EditorColor::BgDeepest);
 
-			if (LogoTexture != ImTextureID_Invalid)
+			const auto Thumbnail = Thumbnails.find(ProjectPath);
+			if (Thumbnail != Thumbnails.end() && Thumbnail->second)
+			{
+				// 이미지 비율을 유지한 채 카드 영역을 채운다(중앙 기준 crop).
+				ComPtr<ID3D11Resource> Resource;
+				Thumbnail->second->GetResource(&Resource);
+				ComPtr<ID3D11Texture2D> Texture;
+				Resource.As(&Texture);
+				D3D11_TEXTURE2D_DESC Desc{};
+				Texture->GetDesc(&Desc);
+				const float ImageAspect = static_cast<float>(Desc.Width) / Desc.Height;
+				const float CardAspect = CardW / ThumbH;
+				const float U = ImageAspect > CardAspect ? (1.0f - CardAspect / ImageAspect) * 0.5f : 0.0f;
+				const float V = ImageAspect < CardAspect ? (1.0f - ImageAspect / CardAspect) * 0.5f : 0.0f;
+				DL->AddImage((ImTextureID)Thumbnail->second.Get(), Pos, { Max.x, Pos.y + ThumbH },
+					{ U, V }, { 1.0f - U, 1.0f - V });
+			}
+			else if (LogoTexture != ImTextureID_Invalid)
 			{
 				const float MarkSize = EditorStyle::Scale(56.0f);
 				const ImVec2 Center = { Pos.x + CardW * 0.5f, Pos.y + ThumbH * 0.5f };
@@ -554,6 +583,32 @@ namespace
 			return bDoubleClicked;
 		}
 
+		void DrawProjectBackground()
+		{
+			if (BackgroundTexture == ImTextureID_Invalid || BackgroundSize.x <= 0.0f || BackgroundSize.y <= 0.0f) return;
+
+			// 창 좌표에 고정해 목록을 스크롤해도 배경은 움직이지 않는다.
+			const ImVec2 PanelPos = ImGui::GetWindowPos();
+			const ImVec2 PanelSize = ImGui::GetWindowSize();
+			const float Inset = EditorStyle::Scale(2.0f);
+			const float AvailableW = std::max(0.0f, PanelSize.x - Inset * 2.0f);
+			const float AvailableH = std::max(0.0f, PanelSize.y - Inset * 2.0f);
+			const float Scale = std::min(AvailableW * 0.8f / BackgroundSize.x, AvailableH / BackgroundSize.y);
+			if (Scale <= 0.0f) return;
+			const ImVec2 Size(BackgroundSize.x * Scale, BackgroundSize.y * Scale);
+			const ImVec2 Max(PanelPos.x + PanelSize.x - Inset, PanelPos.y + PanelSize.y - Inset);
+			const ImVec2 Min(Max.x - Size.x, Max.y - Size.y);
+			ImDrawList* DL = ImGui::GetWindowDrawList();
+			DL->PushClipRect({ PanelPos.x + Inset, PanelPos.y + Inset }, Max, true);
+			DL->AddImage(BackgroundTexture, Min, Max, { 0, 0 }, { 1, 1 }, IM_COL32(255, 255, 255, 80));
+			// 캐릭터를 패널 색으로 서서히 덮어 카드 영역과 자연스럽게 연결한다.
+			const ImU32 Opaque = EditorColor::BgPanel;
+			const ImU32 Transparent = Opaque & ~IM_COL32_A_MASK;
+			DL->AddRectFilledMultiColor(Min, Max, Opaque, Transparent, Transparent, Opaque);
+			DL->AddRectFilledMultiColor(Min, { Max.x, Min.y + Size.y * 0.22f }, Opaque, Opaque, Transparent, Transparent);
+			DL->PopClipRect();
+		}
+
 		void DrawHomePage(HWND Hwnd, float BodyHeight)
 		{
 			ImGui::TextUnformatted("My Projects");
@@ -583,6 +638,7 @@ namespace
 			ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(6.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(18.0f), EditorStyle::Scale(18.0f)));
 			ImGui::BeginChild("##RecentCardsPanel", ImVec2(0.0f, GridH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+			DrawProjectBackground();
 
 			if (Recent.IsEmpty())
 			{
@@ -885,9 +941,11 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 		const ComPtr<ID3D11ShaderResourceView> MyProjectsIcon = CreateLogoTexture(Window.Device.Get(), "Engine/Icons/ProjectBrowser/MyProjects.png");
 		if (NewProjectIcon) UI.NewProjectIcon = (ImTextureID)NewProjectIcon.Get();
 		if (MyProjectsIcon) UI.MyProjectsIcon = (ImTextureID)MyProjectsIcon.Get();
-		const ComPtr<ID3D11ShaderResourceView> Signature = CreateLogoTexture(Window.Device.Get(), "Engine/Sprites/KurisuSignature.png", &UI.SignatureSize);
+		const ComPtr<ID3D11ShaderResourceView> Signature = CreateLogoTexture(Window.Device.Get(), "Engine/Icons/ProjectBrowser/KurisuSignature.png", &UI.SignatureSize);
 		if (Signature) UI.SignatureTexture = (ImTextureID)Signature.Get();
-		UI.Init();
+		const ComPtr<ID3D11ShaderResourceView> Background = CreateLogoTexture(Window.Device.Get(), "Engine/Icons/ProjectBrowser/KurisuBackground.png", &UI.BackgroundSize);
+		if (Background) UI.BackgroundTexture = (ImTextureID)Background.Get();
+		UI.Init(Window.Device.Get());
 
 		bool bRunning = true;
 		while (bRunning && UI.Chosen.empty())

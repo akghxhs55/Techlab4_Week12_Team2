@@ -53,6 +53,11 @@
 #include "Physics/Collision.h"
 
 #include "Audio/AudioDevice.h"
+#include "Core/Misc/Paths.h"
+#include "Engine/GameSettings.h"
+#include <wincodec.h>
+
+#pragma comment(lib, "windowscodecs.lib")
 
 namespace
 {
@@ -66,6 +71,85 @@ namespace
 	// 좌클릭을 이만큼(픽셀) 끌면 선택이 아니라 카메라 조작으로 본다.
 	// FEditorViewportClient의 클릭 선택 문턱과 같은 값이어야 한다.
 	constexpr int32 LeftDragNavThreshold = 3;
+
+	// 기본 클라이언트는 기즈모, 그리드, 선택 외곽선을 등록하지 않는다.
+	class FProjectThumbnailViewport : public FEditorViewportClient
+	{
+	public:
+		explicit FProjectThumbnailViewport(const FSceneRenderOptions& Options)
+		{
+			EngineShowFlags = Options;
+		}
+	};
+
+	bool WriteThumbnailPNG(FTexture2D* Source, const fs::path& Path)
+	{
+		if (!Source || !Source->GetRawPtr() || Source->GetFormat() != DXGI_FORMAT_R8G8B8A8_UNORM)
+			return false;
+		ID3D11Device* Device = FRenderDevice::Get()->GetDevice();
+		ID3D11DeviceContext* Context = FRenderDevice::Get()->GetContext();
+		D3D11_TEXTURE2D_DESC Desc{};
+		Desc.Width = Source->GetWidth();
+		Desc.Height = Source->GetHeight();
+		Desc.MipLevels = Desc.ArraySize = 1;
+		Desc.Format = Source->GetFormat();
+		Desc.SampleDesc.Count = 1;
+		Desc.Usage = D3D11_USAGE_STAGING;
+		Desc.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
+		ComPtr<ID3D11Texture2D> Staging;
+		if (FAILED(Device->CreateTexture2D(&Desc, nullptr, &Staging))) return false;
+		Context->CopyResource(Staging.Get(), Source->GetRawPtr());
+		D3D11_MAPPED_SUBRESOURCE Mapped{};
+		if (FAILED(Context->Map(Staging.Get(), 0, D3D11_MAP_READ, 0, &Mapped))) return false;
+		const uint32 Stride = Desc.Width * 4;
+		TArray<uint8> Pixels;
+		Pixels.SetNum(static_cast<int32>(Stride * Desc.Height));
+		for (uint32 Y = 0; Y < Desc.Height; ++Y)
+		{
+			uint8* Row = Pixels.GetData() + Y * Stride;
+			memcpy(Row, static_cast<const uint8*>(Mapped.pData) + Y * Mapped.RowPitch, Stride);
+			// WIC PNG 인코더는 32bppRGBA 요청을 BGRA로 바꾼다.
+			// 렌더 타깃의 RGBA를 실제 인코더 입력인 BGRA로 변환한다.
+			for (uint32 X = 0; X < Desc.Width; ++X)
+			{
+				std::swap(Row[X * 4], Row[X * 4 + 2]);
+				Row[X * 4 + 3] = 255;
+			}
+		}
+		Context->Unmap(Staging.Get(), 0);
+
+		std::error_code Ec;
+		fs::create_directories(Path.parent_path(), Ec);
+		if (Ec) return false;
+		const fs::path Temp = Path.wstring() + L".tmp";
+		const HRESULT ComResult = CoInitializeEx(nullptr, COINIT_APARTMENTTHREADED);
+		if (FAILED(ComResult) && ComResult != RPC_E_CHANGED_MODE) return false;
+		const bool bEncoded = [&]()
+		{
+			ComPtr<IWICImagingFactory> Factory;
+			ComPtr<IWICStream> Stream;
+			ComPtr<IWICBitmapEncoder> Encoder;
+			ComPtr<IWICBitmapFrameEncode> Frame;
+			WICPixelFormatGUID Format = GUID_WICPixelFormat32bppBGRA;
+			return SUCCEEDED(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&Factory))) &&
+				SUCCEEDED(Factory->CreateStream(&Stream)) &&
+				SUCCEEDED(Stream->InitializeFromFilename(Temp.c_str(), GENERIC_WRITE)) &&
+				SUCCEEDED(Factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, &Encoder)) &&
+				SUCCEEDED(Encoder->Initialize(Stream.Get(), WICBitmapEncoderNoCache)) &&
+				SUCCEEDED(Encoder->CreateNewFrame(&Frame, nullptr)) &&
+				SUCCEEDED(Frame->Initialize(nullptr)) &&
+				SUCCEEDED(Frame->SetSize(Desc.Width, Desc.Height)) &&
+				SUCCEEDED(Frame->SetPixelFormat(&Format)) && IsEqualGUID(Format, GUID_WICPixelFormat32bppBGRA) &&
+				SUCCEEDED(Frame->WritePixels(Desc.Height, Stride, Stride * Desc.Height, Pixels.GetData())) &&
+				SUCCEEDED(Frame->Commit()) && SUCCEEDED(Encoder->Commit());
+		}();
+		if (SUCCEEDED(ComResult)) CoUninitialize();
+		// 인코딩 실패 시 기존 이미지를 보존한다. 스트림을 닫은 뒤 원자적으로 교체한다.
+		if (bEncoded && MoveFileExW(Temp.c_str(), Path.c_str(), MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+			return true;
+		fs::remove(Temp, Ec);
+		return false;
+	}
 }
 
 // 뷰포트 하나의 화면 사각형에 커서를 가둔다.
@@ -162,6 +246,14 @@ bool UEditorEngine::Init()
 	InitEditorRenderers();
 	InitPanels();
 	InitCommands();
+	// 프로젝트 생성 시 이미 만들어진 대표 씬을 열어, 저장 없이 종료해도 최초 썸네일을 남긴다.
+	if (FPaths::HasProject())
+	{
+		const FGameSettings Settings = FGameSettings::Load(FPaths::ToUtf8(FPaths::ProjectDir() / L"Config/DefaultGame.ini"));
+		const fs::path Startup = FPaths::ProjectDir() / FPaths::FromUtf8(Settings.StartupMap);
+		std::error_code Ec;
+		if (fs::is_regular_file(Startup, Ec)) OpenSceneFromPath(FPaths::ToUtf8(Startup));
+	}
 
 	return true;
 }
@@ -950,6 +1042,8 @@ void UEditorEngine::Tick(const float DeltaTime)
 	{
 		UpdateSingleViewportClient(AllViewportClients[ViewIndex], ViewIndex);
 	}
+
+	if (!PendingThumbnailScene.empty()) SaveProjectThumbnail();
 
 	// 별도 창(FWindow) 모드인 경우 PIE 창 타깃에 렌더링하고 스왑체인 백버퍼로 복사한다.
 	bPIEWindowRendered = false;
@@ -1849,6 +1943,7 @@ void UEditorEngine::OpenScene()
 	ResetSceneSelection();
 
 	LevelEditorTab->OnLevelLoaded.Broadcast(FEditorFileUtils::CurrentScenePath);
+	QueueProjectThumbnail(true);
 }
 
 // 콘텐츠 드로어에서 더블클릭한 씬 파일을 바로 연다.
@@ -1867,6 +1962,7 @@ void UEditorEngine::OpenSceneFromPath(const FString& Path)
 	ResetSceneSelection();
 
 	LevelEditorTab->OnLevelLoaded.Broadcast(FEditorFileUtils::CurrentScenePath);
+	QueueProjectThumbnail(true);
 }
 
 // 공통 파일 유틸리티로 현재 씬을 저장한다.
@@ -1877,7 +1973,7 @@ void UEditorEngine::SaveCurrentScene()
 		KRS_LOG(Warning, "Cannot save during PIE. Stop the play session first.");
 		return;
 	}
-	FEditorFileUtils::SaveScene(EditorWorld);
+	if (FEditorFileUtils::SaveScene(EditorWorld)) QueueProjectThumbnail();
 }
 
 // 공통 파일 유틸리티로 새 경로에 씬을 저장한다.
@@ -1888,7 +1984,52 @@ void UEditorEngine::SaveSceneAs()
 		KRS_LOG(Warning, "Cannot save during PIE. Stop the play session first.");
 		return;
 	}
-	FEditorFileUtils::SaveSceneAs(EditorWorld);
+	if (FEditorFileUtils::SaveSceneAs(EditorWorld)) QueueProjectThumbnail();
+}
+
+void UEditorEngine::QueueProjectThumbnail(bool bOnlyIfMissing)
+{
+	if (!FPaths::HasProject()) return;
+	std::error_code Ec;
+	if (bOnlyIfMissing && fs::exists(FPaths::ProjectDir() / FPaths::ProjectThumbnailRelativePath, Ec)) return;
+	const FGameSettings Settings = FGameSettings::Load(FPaths::ToUtf8(FPaths::ProjectDir() / L"Config/DefaultGame.ini"));
+	const fs::path Startup = FPaths::ProjectDir() / FPaths::FromUtf8(Settings.StartupMap);
+	if (fs::equivalent(FPaths::FromUtf8(FEditorFileUtils::CurrentScenePath), Startup, Ec))
+		PendingThumbnailScene = FEditorFileUtils::CurrentScenePath;
+}
+
+void UEditorEngine::SaveProjectThumbnail()
+{
+	const FString Scene = PendingThumbnailScene;
+	PendingThumbnailScene.clear();
+	if (IsPlaying() || Scene != FEditorFileUtils::CurrentScenePath || !ViewportsPanel) return;
+	FEditorViewportClient* View = ViewportsPanel->GetViewportClient(ViewportsPanel->GetActiveViewIndex());
+	if (!View || !View->IsActive())
+	{
+		PendingThumbnailScene = Scene; // 첫 UI 배치 전이면 활성 뷰포트가 생긴 뒤 다시 시도한다.
+		return;
+	}
+	const FGameSettings Settings = FGameSettings::Load(FPaths::ToUtf8(FPaths::ProjectDir() / L"Config/DefaultGame.ini"));
+	FProjectThumbnailViewport Capture(Settings.RenderOptions);
+	Capture.SetWorld(EditorWorld);
+	Capture.SetViewportType(View->GetViewportType());
+	Capture.SetViewLocation(View->GetViewLocation());
+	Capture.SetViewRotation(View->GetViewRotation());
+	Capture.SetViewFOV(View->GetViewFOV());
+	Capture.SetClipPlanes(View->GetNearClip(), View->GetFarClip());
+	Capture.Resize(444, 396); // 카드의 148:132 비율, 3배 해상도
+	Capture.SetOrthoWidth(View->GetOrthoWidth());
+	if (!Capture.GetViewTargets().IsValidFor(444, 396))
+	{
+		KRS_LOG(Warning, "Cannot create project thumbnail render targets.");
+		return;
+	}
+	Capture.Draw(Renderer);
+	const fs::path Path = FPaths::ProjectDir() / FPaths::ProjectThumbnailRelativePath;
+	if (WriteThumbnailPNG(Capture.GetColorTarget(), Path))
+		KRS_LOG(Info, "Project thumbnail saved: {}", FPaths::ToUtf8(Path));
+	else
+		KRS_LOG(Warning, "Failed to save project thumbnail: {}", FPaths::ToUtf8(Path));
 }
 
 // PIE 디버그 표시 (Settings > Debug Draw (PIE))

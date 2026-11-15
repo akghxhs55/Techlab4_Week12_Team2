@@ -64,6 +64,13 @@ MSBuild.exe .\Kurisu.slnx -t:KurisuGame -p:Configuration=Release -p:Platform=x64
 
 ---
 
+## 프로젝트 썸네일
+
+- 대표 씬은 `Config/DefaultGame.ini`의 `[Game] GameDefaultMap`으로 지정합니다. 기본값은 `Content/Scenes/Main.scene`입니다.
+- 프로젝트를 열면 대표 씬을 불러옵니다. 썸네일이 없으면 최초 화면에서 자동 생성하므로, 새 프로젝트에서 저장을 누르지 않고 종료해도 기본 씬의 썸네일이 남습니다.
+- 대표 씬을 저장하면 현재 활성 뷰포트의 시점으로 `Saved/ProjectThumbnail.png`를 자동 갱신합니다. 기즈모, 그리드, 선택 외곽선은 제외합니다.
+- 다른 씬을 저장하거나 PIE 중일 때는 갱신하지 않습니다. 다음에 프로젝트 선택 창을 열면 저장된 썸네일이 표시되며, 이미지가 없거나 읽을 수 없으면 엔진 로고를 표시합니다.
+
 ## 콘텐츠 드로어
 
 - 하단 바의 `Content Drawer` 버튼 또는 `Ctrl + Space`로 열고 닫습니다. 별도 패널로 열려 있으면 단축키로 해당 패널에 포커스를 이동합니다.
