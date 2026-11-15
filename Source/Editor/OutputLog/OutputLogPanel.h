@@ -25,6 +25,15 @@ struct FConsoleCommand
 	FConsoleHandler Handler;
 };
 
+struct FConsoleSuggestion
+{
+	FString Badge;
+	FString DisplayText;
+	FString InsertText;
+	FString Hint;
+	bool bIsCVar = false;
+};
+
 class FOutputLogPanel : public IEditorPanel, public ILogSink
 {
 public:
@@ -50,14 +59,28 @@ public:
 	void SetEditorSettings(FEditorSettings* InSettings) { EditorSettings = InSettings; }
 private:
 	void RegisterCommands();
+	void RegisterSuggestion(const char* Badge, const char* DisplayText, const char* InsertText, const char* Hint = "", bool bIsCVar = false);
+	void UpdateSuggestions(const char* Query);
+	void RenderAutocompletePopup(const ImVec2& InputMin, const ImVec2& InputMax);
 	void AddToHistory(const FString& CommandLine);
 
 	char                  InputBuf[256];
 	TArray<FLogData>       Items;
 	TArray<FConsoleCommand> ConsoleCommands;
 	TArray<FString>		  Commands;
+	TArray<FConsoleSuggestion> AllSuggestions;
+	TArray<int32>         FilteredSuggestionIndices;
 	TArray<FString>       History;
 	int                   HistoryPos;
+	int32                 SelectedSuggestion = 0;
+	bool                  bSuppressSuggestions = false;
+	bool                  bScrollSuggestionToSelection = false;
+	bool                  bSuggestionPopupHovered = false;
+	bool                  bApplySuggestionCompletion = false;
+	bool                  bReclaimInputFocusNextFrame = false;
+	bool                  bMoveCursorToEndOnFocus = false;
+	FString               PendingSuggestionText;
+	FString               LastSuggestionQuery;
 	ImGuiTextFilter       Filter;
 	bool                  AutoScroll;
 	bool                  ScrollToBottom;

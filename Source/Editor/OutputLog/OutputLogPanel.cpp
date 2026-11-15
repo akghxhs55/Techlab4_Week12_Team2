@@ -10,7 +10,10 @@
 
 #include "Components/SkinnedMeshComponent.h"
 
+#include <algorithm>
+#include <cctype>
 #include <charconv>
+#include <cstdio>
 #include <sstream>
 #include "Core/Misc/Paths.h"
 #include <fstream>
@@ -18,6 +21,51 @@
 
 namespace
 {
+	FString TrimLeftCopy(const char* Text)
+	{
+		if (!Text)
+			return {};
+		while (*Text && std::isspace(static_cast<unsigned char>(*Text)))
+			++Text;
+		return FString(Text);
+	}
+
+	bool StartsWithIgnoreCase(const FString& Text, const FString& Prefix)
+	{
+		if (Prefix.size() > Text.size())
+			return false;
+		for (size_t i = 0; i < Prefix.size(); ++i)
+		{
+			if (std::tolower(static_cast<unsigned char>(Text[i])) != std::tolower(static_cast<unsigned char>(Prefix[i])))
+				return false;
+		}
+		return true;
+	}
+
+	bool ContainsIgnoreCase(const FString& Text, const FString& Needle)
+	{
+		if (Needle.empty())
+			return true;
+		if (Needle.size() > Text.size())
+			return false;
+
+		for (size_t i = 0; i <= Text.size() - Needle.size(); ++i)
+		{
+			bool bMatch = true;
+			for (size_t j = 0; j < Needle.size(); ++j)
+			{
+				if (std::tolower(static_cast<unsigned char>(Text[i + j])) != std::tolower(static_cast<unsigned char>(Needle[j])))
+				{
+					bMatch = false;
+					break;
+				}
+			}
+			if (bMatch)
+				return true;
+		}
+		return false;
+	}
+
 	TArray<FString> TokenizeCommand(const FString& Line)
 	{
 		TArray<FString> Tokens;
@@ -255,8 +303,26 @@ void FOutputLogPanel::RenderContents()
 	}
 
 	ImGui::SameLine();
+	if (bApplySuggestionCompletion)
+	{
+		std::snprintf(InputBuf, sizeof(InputBuf), "%s", PendingSuggestionText.c_str());
+		LastSuggestionQuery = PendingSuggestionText;
+		bApplySuggestionCompletion = false;
+	}
+	if (bReclaimInputFocusNextFrame)
+	{
+		ImGui::SetKeyboardFocusHere();
+		bReclaimInputFocusNextFrame = false;
+	}
+
 	bool reclaim_focus = false;
-	ImGuiInputTextFlags input_text_flags = ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_EscapeClearsAll | ImGuiInputTextFlags_CallbackCompletion | ImGuiInputTextFlags_CallbackHistory;
+	const ImGuiInputTextFlags input_text_flags =
+		ImGuiInputTextFlags_EnterReturnsTrue |
+		ImGuiInputTextFlags_EscapeClearsAll |
+		ImGuiInputTextFlags_CallbackCompletion |
+		ImGuiInputTextFlags_CallbackHistory |
+		ImGuiInputTextFlags_CallbackEdit |
+		ImGuiInputTextFlags_CallbackAlways;
 	ImGui::SetNextItemWidth(-1.0f);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorColor::BgDeepest);
 	if (LogFont) ImGui::PushFont(LogFont, 0.0f);
@@ -268,14 +334,39 @@ void FOutputLogPanel::RenderContents()
 			ExecCommand(s);
 		}
 		s[0] = 0;
+		HistoryPos = -1;
+		FilteredSuggestionIndices.Reset();
+		SelectedSuggestion = 0;
+		bSuppressSuggestions = false;
+		LastSuggestionQuery.clear();
 		reclaim_focus = true;
 	}
 	if (LogFont) ImGui::PopFont();
 	ImGui::PopStyleColor();
 
+	const ImVec2 InputMin = ImGui::GetItemRectMin();
+	const ImVec2 InputMax = ImGui::GetItemRectMax();
+	const bool bInputActive = ImGui::IsItemActive();
+
+	if (InputBuf[0] == '\0')
+	{
+		FilteredSuggestionIndices.Reset();
+		SelectedSuggestion = 0;
+		bSuppressSuggestions = false;
+		LastSuggestionQuery.clear();
+	}
+
 	ImGui::SetItemDefaultFocus();
 	if (reclaim_focus)
 		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
+
+	const bool bShowSuggestions =
+		(bInputActive || bSuggestionPopupHovered) &&
+		!bSuppressSuggestions &&
+		!FilteredSuggestionIndices.IsEmpty();
+	bSuggestionPopupHovered = false;
+	if (bShowSuggestions)
+		RenderAutocompletePopup(InputMin, InputMax);
 
 	//////////////////////////////////////////////////////////
 }
@@ -334,14 +425,46 @@ void FOutputLogPanel::ExecCommand(const FString& CommandLine)
 
 int FOutputLogPanel::TextEditCallback(ImGuiInputTextCallbackData* data)
 {
-	//AddLog("cursor: %d, selection: %d-%d", data->CursorPos, data->SelectionStart, data->SelectionEnd);
 	switch (data->EventFlag)
 	{
+	case ImGuiInputTextFlags_CallbackAlways:
+	{
+		if (bMoveCursorToEndOnFocus)
+		{
+			data->CursorPos = data->BufTextLen;
+			data->SelectionStart = data->BufTextLen;
+			data->SelectionEnd = data->BufTextLen;
+			bMoveCursorToEndOnFocus = false;
+		}
+		if (LastSuggestionQuery != data->Buf)
+		{
+			bSuppressSuggestions = false;
+			HistoryPos = -1;
+			UpdateSuggestions(data->Buf);
+		}
+		break;
+	}
+	case ImGuiInputTextFlags_CallbackEdit:
+	{
+		bSuppressSuggestions = false;
+		HistoryPos = -1;
+		UpdateSuggestions(data->Buf);
+		break;
+	}
 	case ImGuiInputTextFlags_CallbackCompletion:
 	{
-		// Example of TEXT COMPLETION
+		if (!bSuppressSuggestions && !FilteredSuggestionIndices.IsEmpty())
+		{
+			const int32 ClampedIndex = std::clamp(SelectedSuggestion, 0, FilteredSuggestionIndices.Num() - 1);
+			const FConsoleSuggestion& Choice = AllSuggestions[FilteredSuggestionIndices[ClampedIndex]];
+			data->DeleteChars(0, data->BufTextLen);
+			data->InsertChars(0, Choice.InsertText.c_str());
+			LastSuggestionQuery = Choice.InsertText;
+			bSuppressSuggestions = true;
+			break;
+		}
 
-		// Locate beginning of current word
+		// 팝업 후보가 없을 때만 기존 단어 단위 prefix 보완으로 폴백
 		const char* word_end = data->Buf + data->CursorPos;
 		const char* word_start = word_end;
 		while (word_start > data->Buf)
@@ -352,60 +475,32 @@ int FOutputLogPanel::TextEditCallback(ImGuiInputTextCallbackData* data)
 			word_start--;
 		}
 
-		// Build a list of candidates
 		ImVector<FString> candidates;
 		for (int i = 0; i < Commands.Num(); i++)
 			if (Strnicmp(Commands[i].c_str(), word_start, (int)(word_end - word_start)) == 0)
 				candidates.push_back(Commands[i]);
 
-		if (candidates.Size == 0)
+		if (candidates.Size == 1)
 		{
-			// No match
-			FLog::Log(ELogVerbosity::Input, "No match for \"{}\"!\n", word_start);
-		}
-		else if (candidates.Size == 1)
-		{
-			// Single match. Delete the beginning of the word and replace it entirely so we've got nice casing.
 			data->DeleteChars((int)(word_start - data->Buf), (int)(word_end - word_start));
 			data->InsertChars(data->CursorPos, candidates[0].c_str());
 			data->InsertChars(data->CursorPos, " ");
 		}
-		else
-		{
-			// Multiple matches. Complete as much as we can..
-			// So inputting "C"+Tab will complete to "CL" then display "CLEAR" and "CLASSIFY" as matches.
-			int match_len = (int)(word_end - word_start);
-			for (;;)
-			{
-				int c = 0;
-				bool all_candidates_matches = true;
-				for (int i = 0; i < candidates.Size && all_candidates_matches; i++)
-					if (i == 0)
-						c = toupper(candidates[i][match_len]);
-					else if (c == 0 || c != toupper(candidates[i][match_len]))
-						all_candidates_matches = false;
-				if (!all_candidates_matches)
-					break;
-				match_len++;
-			}
-
-			if (match_len > 0)
-			{
-				data->DeleteChars((int)(word_start - data->Buf), (int)(word_end - word_start));
-				data->InsertChars(data->CursorPos, candidates[0].c_str(), candidates[0].c_str() + match_len);
-			}
-
-			// List matches
-			FLog::Log(ELogVerbosity::Info, "Possible matches:\n");
-			for (int i = 0; i < candidates.Size; i++)
-				FLog::Log(ELogVerbosity::Info, "- {}\n", candidates[i]);
-		}
-
 		break;
 	}
 	case ImGuiInputTextFlags_CallbackHistory:
 	{
-		// Example of HISTORY
+		if (!bSuppressSuggestions && !FilteredSuggestionIndices.IsEmpty())
+		{
+			const int32 Count = FilteredSuggestionIndices.Num();
+			if (data->EventKey == ImGuiKey_DownArrow)
+				SelectedSuggestion = (SelectedSuggestion + 1) % Count;
+			else if (data->EventKey == ImGuiKey_UpArrow)
+				SelectedSuggestion = (SelectedSuggestion - 1 + Count) % Count;
+			bScrollSuggestionToSelection = true;
+			break;
+		}
+
 		const int prev_history_pos = HistoryPos;
 		if (data->EventKey == ImGuiKey_UpArrow)
 		{
@@ -421,20 +516,231 @@ int FOutputLogPanel::TextEditCallback(ImGuiInputTextCallbackData* data)
 					HistoryPos = -1;
 		}
 
-		// A better implementation would preserve the data on the current input line along with cursor position.
 		if (prev_history_pos != HistoryPos)
 		{
 			const char* history_str = (HistoryPos >= 0) ? History[HistoryPos].c_str() : "";
 			data->DeleteChars(0, data->BufTextLen);
 			data->InsertChars(0, history_str);
+			LastSuggestionQuery = history_str;
+			bSuppressSuggestions = true;
 		}
+		break;
 	}
 	}
 	return 0;
 }
 
+void FOutputLogPanel::RegisterSuggestion(const char* Badge, const char* DisplayText, const char* InsertText, const char* Hint, bool bIsCVar)
+{
+	FConsoleSuggestion Item;
+	Item.Badge = Badge ? Badge : "";
+	Item.DisplayText = DisplayText ? DisplayText : "";
+	Item.InsertText = InsertText ? InsertText : "";
+	Item.Hint = Hint ? Hint : "";
+	Item.bIsCVar = bIsCVar;
+	AllSuggestions.Add(std::move(Item));
+}
+
+void FOutputLogPanel::UpdateSuggestions(const char* Query)
+{
+	LastSuggestionQuery = Query ? Query : "";
+	const FString Trimmed = TrimLeftCopy(Query);
+	FilteredSuggestionIndices.Reset();
+	SelectedSuggestion = 0;
+
+	if (Trimmed.empty())
+		return;
+
+	TArray<int32> PrefixMatches;
+	TArray<int32> SubstringMatches;
+	const TArray<FString> QueryTokens = TokenizeCommand(Trimmed);
+
+	for (int32 i = 0; i < AllSuggestions.Num(); ++i)
+	{
+		const FConsoleSuggestion& Item = AllSuggestions[i];
+		if (StartsWithIgnoreCase(Item.InsertText, Trimmed) || StartsWithIgnoreCase(Item.DisplayText, Trimmed))
+		{
+			PrefixMatches.Add(i);
+			continue;
+		}
+
+		if (ContainsIgnoreCase(Item.InsertText, Trimmed) || ContainsIgnoreCase(Item.DisplayText, Trimmed))
+		{
+			SubstringMatches.Add(i);
+			continue;
+		}
+
+		if (QueryTokens.Num() > 1)
+		{
+			bool bAllTokensMatch = true;
+			for (const FString& Token : QueryTokens)
+			{
+				if (!ContainsIgnoreCase(Item.InsertText, Token) && !ContainsIgnoreCase(Item.Badge, Token))
+				{
+					bAllTokensMatch = false;
+					break;
+				}
+			}
+			if (bAllTokensMatch)
+				SubstringMatches.Add(i);
+		}
+	}
+
+	for (int32 Index : PrefixMatches)
+		FilteredSuggestionIndices.Add(Index);
+	for (int32 Index : SubstringMatches)
+		FilteredSuggestionIndices.Add(Index);
+
+	bScrollSuggestionToSelection = !FilteredSuggestionIndices.IsEmpty();
+}
+
+void FOutputLogPanel::RenderAutocompletePopup(const ImVec2& InputMin, const ImVec2& InputMax)
+{
+	if (FilteredSuggestionIndices.IsEmpty())
+		return;
+
+	SelectedSuggestion = std::clamp(SelectedSuggestion, 0, FilteredSuggestionIndices.Num() - 1);
+
+	const float RowHeight = EditorStyle::Scale(16.5f);
+	const float BadgeWidth = EditorStyle::Scale(39.0f);
+	const float PopupBorderPad = EditorStyle::Scale(2.0f);
+	const int32 MaxVisibleRows = 16;
+	const int32 VisibleRows = std::min(FilteredSuggestionIndices.Num(), MaxVisibleRows);
+	const float PopupHeight = VisibleRows * RowHeight + PopupBorderPad * 2.0f;
+	const float PopupWidth = std::max(EditorStyle::Scale(360.0f), InputMax.x - InputMin.x);
+
+	ImGuiViewport* HostViewport = ImGui::GetWindowViewport();
+	ImVec2 PopupPos(InputMin.x, InputMin.y - PopupHeight - EditorStyle::Scale(2.0f));
+	if (HostViewport)
+	{
+		const ImVec2 WorkMin = HostViewport->WorkPos;
+		const ImVec2 WorkMax(HostViewport->WorkPos.x + HostViewport->WorkSize.x,
+			HostViewport->WorkPos.y + HostViewport->WorkSize.y);
+		if (PopupPos.y < WorkMin.y)
+			PopupPos.y = std::min(InputMax.y + EditorStyle::Scale(2.0f), WorkMax.y - PopupHeight);
+		if (PopupPos.x + PopupWidth > WorkMax.x)
+			PopupPos.x = std::max(WorkMin.x, WorkMax.x - PopupWidth);
+		ImGui::SetNextWindowViewport(HostViewport->ID);
+	}
+
+	ImGui::SetNextWindowPos(PopupPos, ImGuiCond_Always);
+	ImGui::SetNextWindowSize(ImVec2(PopupWidth, PopupHeight), ImGuiCond_Always);
+
+	const ImGuiWindowFlags PopupFlags =
+		ImGuiWindowFlags_Tooltip |
+		ImGuiWindowFlags_NoTitleBar |
+		ImGuiWindowFlags_NoResize |
+		ImGuiWindowFlags_NoMove |
+		ImGuiWindowFlags_NoSavedSettings |
+		ImGuiWindowFlags_NoFocusOnAppearing |
+		ImGuiWindowFlags_NoDocking;
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, PopupBorderPad));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowRounding, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 1.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_PopupBorderSize, 1.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0.0f, 0.0f));
+	ImGui::PushStyleColor(ImGuiCol_WindowBg, IM_COL32(22, 24, 28, 248));
+	ImGui::PushStyleColor(ImGuiCol_Border, IM_COL32(72, 76, 84, 255));
+	ImGui::PushFont(LogFont, ImGui::GetStyle().FontSizeBase * 0.75f);
+
+	if (ImGui::Begin("##OutputLogAutocompletePopup", nullptr, PopupFlags))
+	{
+		// Output Log가 SetKeyboardFocusHere로 다시 앞으로 오더라도 팝업이 뒤에 가려지지 않게 최상단 유지
+		ImGui::BringWindowToDisplayFront(ImGui::GetCurrentWindow());
+		bSuggestionPopupHovered = ImGui::IsWindowHovered(
+			ImGuiHoveredFlags_AllowWhenBlockedByActiveItem |
+			ImGuiHoveredFlags_ChildWindows);
+
+		ImDrawList* DrawList = ImGui::GetWindowDrawList();
+		const float ContentWidth = ImGui::GetContentRegionAvail().x;
+		const float FontHeight = ImGui::GetFontSize();
+
+		for (int32 Row = 0; Row < FilteredSuggestionIndices.Num(); ++Row)
+		{
+			const FConsoleSuggestion& Item = AllSuggestions[FilteredSuggestionIndices[Row]];
+			const bool bSelected = (Row == SelectedSuggestion);
+
+			ImGui::PushID(Row);
+			const ImVec2 RowMin = ImGui::GetCursorScreenPos();
+			const ImVec2 RowMax(RowMin.x + ContentWidth, RowMin.y + RowHeight);
+
+			const bool bClicked = ImGui::InvisibleButton("##SuggestionRow", ImVec2(ContentWidth, RowHeight),
+				ImGuiButtonFlags_PressedOnClick | ImGuiButtonFlags_NoHoldingActiveId);
+			const bool bHovered = ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenBlockedByActiveItem);
+			if (bHovered)
+			{
+				bSuggestionPopupHovered = true;
+				const ImVec2 MouseDelta = ImGui::GetIO().MouseDelta;
+				if (MouseDelta.x != 0.0f || MouseDelta.y != 0.0f)
+					SelectedSuggestion = Row;
+			}
+			if (bClicked)
+			{
+				PendingSuggestionText = Item.InsertText;
+				bApplySuggestionCompletion = true;
+				bReclaimInputFocusNextFrame = true;
+				bMoveCursorToEndOnFocus = true;
+				bSuppressSuggestions = true;
+			}
+
+			if (bSelected && bScrollSuggestionToSelection)
+			{
+				ImGui::SetScrollHereY(0.5f);
+				bScrollSuggestionToSelection = false;
+			}
+
+			// 왼쪽 뱃지 색상 (Stat: 라임 그린, CSM: 앰버, CVar: 블루, Cmd: 민트)
+			ImU32 BadgeColor = IM_COL32(108, 186, 128, 255);
+			if (Item.Badge == "Stat")
+				BadgeColor = IM_COL32(142, 204, 62, 255);
+			else if (Item.Badge == "CSM")
+				BadgeColor = IM_COL32(214, 162, 68, 255);
+			else if (Item.bIsCVar)
+				BadgeColor = IM_COL32(92, 166, 214, 255);
+
+			if (bSelected)
+				DrawList->AddRectFilled(ImVec2(RowMin.x + BadgeWidth, RowMin.y), RowMax, IM_COL32(56, 62, 74, 255));
+			else if (bHovered)
+				DrawList->AddRectFilled(ImVec2(RowMin.x + BadgeWidth, RowMin.y), RowMax, IM_COL32(42, 47, 56, 255));
+
+			DrawList->AddRectFilled(RowMin, ImVec2(RowMin.x + BadgeWidth, RowMax.y), BadgeColor);
+
+			const ImVec2 BadgeTextSize = ImGui::CalcTextSize(Item.Badge.c_str());
+			const ImVec2 BadgeTextPos(
+				RowMin.x + std::max(EditorStyle::Scale(3.0f), (BadgeWidth - BadgeTextSize.x) * 0.5f),
+				RowMin.y + (RowHeight - FontHeight) * 0.5f);
+			DrawList->AddText(BadgeTextPos, IM_COL32(18, 22, 16, 255), Item.Badge.c_str());
+
+			const float LabelX = RowMin.x + BadgeWidth + EditorStyle::Scale(6.0f);
+			const float TextY = RowMin.y + (RowHeight - FontHeight) * 0.5f;
+			DrawList->AddText(ImVec2(LabelX, TextY), IM_COL32(232, 234, 238, 255), Item.DisplayText.c_str());
+
+			if (!Item.Hint.empty())
+			{
+				const ImVec2 LabelSize = ImGui::CalcTextSize(Item.DisplayText.c_str());
+				const ImVec2 HintSize = ImGui::CalcTextSize(Item.Hint.c_str());
+				const float HintRightX = RowMax.x - EditorStyle::Scale(6.0f) - HintSize.x;
+				if (HintRightX > LabelX + LabelSize.x + EditorStyle::Scale(10.0f))
+					DrawList->AddText(ImVec2(HintRightX, TextY), IM_COL32(140, 146, 156, 255), Item.Hint.c_str());
+			}
+
+			ImGui::PopID();
+		}
+	}
+	ImGui::End();
+
+	ImGui::PopFont();
+	ImGui::PopStyleColor(2);
+	ImGui::PopStyleVar(5);
+}
+
 void FOutputLogPanel::RegisterCommands()
 {
+	ConsoleCommands.Empty();
+	Commands.Empty();
+	AllSuggestions.Empty();
+
 	auto Add = [this](const char* Name, const char* Usage, FConsoleHandler Handler)
 		{
 			ConsoleCommands.Add({ Name, Usage, std::move(Handler) });
@@ -463,7 +769,7 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
-	Add("STAT", "STAT <fps|memory|profile|light|decal|all|none>", [](const TArray<FString>&, const FString& Line)
+	Add("STAT", "STAT <fps|memory|profile|light|decal|skinning|all|none>", [](const TArray<FString>&, const FString& Line)
 		{
 			FString Message;
 			FStatOverlay::ExecCommand(Line, Message);   // 해석은 엔진 쪽에 맡긴다
@@ -515,14 +821,35 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
-		Add("r.Skinning.ForceUpdate", "r.Skinning.ForceUpdate [0|1]", [](const TArray<FString>& Args, const FString&)
-			{
-				bool bOn = false;
-				if (!ParseToggle(Args, USkinnedMeshComponent::bForceSkinUpdate, bOn)) return false;
-				USkinnedMeshComponent::bForceSkinUpdate = bOn;
-				FLog::Log(ELogVerbosity::Info, "r.Skinning.ForceUpdate = {}", bOn ? 1 : 0);
-				return true;
-			});
+	Add("r.Skinning.ForceUpdate", "r.Skinning.ForceUpdate [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, USkinnedMeshComponent::bForceSkinUpdate, bOn)) return false;
+			USkinnedMeshComponent::bForceSkinUpdate = bOn;
+			FLog::Log(ELogVerbosity::Info, "r.Skinning.ForceUpdate = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	// 자동완성 미리보기 항목 등록 (명령 + 자주 쓰는 서브명령 조합)
+	RegisterSuggestion("Cmd", "HELP", "HELP", "Show command list");
+	RegisterSuggestion("Cmd", "CLEAR", "CLEAR", "Clear output log");
+	RegisterSuggestion("Cmd", "HISTORY", "HISTORY", "Show recent commands");
+
+	RegisterSuggestion("Stat", "FPS", "STAT FPS", "Frame rate overlay");
+	RegisterSuggestion("Stat", "MEMORY", "STAT MEMORY", "Memory usage overlay");
+	RegisterSuggestion("Stat", "PROFILE", "STAT PROFILE", "CPU/GPU profiler overlay");
+	RegisterSuggestion("Stat", "LIGHT", "STAT LIGHT", "Lighting stats overlay");
+	RegisterSuggestion("Stat", "DECAL", "STAT DECAL", "Decal stats overlay");
+	RegisterSuggestion("Stat", "SKINNING", "STAT SKINNING", "Skeletal skinning overlay");
+	RegisterSuggestion("Stat", "ALL", "STAT ALL", "Enable all stat overlays");
+	RegisterSuggestion("Stat", "NONE", "STAT NONE", "Hide all stat overlays");
+
+	RegisterSuggestion("CSM", "Count", "CSM Count ", "<1-4>");
+	RegisterSuggestion("CSM", "LogRatio", "CSM LogRatio ", "<0.0-1.0>");
+
+	RegisterSuggestion("CVar", "r.shadow.CacheWholeSceneShadows", "r.shadow.CacheWholeSceneShadows", "[0|1]", true);
+	RegisterSuggestion("CVar", "r.GPUSkinning", "r.GPUSkinning", "[0|1]", true);
+	RegisterSuggestion("CVar", "r.Skinning.ForceUpdate", "r.Skinning.ForceUpdate", "[0|1]", true);
 }
 
 void FOutputLogPanel::AddToHistory(const FString& CommandLine)
