@@ -76,10 +76,10 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 {
 	wchar_t ExePath[MAX_PATH] = {};
 	GetModuleFileNameW(nullptr, ExePath, MAX_PATH);
-	const std::filesystem::path GameExe = std::filesystem::path(ExePath).parent_path() / L"HitoriGame.exe";
+	const std::filesystem::path GameExe = std::filesystem::path(ExePath).parent_path() / L"KrisGame.exe";
 	if (!std::filesystem::exists(GameExe))
 	{
-		HTR_LOG(Error, "Packaging canceled: no source tree to build from and no prebuilt HitoriGame.exe next to the editor.");
+		HTR_LOG(Error, "Packaging canceled: no source tree to build from and no prebuilt KrisGame.exe next to the editor.");
 		return false;
 	}
 
@@ -89,7 +89,7 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 	bCopyDone = false;
 	bCopyFailed = false;
 	CopyResult = FPaths::ToUtf8(Out);
-	HTR_LOG(Info, "Packaging with prebuilt HitoriGame.exe (no build) -> {}", CopyResult);
+	HTR_LOG(Info, "Packaging with prebuilt KrisGame.exe (no build) -> {}", CopyResult);
 
 	// 콘텐츠가 100MB 넘게 복사되므로 에디터가 멈추지 않게 따로 돌린다. 로그는 메인 스레드의 Tick에서만 남긴다.
 	CopyThread = std::thread([this, Root, ProjectDir, ProjectFile, GameExe, Out]
@@ -98,9 +98,9 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 			std::error_code Ec;
 			fs::remove_all(Out, Ec);
 			fs::create_directories(Out, Ec);
-			if (Ec || !fs::copy_file(GameExe, Out / L"HitoriGame.exe", fs::copy_options::overwrite_existing, Ec))
+			if (Ec || !fs::copy_file(GameExe, Out / L"KrisGame.exe", fs::copy_options::overwrite_existing, Ec))
 			{
-				CopyResult = "HitoriGame.exe";
+				CopyResult = "KrisGame.exe";
 				bCopyFailed = true;
 			}
 			// 엔진 콘텐츠(EngineResources)는 엔진 폴더에서, 프로젝트 콘텐츠(Content)는 프로젝트 폴더에서 가져온다.

@@ -117,7 +117,7 @@ namespace
 	FString MakeDefaultGameIni(const FString& Name)
 	{
 		return
-			"; HitoriGame 실행 설정. 프로젝트 폴더의 Config에서 읽는다.\n"
+			"; KrisGame 실행 설정. 프로젝트 폴더의 Config에서 읽는다.\n"
 			"; 항목이 없거나 값이 잘못되면 코드의 기본값을 쓴다.\n"
 			"\n"
 			"[Game]\n"

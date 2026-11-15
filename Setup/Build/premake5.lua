@@ -5,10 +5,10 @@ if _ACTION and not os.isfile(ProjectRoot .. "/Source/ThirdParty/ImGui/imgui.h") 
 	error("Bundled ImGui sources are missing. Restore Source/ThirdParty/ImGui from this repository.")
 end
 
-workspace "Hitori"
+workspace "Kris"
 	location (ProjectRoot)
 	architecture "x64"
-	startproject "HitoriEditor"
+	startproject "KrisEditor"
 
 	configurations
 	{
@@ -97,11 +97,11 @@ end
 
 
 -- 헤더 툴 (UE의 UnrealHeaderTool 역할). 엔진 코드에 의존하지 않고 std만 쓴다.
--- HitoriEngine / HitoriEditor가 빌드 전에 이 exe로 *.generated.h를 만든다.
-HeaderTool = '"' .. ProjectRoot .. '/Build/Bin/' .. outputdir .. '/HitoriHeaderTool.exe"'
+-- KrisEngine / KrisEditor가 빌드 전에 이 exe로 *.generated.h를 만든다.
+HeaderTool = '"' .. ProjectRoot .. '/Build/Bin/' .. outputdir .. '/KrisHeaderTool.exe"'
 GeneratedDir = ProjectRoot .. "/Build/Generated"
 
-project "HitoriHeaderTool"
+project "KrisHeaderTool"
 	location (ProjectRoot .. "/Build/Projects")
 	kind     "ConsoleApp"
 	CommonSettings()
@@ -113,7 +113,7 @@ project "HitoriHeaderTool"
 	}
 
 -- 런타임. 에디터를 모른다. include 경로에 Source/Editor가 없는 것이 그 방벽이다.
-project "HitoriEngine"
+project "KrisEngine"
 	location (ProjectRoot .. "/Build/Projects")
 	kind     "StaticLib"
 	CommonSettings()
@@ -151,7 +151,7 @@ project "HitoriEngine"
 		enablepch "Off"
 	filter {}
 
-	dependson { "HitoriHeaderTool" }
+	dependson { "KrisHeaderTool" }
 	prebuildcommands { HeaderTool .. ' Runtime "' .. GeneratedDir .. '/Runtime" "' .. ProjectRoot .. '/Source/Runtime"' }
 
 	-- sol2 템플릿이 섹션 수 제한을 넘긴다
@@ -172,7 +172,7 @@ project "HitoriEngine"
 	filter {}
 
 -- 에디터 애플리케이션. 정적 메시와 스켈레탈 메시 뷰어는 에디터 내부에서 실행한다.
-project "HitoriEditor"
+project "KrisEditor"
 	location (ProjectRoot .. "/Build/Projects")
 	kind     "WindowedApp"
 	CommonSettings()
@@ -194,7 +194,7 @@ project "HitoriEditor"
 	pchheader "EnginePCH.h"
 	pchsource (ProjectRoot .. "/Source/Editor/EditorPCH.cpp")
 
-	links { "HitoriEngine" }
+	links { "KrisEngine" }
 
 	-- ImGui와 NodeEditor는 에디터에서만 컴파일하고 엔진 PCH를 사용하지 않는다.
 	files
@@ -218,7 +218,7 @@ project "HitoriEditor"
 
 	-- UClass는 헤더의 정적 객체가 등록하므로, exe가 직접 참조하지 않는 클래스의 .obj를 링커가 버리면
 	-- 그 클래스가 등록되지 않아 씬 로드 때 액터가 사라진다. 엔진 .obj를 전부 링크해 막는다.
-	linkoptions { "/WHOLEARCHIVE:HitoriEngine" }
+	linkoptions { "/WHOLEARCHIVE:KrisEngine" }
 
 	files
 	{
@@ -230,7 +230,7 @@ project "HitoriEditor"
 	}
 
 
-	dependson { "HitoriHeaderTool" }
+	dependson { "KrisHeaderTool" }
 	prebuildcommands { HeaderTool .. ' Editor "' .. GeneratedDir .. '/Editor" "' .. ProjectRoot .. '/Source/Editor"' }
 
 	includedirs
@@ -263,19 +263,19 @@ project "HitoriEditor"
 
 -- 패키징용 게임 실행 파일. 에디터 소스와 ImGui를 링크하지 않는다.
 -- 에셋과 셰이더는 실행 중에 읽으므로 배포 시 Package.bat으로 콘텐츠를 함께 복사한다.
-project "HitoriGame"
+project "KrisGame"
 	location (ProjectRoot .. "/Build/Projects")
 	kind     "WindowedApp"
 	CommonSettings()
-	targetname "HitoriGame"
+	targetname "KrisGame"
 
 	pchheader "EnginePCH.h"
 	pchsource (ProjectRoot .. "/Source/Game/GamePCH.cpp")
 
-	links { "HitoriEngine" }
+	links { "KrisEngine" }
 
 	-- 에디터와 같은 이유. 게임 코드는 라이트 액터 등을 직접 참조하지 않아 특히 빠지기 쉽다.
-	linkoptions { "/WHOLEARCHIVE:HitoriEngine" }
+	linkoptions { "/WHOLEARCHIVE:KrisEngine" }
 
 	files
 	{

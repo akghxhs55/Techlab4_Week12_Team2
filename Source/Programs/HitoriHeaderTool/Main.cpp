@@ -145,7 +145,7 @@ namespace
     {
         if (Argc < 4)
         {
-            PrintLine("How To Use: HitoriHeaderTool <Module Name> <Output Folder> <Source Folder>...", true);
+            PrintLine("How To Use: KrisHeaderTool <Module Name> <Output Folder> <Source Folder>...", true);
             return 2;
         }
 

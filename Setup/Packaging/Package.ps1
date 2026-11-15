@@ -19,7 +19,7 @@ try {
     $projectFile = (Resolve-Path -LiteralPath $Project).ProviderPath
     $projectRoot = Split-Path -Parent $projectFile
     $projectName = [IO.Path]::GetFileNameWithoutExtension($projectFile)
-    $solution = Join-Path $engineRoot 'Hitori.slnx'
+    $solution = Join-Path $engineRoot 'Kris.slnx'
     if (-not $SkipBuild) {
         if (-not (Test-Path -LiteralPath $solution)) {
             & (Join-Path $engineRoot 'SlnGenerator.bat') --no-pause
@@ -29,10 +29,10 @@ try {
         $msbuild = & $vswhere -latest -prerelease -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
         if (-not $msbuild) { throw 'MSBuild not found. Install the Visual Studio C++ workload.' }
         $env:VSLANG = '1033'
-        & $msbuild $solution -t:HitoriGame "-p:Configuration=$Configuration" -p:Platform=x64 -m -nologo -v:minimal
+        & $msbuild $solution -t:KrisGame "-p:Configuration=$Configuration" -p:Platform=x64 -m -nologo -v:minimal
         if ($LASTEXITCODE -ne 0) { throw 'Game build failed.' }
     }
-    $gameExe = Join-Path $engineRoot "Build\Bin\$Configuration-windows-x86_64\HitoriGame.exe"
+    $gameExe = Join-Path $engineRoot "Build\Bin\$Configuration-windows-x86_64\KrisGame.exe"
     if (-not (Test-Path -LiteralPath $gameExe -PathType Leaf)) { throw "Missing executable: $gameExe" }
     $packageRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'Build\Package'))
     $out = [IO.Path]::GetFullPath((Join-Path $packageRoot $projectName))
