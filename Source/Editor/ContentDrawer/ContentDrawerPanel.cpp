@@ -1,6 +1,11 @@
 #include "EnginePCH.h"
 #include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/ContentDrawer/ContentDrawerPanel.h"
+#include "Editor/Viewports/ViewportToolbarWidgets.h"
+
+#include <algorithm>
+#include <cctype>
+#include <string_view>
 
 #include "Render/SkeletalMesh.h"
 #include "Asset/AssetManager.h"
@@ -10,6 +15,214 @@
 #include "Animation/AnimSequenceFile.h"
 #include "Animation/BlendSpaceFile.h"
 #include "Animation/AnimBlueprintFile.h"
+
+namespace
+{
+	std::string ToLowerAscii(std::string_view Text)
+	{
+		std::string Result(Text);
+		std::transform(Result.begin(), Result.end(), Result.begin(),
+			[](unsigned char Ch) { return static_cast<char>(std::tolower(Ch)); });
+		return Result;
+	}
+
+	bool ContainsCaseInsensitive(std::string_view Haystack, std::string_view LowerNeedle)
+	{
+		if (LowerNeedle.empty())
+		{
+			return true;
+		}
+		return ToLowerAscii(Haystack).find(LowerNeedle) != std::string::npos;
+	}
+
+	void DrawSearchBox(const char* WidgetId, const char* Hint, char* Buffer, size_t BufferSize, float Width, bool bFocus)
+	{
+		if (Width <= 0.0f)
+		{
+			return;
+		}
+
+		const ImTextureID SearchIcon = ViewportToolbarWidgets::GetIcon("Search");
+		const float IconSize = SearchIcon ? EditorStyle::Scale(14.0f) : 0.0f;
+		const float IconPadLeft = SearchIcon ? (IconSize + EditorStyle::Scale(8.0f)) : 0.0f;
+		const ImGuiStyle& Style = ImGui::GetStyle();
+		const bool bHasText = (Buffer[0] != '\0');
+		const float ClearWidth = bHasText ? ImGui::GetFrameHeight() : 0.0f;
+		const float InputWidth = (std::max)(EditorStyle::Scale(40.0f), Width - (bHasText ? ClearWidth + Style.ItemSpacing.x : 0.0f));
+
+		ImGui::SetNextItemWidth(InputWidth);
+		if (bFocus)
+		{
+			ImGui::SetKeyboardFocusHere();
+		}
+
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+			ImVec2(Style.FramePadding.x + IconPadLeft, Style.FramePadding.y));
+		ImGui::InputTextWithHint(WidgetId, Hint, Buffer, BufferSize);
+		ImGui::PopStyleVar();
+
+		if (SearchIcon)
+		{
+			const ImVec2 BoxMin = ImGui::GetItemRectMin();
+			const ImVec2 BoxMax = ImGui::GetItemRectMax();
+			const float IconY = BoxMin.y + ((BoxMax.y - BoxMin.y) - IconSize) * 0.5f;
+			const float IconX = BoxMin.x + Style.FramePadding.x + EditorStyle::Scale(2.0f);
+			ImGui::GetWindowDrawList()->AddImage(
+				SearchIcon,
+				ImVec2(IconX, IconY),
+				ImVec2(IconX + IconSize, IconY + IconSize),
+				ImVec2(0.0f, 0.0f),
+				ImVec2(1.0f, 1.0f),
+				IM_COL32(180, 185, 195, 220));
+		}
+
+		if (bHasText)
+		{
+			ImGui::SameLine();
+			std::string ClearId = std::string("X##Clear") + WidgetId;
+			if (ImGui::Button(ClearId.c_str(), ImVec2(ClearWidth, ImGui::GetFrameHeight())))
+			{
+				Buffer[0] = '\0';
+			}
+		}
+	}
+
+	bool DrawHistoryButton(const char* WidgetId, bool bForward, bool bEnabled, const char* Tooltip)
+	{
+		const float BtnSize = ImGui::GetFrameHeight();
+		ImGui::BeginDisabled(!bEnabled);
+		const bool bClicked = ImGui::InvisibleButton(WidgetId, ImVec2(BtnSize, BtnSize));
+		const bool bHovered = bEnabled && ImGui::IsItemHovered();
+		const bool bActive = bEnabled && ImGui::IsItemActive();
+
+		const ImVec2 Min = ImGui::GetItemRectMin();
+		const ImVec2 Max = ImGui::GetItemRectMax();
+		const ImVec2 Center((Min.x + Max.x) * 0.5f, (Min.y + Max.y) * 0.5f);
+		const float Radius = BtnSize * 0.38f;
+		ImDrawList* DrawList = ImGui::GetWindowDrawList();
+
+		if (bActive)
+		{
+			DrawList->AddCircleFilled(Center, Radius, IM_COL32(255, 255, 255, 45), 24);
+		}
+		else if (bHovered)
+		{
+			DrawList->AddCircleFilled(Center, Radius, IM_COL32(255, 255, 255, 26), 24);
+		}
+
+		const ImU32 InkCol = bEnabled
+			? (bHovered ? IM_COL32(240, 242, 246, 255) : IM_COL32(205, 210, 218, 240))
+			: IM_COL32(125, 130, 138, 100);
+		const float Stroke = EditorStyle::Scale(1.5f);
+
+		DrawList->AddCircle(Center, Radius, InkCol, 24, Stroke);
+
+		const float Dir = bForward ? 1.0f : -1.0f;
+		const float HalfShaft = Radius * 0.44f;
+		const float HeadSize = Radius * 0.34f;
+		const ImVec2 Tip(Center.x + Dir * HalfShaft, Center.y);
+		const ImVec2 Tail(Center.x - Dir * HalfShaft, Center.y);
+
+		DrawList->AddLine(Tail, Tip, InkCol, Stroke);
+		DrawList->AddLine(Tip, ImVec2(Tip.x - Dir * HeadSize, Tip.y - HeadSize), InkCol, Stroke);
+		DrawList->AddLine(Tip, ImVec2(Tip.x - Dir * HeadSize, Tip.y + HeadSize), InkCol, Stroke);
+
+		ImGui::EndDisabled();
+
+		if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+		{
+			ImGui::SetTooltip("%s", Tooltip);
+		}
+
+		return bEnabled && bClicked;
+	}
+
+	bool IsValidEntryName(std::string_view Name)
+	{
+		return !Name.empty()
+			&& Name != "."
+			&& Name != ".."
+			&& Name.find_first_of("\\/:*?\"<>|") == std::string_view::npos;
+	}
+
+	bool IsPathOrDescendant(const fs::path& Candidate, const fs::path& Base)
+	{
+		if (Candidate == Base)
+		{
+			return true;
+		}
+		const fs::path Rel = Candidate.lexically_relative(Base);
+		if (Rel.empty())
+		{
+			return false;
+		}
+		return *Rel.begin() != ".." && !Rel.is_absolute();
+	}
+
+	fs::path RebasePathPrefix(const fs::path& Original, const fs::path& OldPrefix, const fs::path& NewPrefix)
+	{
+		if (Original == OldPrefix)
+		{
+			return NewPrefix;
+		}
+		return NewPrefix / Original.lexically_relative(OldPrefix);
+	}
+
+	ImTextureID GetFolderIconTextureId(const FString& FolderIconPath)
+	{
+		if (UTexture2D* FolderTex = UAssetManager::GetAssetByPath<UTexture2D>(FolderIconPath))
+		{
+			if (FolderTex->GetResource() && FolderTex->GetResource()->GetSRV())
+			{
+				return static_cast<ImTextureID>(reinterpret_cast<uintptr_t>(FolderTex->GetResource()->GetSRV()));
+			}
+		}
+		return 0;
+	}
+
+	void DrawRightChevron(ImDrawList* DrawList, ImVec2 Center, float Size, ImU32 Color)
+	{
+		const float HalfH = Size * 0.42f;
+		const float HalfW = Size * 0.25f;
+		const float Stroke = EditorStyle::Scale(1.3f);
+		DrawList->AddLine(ImVec2(Center.x - HalfW, Center.y - HalfH), ImVec2(Center.x + HalfW, Center.y), Color, Stroke);
+		DrawList->AddLine(ImVec2(Center.x + HalfW, Center.y), ImVec2(Center.x - HalfW, Center.y + HalfH), Color, Stroke);
+	}
+
+	bool DrawFolderTreeNode(const char* HiddenId, const char* Label, ImTextureID FolderTex, ImGuiTreeNodeFlags Flags)
+	{
+		const float NodeStartX = ImGui::GetCursorScreenPos().x;
+		const bool bIsOpen = ImGui::TreeNodeEx(HiddenId, Flags);
+
+		const ImVec2 ItemMin = ImGui::GetItemRectMin();
+		const ImVec2 ItemMax = ImGui::GetItemRectMax();
+		const float RowCenterY = (ItemMin.y + ItemMax.y) * 0.5f;
+		const float FontSize = ImGui::GetFontSize();
+		float CursorX = NodeStartX + ImGui::GetTreeNodeToLabelSpacing();
+
+		ImDrawList* DrawList = ImGui::GetWindowDrawList();
+		DrawList->PushClipRect(ItemMin, ItemMax, true);
+
+		if (FolderTex)
+		{
+			const float IconSize = FontSize;
+			const float IconY = RowCenterY - IconSize * 0.5f;
+			DrawList->AddImage(
+				FolderTex,
+				ImVec2(CursorX, IconY),
+				ImVec2(CursorX + IconSize, IconY + IconSize));
+			CursorX += IconSize + EditorStyle::Scale(5.0f);
+		}
+
+		DrawList->AddText(
+			ImVec2(CursorX, RowCenterY - FontSize * 0.5f),
+			ImGui::GetColorU32(ImGuiCol_Text),
+			Label);
+
+		DrawList->PopClipRect();
+		return bIsOpen;
+	}
+}
 
 namespace
 {
@@ -94,6 +307,8 @@ void FContentDrawerPanel::RenderContents()
 	if (!fs::is_directory(CurrentPath, Error))
 	{
 		CurrentPath = AssetRootPath;
+		PathHistory = { CurrentPath };
+		PathHistoryIndex = 0;
 	}
 
 	Error.clear();
@@ -104,31 +319,202 @@ void FContentDrawerPanel::RenderContents()
 		return;
 	}
 
-	RenderNavigationBar();
-	ImGui::Separator();
-
-	float treeViewWidth = ImMin(EditorStyle::Scale(200.0f), ImGui::GetContentRegionAvail().x * 0.35f);
-	ImGui::BeginChild("FolderTreeView", ImVec2(treeViewWidth, 0));
+	// 마우스 측면 이전/이후 버튼 지원 (콘텐츠 드로어에 호버된 경우)
+	if (ImGui::IsWindowHovered(ImGuiHoveredFlags_ChildWindows))
 	{
-		// 루트 노드: 상단 경로 표시와 같도록 폴더 이름만 보여 준다. (예: Content)
-		const FString RootLabel = AssetRootPath.filename().string() + "##AssetRoot";
-		if (ImGui::TreeNodeEx(RootLabel.c_str(), ImGuiTreeNodeFlags_DefaultOpen | ImGuiTreeNodeFlags_SpanAvailWidth |
-			(AssetRootPath == CurrentPath ? ImGuiTreeNodeFlags_Selected : 0) | ImGuiTreeNodeFlags_DrawLinesToNodes))
+		if (ImGui::IsMouseClicked(static_cast<ImGuiMouseButton>(3)) && CanNavigateBack())
 		{
-			if (ImGui::IsItemClicked())
-			{
-				CurrentPath = AssetRootPath;
-			}
-			RenderFolderTree(AssetRootPath, CurrentPath);
-			ImGui::TreePop();
+			NavigateBack();
 		}
+		else if (ImGui::IsMouseClicked(static_cast<ImGuiMouseButton>(4)) && CanNavigateForward())
+		{
+			NavigateForward();
+		}
+	}
+
+	const float TotalAvailW = ImGui::GetContentRegionAvail().x;
+	const float SplitterWidth = EditorStyle::Scale(4.0f);
+	const float MinTreeWidth = ImMin(EditorStyle::Scale(140.0f), TotalAvailW * 0.45f);
+	const float MaxTreeWidth = ImMax(MinTreeWidth, TotalAvailW * 0.65f);
+	if (FolderTreeWidth <= 0.0f)
+	{
+		FolderTreeWidth = EditorStyle::Scale(210.0f);
+	}
+	FolderTreeWidth = ImClamp(FolderTreeWidth, MinTreeWidth, MaxTreeWidth);
+
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.055f, 0.058f, 0.065f, 1.0f));
+	ImGui::BeginChild("FolderTreeView", ImVec2(FolderTreeWidth, 0.0f), ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar);
+	ImGui::PopStyleColor();
+	ImGui::PopStyleVar(2);
+	{
+		// UE5 스타일 회색 헤더 바 (프로젝트 이름 + 경로 검색 토글)
+		const float HeaderHeight = ImGui::GetFrameHeight() + EditorStyle::Scale(6.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(3.0f)));
+		ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.18f, 0.19f, 0.21f, 1.0f));
+		if (ImGui::BeginChild("FolderTreeHeader", ImVec2(0.0f, HeaderHeight), ImGuiChildFlags_AlwaysUseWindowPadding, ImGuiWindowFlags_NoScrollbar))
+		{
+			const ImVec2 HeaderPos = ImGui::GetCursorScreenPos();
+			const float ChevronBoxW = EditorStyle::Scale(12.0f);
+			ImGui::Dummy(ImVec2(ChevronBoxW, ImGui::GetFrameHeight()));
+			ViewportToolbarWidgets::DrawChevron(
+				ImGui::GetWindowDrawList(),
+				ImVec2(HeaderPos.x + ChevronBoxW * 0.45f, HeaderPos.y + ImGui::GetFrameHeight() * 0.5f),
+				EditorStyle::Scale(7.0f),
+				ImGui::GetColorU32(ImGuiCol_Text));
+
+			ImGui::SameLine(0.0f, EditorStyle::Scale(4.0f));
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted("Kris");
+
+			const float ToggleSize = ImGui::GetFrameHeight();
+			ImGui::SameLine(ImMax(0.0f, ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - ToggleSize));
+
+			const ImTextureID SearchIcon = ViewportToolbarWidgets::GetIcon("Search");
+			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+			if (bShowPathSearch)
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.43f, 0.85f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.50f, 0.92f, 1.0f));
+			}
+			else
+			{
+				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.26f, 0.28f, 0.32f, 0.75f));
+			}
+
+			bool bToggleClicked = false;
+			if (SearchIcon)
+			{
+				bToggleClicked = ImGui::ImageButton("##PathSearchToggle",
+					SearchIcon,
+					ImVec2(ToggleSize - EditorStyle::Scale(8.0f), ToggleSize - EditorStyle::Scale(8.0f)));
+			}
+			else
+			{
+				bToggleClicked = ImGui::Button("?##PathSearchToggle", ImVec2(ToggleSize, ToggleSize));
+			}
+
+			ImGui::PopStyleColor(2);
+			ImGui::PopStyleVar();
+
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("Search folder paths");
+			}
+
+			if (bToggleClicked)
+			{
+				bShowPathSearch = !bShowPathSearch;
+				if (bShowPathSearch)
+				{
+					bFocusPathSearch = true;
+				}
+				else
+				{
+					PathSearchBuf[0] = '\0';
+				}
+			}
+		}
+		ImGui::EndChild();
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar(2);
+
+		if (bShowPathSearch)
+		{
+			ImGui::SetCursorPos(ImVec2(EditorStyle::Scale(6.0f), ImGui::GetCursorPosY() + EditorStyle::Scale(4.0f)));
+			DrawSearchBox("##PathSearchInput", "Search Paths", PathSearchBuf, sizeof(PathSearchBuf),
+				ImGui::GetContentRegionAvail().x - EditorStyle::Scale(6.0f), bFocusPathSearch);
+			bFocusPathSearch = false;
+		}
+
+		// 검은색 배경의 폴더 하이라키 영역
+		ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(4.0f), EditorStyle::Scale(6.0f)));
+		ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.055f, 0.058f, 0.065f, 1.0f));
+		ImGui::BeginChild("FolderTreeScroll", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar(2);
+		{
+			// 루트 노드: 상단 경로 표시와 같도록 폴더 이름과 폴더 아이콘을 함께 보여 준다. (예: Content)
+			const std::string RootName = FPaths::ToUtf8(AssetRootPath.filename());
+			const ImTextureID FolderTex = GetFolderIconTextureId(FolderIconPath);
+			const ImGuiTreeNodeFlags RootFlags =
+				ImGuiTreeNodeFlags_DefaultOpen |
+				ImGuiTreeNodeFlags_SpanAvailWidth |
+				(AssetRootPath == CurrentPath ? ImGuiTreeNodeFlags_Selected : 0) |
+				ImGuiTreeNodeFlags_DrawLinesToNodes;
+
+			if (DrawFolderTreeNode("##AssetRoot", RootName.c_str(), FolderTex, RootFlags))
+			{
+				if (ImGui::IsItemClicked())
+				{
+					NavigateTo(AssetRootPath);
+				}
+				fs::path PendingTreeSelection = CurrentPath;
+				RenderFolderTree(AssetRootPath, PendingTreeSelection);
+				if (PendingTreeSelection != CurrentPath)
+				{
+					NavigateTo(PendingTreeSelection);
+				}
+				ImGui::TreePop();
+			}
+		}
+		ImGui::EndChild();
 	}
 	ImGui::EndChild();
 
-	ImGui::SameLine();
-
-	ImGui::BeginChild("AssetGridView");
+	// 좌측 폴더 트리와 우측 에셋 그리드 사이 구분선 겸 드래그 스플리터
+	ImGui::SameLine(0.0f, 0.0f);
+	ImGui::InvisibleButton("##ContentDrawerSplitter", ImVec2(SplitterWidth, -1.0f));
+	const bool bSplitterHovered = ImGui::IsItemHovered();
+	const bool bSplitterActive = ImGui::IsItemActive();
+	if (bSplitterHovered || bSplitterActive)
 	{
+		ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+	}
+	if (bSplitterActive)
+	{
+		FolderTreeWidth = ImClamp(FolderTreeWidth + ImGui::GetIO().MouseDelta.x, MinTreeWidth, MaxTreeWidth);
+	}
+	{
+		const ImVec2 SplitMin = ImGui::GetItemRectMin();
+		const ImVec2 SplitMax = ImGui::GetItemRectMax();
+		const float MidX = (SplitMin.x + SplitMax.x) * 0.5f;
+		const ImU32 LineCol = (bSplitterHovered || bSplitterActive)
+			? IM_COL32(70, 125, 215, 255)
+			: IM_COL32(28, 30, 35, 255);
+		ImGui::GetWindowDrawList()->AddLine(ImVec2(MidX, SplitMin.y), ImVec2(MidX, SplitMax.y), LineCol, EditorStyle::Scale(1.5f));
+	}
+
+	ImGui::SameLine(0.0f, 0.0f);
+
+	// 우측 영역: 상단 툴바(Import, 뒤로/앞으로, 브레드크럼) + 검색창 + 에셋 그리드
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(6.0f)));
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.125f, 0.132f, 0.148f, 1.0f));
+	ImGui::BeginChild("AssetGridView", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
+	ImGui::PopStyleColor();
+	ImGui::PopStyleVar(2);
+	{
+		RenderTopToolbar();
+
+		const std::string CurrentFolderName = FPaths::ToUtf8(CurrentPath.filename());
+		const std::string AssetSearchHint = CurrentFolderName.empty()
+			? "Search Assets"
+			: ("Search " + CurrentFolderName);
+		DrawSearchBox("##AssetSearchInput", AssetSearchHint.c_str(), AssetSearchBuf, sizeof(AssetSearchBuf),
+			ImGui::GetContentRegionAvail().x, false);
+		ImGui::Spacing();
+
+		ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+		ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.11f, 0.118f, 0.132f, 1.0f));
+		ImGui::BeginChild("AssetGridScroll", ImVec2(0.0f, 0.0f), ImGuiChildFlags_AlwaysUseWindowPadding);
+		ImGui::PopStyleColor();
+		ImGui::PopStyleVar();
+		{
 		// 빈 곳 우클릭 (항목 위 우클릭은 제외)
 		if (ImGui::BeginPopupContextWindow("##DrawerContext", ImGuiPopupFlags_MouseButtonRight | ImGuiPopupFlags_NoOpenOverItems))
 		{
@@ -203,11 +589,14 @@ void FContentDrawerPanel::RenderContents()
 			ImGui::EndPopup();
 		}
 
-		// 그리드 레이아웃 계산
-		float padding = EditorStyle::Scale(16.0f);
-		float thumbnailSize = EditorStyle::Scale(80.0f);
-		float cellSize = thumbnailSize + padding;
-		float panelWidth = ImGui::GetContentRegionAvail().x;
+		// 그리드 레이아웃 계산 (FramePadding과 CellPadding을 포함해 오른쪽 테두리가 잘리지 않도록 계산)
+		const ImGuiStyle& GridStyle = ImGui::GetStyle();
+		const float padding = EditorStyle::Scale(12.0f);
+		const float thumbnailSize = EditorStyle::Scale(80.0f);
+		const float framePadX = GridStyle.FramePadding.x;
+		const float framePadY = GridStyle.FramePadding.y;
+		const float cellSize = thumbnailSize + framePadX * 2.0f + GridStyle.CellPadding.x * 2.0f + padding;
+		const float panelWidth = ImGui::GetContentRegionAvail().x;
 		int ColumnCount = static_cast<int>(panelWidth / cellSize);
 		if (ColumnCount < 1) ColumnCount = 1;
 
@@ -221,19 +610,26 @@ void FContentDrawerPanel::RenderContents()
 			// 폴더를 열 때 멈추지 않도록 썸네일은 프레임당 하나씩 로드한다. 그동안은 파일 아이콘을 보여 준다.
 			bool bLoadedThumbnail = false;
 
+			auto ComputeItemImgSize = [thumbnailSize, framePadX]() -> float
+			{
+				const float MaxImg = ImGui::GetContentRegionAvail().x - framePadX * 2.0f - EditorStyle::Scale(2.0f);
+				return ImMin(thumbnailSize, ImMax(EditorStyle::Scale(24.0f), MaxImg));
+			};
+
 			// 맨 앞 칸: ".." 를 더블클릭하면 상위 폴더로 간다. 루트에서는 보이지 않는다.
 			bool bGoToParent = false;
 			if (CurrentPath != AssetRootPath)
 			{
 				ImGui::TableNextColumn();
 				ImGui::PushID("##ParentFolder");
+				const float ItemImgSize = ComputeItemImgSize();
 				if (UTexture2D* FolderIcon = UAssetManager::GetAssetByPath<UTexture2D>(FolderIconPath))
 				{
-					ImGui::ImageButton("##ParentFolderButton", (ImTextureID)FolderIcon->GetResource()->GetSRV(), { thumbnailSize, thumbnailSize });
+					ImGui::ImageButton("##ParentFolderButton", (ImTextureID)FolderIcon->GetResource()->GetSRV(), { ItemImgSize, ItemImgSize });
 				}
 				else
 				{
-					ImGui::Button("##ParentFolderButton", { thumbnailSize, thumbnailSize });
+					ImGui::Button("##ParentFolderButton", { ItemImgSize + framePadX * 2.0f, ItemImgSize + framePadY * 2.0f });
 				}
 				if (ImGui::IsItemHovered() && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
 				{
@@ -242,6 +638,8 @@ void FContentDrawerPanel::RenderContents()
 				ImGui::TextWrapped("..");
 				ImGui::PopID();
 			}
+
+			const std::string AssetSearchLower = ToLowerAscii(AssetSearchBuf);
 
 			for (; !IterateError && It != End; It.increment(IterateError))
 			{
@@ -253,10 +651,13 @@ void FContentDrawerPanel::RenderContents()
 				if (TypeError)
 					continue;
 
-				ImGui::TableNextColumn();
-
 				std::string PathString = Path.generic_string();
-				std::string FilenameString = Path.filename().string();
+				std::string FilenameString = FPaths::ToUtf8(Path.filename());
+
+				if (!ContainsCaseInsensitive(FilenameString, AssetSearchLower))
+					continue;
+
+				ImGui::TableNextColumn();
 
 				ImGui::PushID(PathString.c_str()); // 각 위젯에 고유 ID 부여
 				UTexture2D* Thumbnail = nullptr;
@@ -303,22 +704,41 @@ void FContentDrawerPanel::RenderContents()
 						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(FileIconPath);
 					}
 				}
+
+				const float ItemImgSize = ComputeItemImgSize();
 				if (Thumbnail)
 				{
-					ImGui::ImageButton(PathString.c_str(), (ImTextureID)Thumbnail->GetResource()->GetSRV(), { thumbnailSize, thumbnailSize });
+					ImGui::ImageButton(PathString.c_str(), (ImTextureID)Thumbnail->GetResource()->GetSRV(), { ItemImgSize, ItemImgSize });
+				}
+				else
+				{
+					ImGui::Button("##FallbackAssetButton", { ItemImgSize + framePadX * 2.0f, ItemImgSize + framePadY * 2.0f });
+				}
 
+				if (ImGui::BeginPopupContextItem("##AssetContext"))
+				{
 					if (!bIsDirectory)
 					{
-                        URenderAsset* ContextAsset = UAssetManager::FindLoadedAsset(PathString);
-                        const bool bSkeletalMesh = (ContextAsset && ContextAsset->IsA<USkeletalMesh>()) || UAssetManager::GetUnloadedAssetType(PathString) == EAssetType::SkeletalMesh;
-
-                        if (bSkeletalMesh && ImGui::BeginPopupContextItem("##AssetContext"))
-                        {
-                            BlendSpaceCreator.DrawMenuItems(PathString, CurrentPath);
-                            AnimBlueprintCreator.DrawMenuItems(PathString, CurrentPath);
-                            ImGui::EndPopup();
-                        }
+						URenderAsset* ContextAsset = UAssetManager::FindLoadedAsset(PathString);
+						const bool bSkeletalMesh = (ContextAsset && ContextAsset->IsA<USkeletalMesh>())
+							|| UAssetManager::GetUnloadedAssetType(PathString) == EAssetType::SkeletalMesh;
+						if (bSkeletalMesh)
+						{
+							BlendSpaceCreator.DrawMenuItems(PathString, CurrentPath);
+							AnimBlueprintCreator.DrawMenuItems(PathString, CurrentPath);
+							ImGui::Separator();
+						}
 					}
+
+					if (ImGui::MenuItem("Rename"))
+					{
+						RequestRenameItem(Path, bIsDirectory);
+					}
+					if (ImGui::MenuItem("Delete"))
+					{
+						RequestDeleteItem(Path, bIsDirectory);
+					}
+					ImGui::EndPopup();
 				}
 
 				// 페이로드에 포인터를 그대로 실어서 받는 쪽이 AssetMap을 다시 뒤지지 않게 한다.
@@ -345,7 +765,7 @@ void FContentDrawerPanel::RenderContents()
 				{
 					if (bIsDirectory)
 					{
-						CurrentPath /= Path.filename(); // 하위 폴더로 이동
+						NavigateTo(CurrentPath / Path.filename()); // 하위 폴더로 이동
 					}
 
 					// TODO: UIEditor를 FAssetEditor 계열로 통합
@@ -380,34 +800,261 @@ void FContentDrawerPanel::RenderContents()
 
 			if (bGoToParent)
 			{
-				CurrentPath = CurrentPath.parent_path();
+				NavigateTo(CurrentPath.parent_path());
 			}
 		}
+		}
+		ImGui::EndChild();
 	}
 	BlendSpaceCreator.ProcessCreateRequest();
     AnimBlueprintCreator.ProcessCreateRequest();
 
 	ImGui::EndChild();
+
+	RenderAssetModals();
+}
+
+void FContentDrawerPanel::RenderTopToolbar()
+{
+	if (ImGui::Button("Import"))
+	{
+		ImGui::OpenPopup("ImportAssetPopup");
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Import external mesh asset (FBX)");
+	}
+
+	const ImVec2 ImportMin = ImGui::GetItemRectMin();
+	const ImVec2 ImportMax = ImGui::GetItemRectMax();
+	ImGui::SetNextWindowPos(ImVec2(ImportMin.x, ImportMax.y + EditorStyle::Scale(2.0f)), ImGuiCond_Appearing);
+	if (ImGui::BeginPopup("ImportAssetPopup"))
+	{
+		if (ImGui::MenuItem("Import Static Mesh (FBX)..."))
+		{
+			if (OnImportFbx)
+			{
+				OnImportFbx(EFbxImportMode::Static);
+			}
+		}
+		if (ImGui::MenuItem("Import Skeletal Mesh (FBX)..."))
+		{
+			if (OnImportFbx)
+			{
+				OnImportFbx(EFbxImportMode::Skeletal);
+			}
+		}
+		ImGui::EndPopup();
+	}
+
+	ImGui::SameLine();
+	if (DrawHistoryButton("##HistoryBack", false, CanNavigateBack(), "Back"))
+	{
+		NavigateBack();
+	}
+
+	ImGui::SameLine(0.0f, EditorStyle::Scale(2.0f));
+	if (DrawHistoryButton("##HistoryForward", true, CanNavigateForward(), "Forward"))
+	{
+		NavigateForward();
+	}
+
+	ImGui::SameLine();
+	RenderNavigationBar();
 }
 
 void FContentDrawerPanel::RenderNavigationBar()
 {
-	// 현재 경로를 평범한 텍스트로 표시한다. (예: Asset/Textures/UI)
-	fs::path DisplayPath = AssetRootPath.filename();
+	struct FBreadcrumbSegment
+	{
+		std::string Label;
+		fs::path TargetPath;
+	};
 
+	std::vector<FBreadcrumbSegment> Segments;
+	Segments.push_back({ AssetRootPath.filename().string(), AssetRootPath });
+
+	fs::path AccumPath = AssetRootPath;
 	const fs::path Relative = CurrentPath.lexically_relative(AssetRootPath);
 	for (const fs::path& Part : Relative)
 	{
-		if (Part.empty() || Part == ".")
+		if (Part.empty() || Part == "." || Part == "..")
+		{
 			continue;
-		DisplayPath /= Part;
+		}
+		AccumPath /= Part;
+		Segments.push_back({ Part.string(), AccumPath });
 	}
 
-	ImGui::TextUnformatted(DisplayPath.generic_string().c_str());
+	ImGui::PushStyleColor(ImGuiCol_ChildBg, ImVec4(0.085f, 0.092f, 0.105f, 0.90f));
+	ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(6.0f), 0.0f));
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildBorderSize, 0.0f);
+	ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(4.0f));
+	if (ImGui::BeginChild("PathBreadcrumbBar", ImVec2(0.0f, ImGui::GetFrameHeight()),
+		ImGuiChildFlags_None, ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse))
+	{
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.24f, 0.27f, 0.33f, 0.70f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonActive, ImVec4(0.30f, 0.34f, 0.42f, 0.90f));
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
+		ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, EditorStyle::Scale(3.0f));
+		ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(EditorStyle::Scale(2.0f), 0.0f));
+		ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(6.0f), ImGui::GetStyle().FramePadding.y));
+
+		for (size_t Index = 0; Index < Segments.size(); ++Index)
+		{
+			if (Index > 0)
+			{
+				ImGui::SameLine();
+				const ImVec2 ChevronPos = ImGui::GetCursorScreenPos();
+				const float ChevronBoxW = EditorStyle::Scale(10.0f);
+				const float FrameH = ImGui::GetFrameHeight();
+				ImGui::Dummy(ImVec2(ChevronBoxW, FrameH));
+				DrawRightChevron(
+					ImGui::GetWindowDrawList(),
+					ImVec2(ChevronPos.x + ChevronBoxW * 0.5f, ChevronPos.y + FrameH * 0.5f),
+					EditorStyle::Scale(7.5f),
+					ImGui::GetColorU32(ImGuiCol_TextDisabled));
+				ImGui::SameLine();
+			}
+
+			ImGui::PushID(static_cast<int>(Index));
+			if (ImGui::Button(Segments[Index].Label.c_str()))
+			{
+				NavigateTo(Segments[Index].TargetPath);
+			}
+			ImGui::PopID();
+		}
+
+		ImGui::PopStyleVar(4);
+		ImGui::PopStyleColor(3);
+	}
+	ImGui::EndChild();
+	ImGui::PopStyleVar(3);
+	ImGui::PopStyleColor();
+}
+
+void FContentDrawerPanel::NavigateTo(const fs::path& NewPath)
+{
+	std::error_code Error;
+	if (!fs::is_directory(NewPath, Error) || NewPath == CurrentPath)
+	{
+		return;
+	}
+
+	if (PathHistory.empty())
+	{
+		PathHistory.push_back(CurrentPath);
+		PathHistoryIndex = 0;
+	}
+
+	if (PathHistoryIndex + 1 < PathHistory.size())
+	{
+		PathHistory.resize(PathHistoryIndex + 1);
+	}
+
+	PathHistory.push_back(NewPath);
+	constexpr size_t MaxHistoryEntries = 64;
+	if (PathHistory.size() > MaxHistoryEntries)
+	{
+		PathHistory.erase(PathHistory.begin());
+	}
+	PathHistoryIndex = PathHistory.size() - 1;
+	CurrentPath = NewPath;
+}
+
+bool FContentDrawerPanel::CanNavigateBack() const
+{
+	return !PathHistory.empty() && PathHistoryIndex > 0;
+}
+
+bool FContentDrawerPanel::CanNavigateForward() const
+{
+	return !PathHistory.empty() && (PathHistoryIndex + 1) < PathHistory.size();
+}
+
+void FContentDrawerPanel::NavigateBack()
+{
+	if (!CanNavigateBack())
+	{
+		return;
+	}
+
+	size_t Candidate = PathHistoryIndex - 1;
+	while (true)
+	{
+		std::error_code Error;
+		if (fs::is_directory(PathHistory[Candidate], Error))
+		{
+			PathHistoryIndex = Candidate;
+			CurrentPath = PathHistory[Candidate];
+			return;
+		}
+		if (Candidate == 0)
+		{
+			return;
+		}
+		--Candidate;
+	}
+}
+
+void FContentDrawerPanel::NavigateForward()
+{
+	if (!CanNavigateForward())
+	{
+		return;
+	}
+
+	size_t Candidate = PathHistoryIndex + 1;
+	while (Candidate < PathHistory.size())
+	{
+		std::error_code Error;
+		if (fs::is_directory(PathHistory[Candidate], Error))
+		{
+			PathHistoryIndex = Candidate;
+			CurrentPath = PathHistory[Candidate];
+			return;
+		}
+		++Candidate;
+	}
+}
+
+bool FContentDrawerPanel::DoesSubtreeMatchPathFilter(const fs::path& Path, std::string_view LowerFilter) const
+{
+	if (LowerFilter.empty())
+	{
+		return true;
+	}
+
+	if (ContainsCaseInsensitive(Path.filename().string(), LowerFilter))
+	{
+		return true;
+	}
+
+	std::error_code IterateError;
+	fs::directory_iterator It(Path, IterateError);
+	const fs::directory_iterator End;
+
+	for (; !IterateError && It != End; It.increment(IterateError))
+	{
+		const fs::path Entry = It->path();
+		std::error_code TypeError;
+		if (!TypeError && fs::is_directory(Entry, TypeError) && !TypeError)
+		{
+			if (DoesSubtreeMatchPathFilter(Entry, LowerFilter))
+			{
+				return true;
+			}
+		}
+	}
+
+	return false;
 }
 
 void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& SelectedPath)
 {
+	const std::string LowerFilter = ToLowerAscii(PathSearchBuf);
+
 	std::error_code IterateError;
 	fs::directory_iterator It(Path, IterateError);
 	const fs::directory_iterator End;
@@ -424,7 +1071,10 @@ void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& Selec
 			continue;
 
 		const FString FilenameString =
-			Entry.filename().string();
+			FPaths::ToUtf8(Entry.filename());
+
+		if (!LowerFilter.empty() && !DoesSubtreeMatchPathFilter(Entry, LowerFilter))
+			continue;
 
 		ImGuiTreeNodeFlags Flags =
 			ImGuiTreeNodeFlags_OpenOnArrow |
@@ -434,8 +1084,28 @@ void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& Selec
 		if (Entry == SelectedPath)
 			Flags |= ImGuiTreeNodeFlags_Selected;
 
+		if (!LowerFilter.empty())
+		{
+			ImGui::SetNextItemOpen(true, ImGuiCond_Always);
+		}
+
+		const std::string NodeHiddenId = "##TreeFolder_" + Entry.generic_string();
+		const ImTextureID FolderTex = GetFolderIconTextureId(FolderIconPath);
 		const bool bIsOpen =
-			ImGui::TreeNodeEx(FilenameString.c_str(), Flags);
+			DrawFolderTreeNode(NodeHiddenId.c_str(), FilenameString.c_str(), FolderTex, Flags);
+
+		if (ImGui::BeginPopupContextItem())
+		{
+			if (ImGui::MenuItem("Rename"))
+			{
+				RequestRenameItem(Entry, true);
+			}
+			if (ImGui::MenuItem("Delete"))
+			{
+				RequestDeleteItem(Entry, true);
+			}
+			ImGui::EndPopup();
+		}
 
 		if (ImGui::IsItemClicked())
 			SelectedPath = Entry;
@@ -450,5 +1120,185 @@ void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& Selec
 	if (IterateError)
 	{
 		ImGui::TextUnformatted("Could not read this folder.");
+	}
+}
+
+void FContentDrawerPanel::RequestRenameItem(const fs::path& TargetPath, bool bIsDirectory)
+{
+	PendingItemTarget = TargetPath;
+	PendingItemIsDirectory = bIsDirectory;
+	FileOpErrorMessage.clear();
+	const std::string CurrentName = FPaths::ToUtf8(TargetPath.filename());
+	strcpy_s(RenameBuffer, CurrentName.c_str());
+	bOpenRenameModal = true;
+}
+
+void FContentDrawerPanel::RequestDeleteItem(const fs::path& TargetPath, bool bIsDirectory)
+{
+	PendingItemTarget = TargetPath;
+	PendingItemIsDirectory = bIsDirectory;
+	FileOpErrorMessage.clear();
+	bOpenDeleteModal = true;
+}
+
+void FContentDrawerPanel::RenderAssetModals()
+{
+	if (bOpenRenameModal)
+	{
+		ImGui::OpenPopup("Rename");
+		bOpenRenameModal = false;
+	}
+	if (bOpenDeleteModal)
+	{
+		ImGui::OpenPopup("Delete");
+		bOpenDeleteModal = false;
+	}
+
+	if (ImGui::BeginPopupModal("Rename", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		if (ImGui::IsWindowAppearing())
+		{
+			ImGui::SetKeyboardFocusHere();
+		}
+
+		const bool bEnter = ImGui::InputText("New Name", RenameBuffer, sizeof(RenameBuffer),
+			ImGuiInputTextFlags_EnterReturnsTrue | ImGuiInputTextFlags_AutoSelectAll);
+
+		const std::string_view NewNameView(RenameBuffer);
+		const bool bInvalidName = !IsValidEntryName(NewNameView);
+		const fs::path TargetPath = PendingItemTarget.parent_path() / FPaths::FromUtf8(RenameBuffer);
+		const bool bSameName = (!bInvalidName && TargetPath == PendingItemTarget);
+		std::error_code ExistsError;
+		const bool bExists = !bInvalidName && !bSameName && fs::exists(TargetPath, ExistsError);
+
+		if (bExists)
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "A file or folder with this name already exists.");
+		}
+		else if (bInvalidName && !NewNameView.empty())
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "Invalid name.");
+		}
+		else if (!FileOpErrorMessage.empty())
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", FileOpErrorMessage.c_str());
+		}
+
+		const bool bCanConfirm = !bInvalidName && !bSameName && !bExists;
+		ImGui::BeginDisabled(!bCanConfirm);
+		if (ImGui::Button("Rename") || (bEnter && bCanConfirm))
+		{
+			std::error_code RenameError;
+			fs::rename(PendingItemTarget, TargetPath, RenameError);
+			if (!RenameError)
+			{
+				if (PendingItemIsDirectory)
+				{
+					if (IsPathOrDescendant(CurrentPath, PendingItemTarget))
+					{
+						CurrentPath = RebasePathPrefix(CurrentPath, PendingItemTarget, TargetPath);
+					}
+					for (fs::path& HistoryEntry : PathHistory)
+					{
+						if (IsPathOrDescendant(HistoryEntry, PendingItemTarget))
+						{
+							HistoryEntry = RebasePathPrefix(HistoryEntry, PendingItemTarget, TargetPath);
+						}
+					}
+				}
+				ImGui::CloseCurrentPopup();
+			}
+			else
+			{
+				FileOpErrorMessage = RenameError.message();
+				HTR_LOG(Warning, "Failed to rename {} -> {} : {}", FPaths::ToUtf8(PendingItemTarget), FPaths::ToUtf8(TargetPath), FileOpErrorMessage);
+			}
+		}
+		ImGui::EndDisabled();
+
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
+
+	if (ImGui::BeginPopupModal("Delete", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		const std::string TargetName = FPaths::ToUtf8(PendingItemTarget.filename());
+		if (PendingItemIsDirectory)
+		{
+			ImGui::Text("Delete folder '%s' and all of its contents from disk?", TargetName.c_str());
+		}
+		else
+		{
+			ImGui::Text("Delete file '%s' from disk?", TargetName.c_str());
+		}
+		ImGui::TextDisabled("This action cannot be undone.");
+
+		if (!FileOpErrorMessage.empty())
+		{
+			ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.4f, 1.0f), "%s", FileOpErrorMessage.c_str());
+		}
+
+		ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.68f, 0.16f, 0.16f, 1.0f));
+		ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.80f, 0.22f, 0.22f, 1.0f));
+		if (ImGui::Button("Delete"))
+		{
+			std::error_code RemoveError;
+			fs::remove_all(PendingItemTarget, RemoveError);
+			if (!RemoveError)
+			{
+				if (IsPathOrDescendant(CurrentPath, PendingItemTarget))
+				{
+					fs::path Fallback = PendingItemTarget.parent_path();
+					std::error_code DirErr;
+					if (!fs::is_directory(Fallback, DirErr) || !IsPathOrDescendant(Fallback, AssetRootPath))
+					{
+						Fallback = AssetRootPath;
+					}
+					CurrentPath = Fallback;
+				}
+
+				for (size_t i = PathHistory.size(); i > 0; --i)
+				{
+					const size_t Idx = i - 1;
+					std::error_code HistErr;
+					if (IsPathOrDescendant(PathHistory[Idx], PendingItemTarget) || !fs::is_directory(PathHistory[Idx], HistErr))
+					{
+						PathHistory.erase(PathHistory.begin() + static_cast<ptrdiff_t>(Idx));
+						if (PathHistoryIndex >= Idx && PathHistoryIndex > 0)
+						{
+							--PathHistoryIndex;
+						}
+					}
+				}
+				if (PathHistory.empty())
+				{
+					PathHistory.push_back(CurrentPath);
+					PathHistoryIndex = 0;
+				}
+				else if (PathHistoryIndex >= PathHistory.size())
+				{
+					PathHistoryIndex = PathHistory.size() - 1;
+				}
+
+				ImGui::CloseCurrentPopup();
+			}
+			else
+			{
+				FileOpErrorMessage = RemoveError.message();
+				HTR_LOG(Warning, "Failed to delete {} : {}", FPaths::ToUtf8(PendingItemTarget), FileOpErrorMessage);
+			}
+		}
+		ImGui::PopStyleColor(2);
+
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel"))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
 	}
 }

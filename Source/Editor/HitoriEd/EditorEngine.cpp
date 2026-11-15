@@ -302,6 +302,7 @@ void UEditorEngine::InitPanels()
 
 	// .scene 더블클릭 → 레벨 에디터에 그 씬을 연다
 	ContentDrawerPanel->SetOpenSceneCallback([this](const FString& Path) { OpenSceneFromPath(Path); });
+	ContentDrawerPanel->SetImportFbxCallback([](EFbxImportMode Mode) { FEditorFileUtils::ImportFbx(Mode); });
 
 	ContentDrawerPanel->SetBlendSpaceCreatedCallback([this](const FString& Path) { EditorManager->OpenEditor(Path); });
     ContentDrawerPanel->SetAnimBlueprintCreatedCallback([this](const FString& Path) { EditorManager->OpenEditor(Path); });
