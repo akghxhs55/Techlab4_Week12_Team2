@@ -77,7 +77,7 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 	wchar_t ExePath[MAX_PATH] = {};
 	GetModuleFileNameW(nullptr, ExePath, MAX_PATH);
 	const std::filesystem::path RuntimeDllDir = std::filesystem::path(ExePath).parent_path();
-	const std::filesystem::path GameExe = Root / L"EngineResources/Runtime/Windows-x86_64/KurisuPlayer.bin";
+	const std::filesystem::path GameExe = Root / L"EngineResources/Runtime/Windows-x86_64/KurisuGame.exe";
 	if (!std::filesystem::exists(GameExe))
 	{
 		KRS_LOG(Error, "Packaging canceled: the editor distribution is missing its player template. Replace it with a complete Release distribution.");

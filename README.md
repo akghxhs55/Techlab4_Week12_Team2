@@ -31,7 +31,7 @@ Visual Studio 2026의 C++ 데스크톱 개발 워크로드와 Windows SDK가 필
    - 지원 구성: `Debug`, `Release`, `Shipping` (`x64`, C++20)
    - 주요 타깃: `KurisuEditor` (에디터), `KurisuGame` (게임)
    - 에디터·엔진 빌드 결과물: `<EngineRoot>/Build/Bin/<Configuration>-windows-x86_64/`
-   - 게임 빌드 결과물: `<ProjectRoot>/Build/Bin/<Configuration>-windows-x86_64/` (직접 `KurisuGame`을 빌드하면 기본 프로젝트인 `DefaultProject` 사용)
+   - 게임 빌드 결과물: `<ProjectRoot>/Build/Bin/<Configuration>-windows-x86_64/` (프로젝트를 지정하지 않고 `KurisuGame`을 빌드하면 엔진 `Build/Bin`에 에디터 배포용 실행 템플릿으로 생성)
 3. **패키징**
    - `Setup/Packaging/Package.bat [Release|Shipping] [프로젝트.kproject 경로]` 또는 `Setup/Packaging/Package.ps1`을 실행하면 `<ProjectRoot>/Build/Package/<ProjectName>/`에 실행 파일, `EngineResources`, 프로젝트 `Content`/`Config`가 패키징됩니다.
 
@@ -52,9 +52,9 @@ MSBuild.exe .\Kurisu.slnx -t:KurisuEditor -p:Configuration=Release -p:Platform=x
 
 ### 에디터 배포본
 
-`SlnGenerator.bat`으로 솔루션을 갱신하고 `KurisuEditor`를 **Release / x64**로 빌드하면 `Build/Distributions/KurisuEditor/` 배포 폴더를 자동 생성합니다. 폴더 전체를 옮겨 `KurisuEditor.exe`로 실행하면 됩니다. 에디터 빌드는 `KurisuGame`을 빌드하지 않습니다.
+`SlnGenerator.bat`으로 솔루션을 갱신하고 `KurisuEditor`를 **Release / x64**로 빌드하면 `KurisuGame`도 먼저 빌드한 뒤 `Build/Distributions/KurisuEditor/` 배포 폴더를 자동 생성합니다. 폴더 전체를 옮겨 `KurisuEditor.exe`로 실행하면 됩니다. Debug 에디터 빌드는 게임을 빌드하지 않습니다.
 
-배포본에는 에디터 실행 파일, FBX DLL, 해당 도구 버전의 x64 C++ 런타임 DLL 및 `EngineResources`가 포함됩니다. `EngineResources/Runtime/Windows-x86_64/KurisuPlayer.bin`은 게임 패키징에 사용하는 실행 템플릿이며 Release 에디터 빌드 시 함께 준비됩니다. 소스, 프로젝트 게임 실행 파일, PDB, 정적 라이브러리, 중간 빌드 파일과 개인 설정은 포함하지 않습니다. 프로젝트는 새로 생성하거나 별도로 보관한 `.kproject`를 열면 됩니다.
+배포본에는 에디터 실행 파일, FBX DLL, 해당 도구 버전의 x64 C++ 런타임 DLL 및 `EngineResources`가 포함됩니다. `EngineResources/Runtime/Windows-x86_64/KurisuGame.exe`는 기존 `KurisuGame`의 Release 빌드 결과이며, 사용자가 만든 콘텐츠와 함께 복사해 게임을 패키징합니다. 소스, 기본 프로젝트 콘텐츠, PDB, 정적 라이브러리, 중간 빌드 파일과 개인 설정은 포함하지 않습니다. 프로젝트는 새로 생성하거나 별도로 보관한 `.kproject`를 열면 됩니다.
 
 원본 프로젝트에서 게임 패키징을 실행하면 필요한 `KurisuGame`을 해당 프로젝트의 `Build/Bin`에 빌드합니다. 소스 없는 배포 에디터는 함께 제공되는 실행 템플릿을 사용해 `<ProjectRoot>/Build/Package/<ProjectName>/KurisuGame.exe`와 콘텐츠를 생성하므로 Visual Studio나 엔진 소스가 필요하지 않습니다.
 

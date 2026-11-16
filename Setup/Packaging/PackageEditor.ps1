@@ -8,9 +8,10 @@ $ErrorActionPreference = 'Stop'
 try {
     $engineRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
     $bin = Join-Path $engineRoot "Build\Bin\$Configuration-windows-x86_64"
-    $playerTemplate = Join-Path $engineRoot "Build\Runtime\$Configuration-windows-x86_64\KurisuPlayer.bin"
-    if (-not (Test-Path -LiteralPath $playerTemplate -PathType Leaf)) {
-        throw 'Missing player template. Regenerate the solution and build KurisuEditor in Release.'
+    # The editor's Release project reference builds the launcher template here.
+    $gameExe = Join-Path $bin 'KurisuGame.exe'
+    if (-not (Test-Path -LiteralPath $gameExe -PathType Leaf)) {
+        throw 'Missing KurisuGame.exe. Regenerate the solution and build KurisuEditor in Release.'
     }
     $distributionRoot = [IO.Path]::GetFullPath((Join-Path $engineRoot 'Build\Distributions'))
     $stage = [IO.Path]::GetFullPath((Join-Path $distributionRoot '.KurisuEditor-Release.staging'))
@@ -43,7 +44,7 @@ try {
     if (-not (Test-Path -LiteralPath $dumpbin)) { throw 'Cannot locate dumpbin for runtime dependency inspection.' }
     $pending = New-Object 'System.Collections.Generic.Queue[string]'
     foreach ($name in $binaries) { $pending.Enqueue((Join-Path $bin $name)) }
-    $pending.Enqueue($playerTemplate)
+    $pending.Enqueue($gameExe)
     $required = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
     while ($pending.Count -gt 0) {
         $dependencies = & $dumpbin /NOLOGO /DEPENDENTS $pending.Dequeue()
@@ -67,7 +68,7 @@ try {
     Copy-Item -LiteralPath (Join-Path $engineRoot 'EngineResources') -Destination $stage -Recurse
     $playerDirectory = Join-Path $stage 'EngineResources\Runtime\Windows-x86_64'
     New-Item -ItemType Directory -Path $playerDirectory -Force | Out-Null
-    Copy-Item -LiteralPath $playerTemplate -Destination $playerDirectory
+    Copy-Item -LiteralPath $gameExe -Destination $playerDirectory
     if (Test-Path -LiteralPath $output) { Remove-Item -LiteralPath $output -Recurse -Force }
     Move-Item -LiteralPath $stage -Destination $output
     Write-Host "Portable editor: $output"

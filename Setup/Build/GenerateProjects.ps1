@@ -51,7 +51,10 @@ try {
         $defaults = $gameXml.CreateElement('PropertyGroup', $namespace)
         $projectDir = $gameXml.CreateElement('KurisuGameProjectDir', $namespace)
         $projectDir.SetAttribute('Condition', "'`$(KurisuGameProjectDir)' == ''")
-        $projectDir.InnerText = '$(ProjectDir)..\..\DefaultProject'
+        # Without a selected project, KurisuGame is the editor distribution's
+        # launcher template and stays in the engine's Build folder. Game
+        # packaging always passes KurisuGameProjectDir explicitly.
+        $projectDir.InnerText = '$(ProjectDir)..\..'
         [void]$defaults.AppendChild($projectDir)
         $firstOutDir = $gameXml.SelectSingleNode("//*[local-name()='OutDir']")
         [void]$gameXml.DocumentElement.InsertBefore($defaults, $firstOutDir.ParentNode)
@@ -66,13 +69,12 @@ try {
         # filtered. A conditional project reference keeps Debug editor-only.
         $editorProject = Join-Path $engineRoot 'Build\Projects\KurisuEditor.vcxproj'
         [xml]$editorXml = [IO.File]::ReadAllText($editorProject)
-        [xml]$playerXml = [IO.File]::ReadAllText((Join-Path $engineRoot 'Build\Projects\KurisuPlayer.vcxproj'))
         $references = $editorXml.CreateElement('ItemGroup', $namespace)
         $references.SetAttribute('Condition', "'`$(Configuration)' == 'Release'")
         $reference = $editorXml.CreateElement('ProjectReference', $namespace)
-        $reference.SetAttribute('Include', 'KurisuPlayer.vcxproj')
+        $reference.SetAttribute('Include', 'KurisuGame.vcxproj')
         foreach ($entry in @{
-            Project = $playerXml.SelectSingleNode("//*[local-name()='ProjectGuid']").InnerText
+            Project = $gameXml.SelectSingleNode("//*[local-name()='ProjectGuid']").InnerText
             LinkLibraryDependencies = 'false'
             ReferenceOutputAssembly = 'false'
         }.GetEnumerator()) {

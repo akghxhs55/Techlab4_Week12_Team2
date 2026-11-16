@@ -268,7 +268,7 @@ filter "configurations:Release"
 	}
 filter {}
 
--- Shared launcher settings for project games and the portable editor's player template.
+-- Game launcher settings. Release editor distributions reuse this executable.
 function ConfigureGameRuntime()
 	location (ProjectRoot .. "/Build/Projects")
 	kind     "WindowedApp"
@@ -310,22 +310,16 @@ function ConfigureGameRuntime()
 	}
 end
 
--- A selected project's game executable belongs to that project's Build folder.
+-- Without a selected project this builds the editor distribution's launcher
+-- template into the engine's Build folder. Game packaging redirects it to the
+-- selected project's Build folder (see GenerateProjects.ps1).
 project "KurisuGame"
 	ConfigureGameRuntime()
 	targetname "KurisuGame"
-	targetdir (ProjectRoot .. "/DefaultProject/Build/Bin/" .. outputdir)
-	objdir (ProjectRoot .. "/DefaultProject/Build/Intermediate/" .. outputdir .. "/KurisuGame")
+	targetdir (ProjectRoot .. "/Build/Bin/" .. outputdir)
+	objdir (ProjectRoot .. "/Build/Intermediate/" .. outputdir .. "/KurisuGame")
 	debugdir (ProjectRoot .. "/DefaultProject")
 	debugargs { "DefaultProject.kproject" }
-
--- Engine distribution support, not a built game. Exported games receive a copy
--- of this PE image as KurisuGame.exe inside their own Build/Package folder.
-project "KurisuPlayer"
-	ConfigureGameRuntime()
-	targetname "KurisuPlayer"
-	targetextension ".bin"
-	targetdir (ProjectRoot .. "/Build/Runtime/" .. outputdir)
 
 -- 셰이더를 VS에서 편집하기 위한 보기 전용 프로젝트 (언리얼의 Shaders와 같은 역할).
 -- 에셋(Assets)은 에디터 Content Drawer에서 다루므로 솔루션에 넣지 않는다.
