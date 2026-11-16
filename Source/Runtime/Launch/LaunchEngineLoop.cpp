@@ -4,6 +4,7 @@
 #include <shellapi.h>
 
 #include "Launch/EntryPoint.h"
+#include "Launch/Windows/WindowsCrashHandler.h"
 #include "Core/Misc/Paths.h"
 #include "Core/CoreGlobals.h"
 
@@ -70,6 +71,9 @@ namespace
 			return false;
 		}
 
+		// 프로젝트 선택 중 발생한 크래시는 엔진 폴더에 저장한다.
+		PrepareCrashDumpDirectory(FPaths::EngineSavedDir(), false);
+
 		const std::filesystem::path ProjectFile = ResolveProjectFile(hInstance, FindProjectInCommandLine());
 		if (ProjectFile.empty()) return false;
 
@@ -80,6 +84,9 @@ namespace
 			MessageBoxW(nullptr, std::wstring(Msg.begin(), Msg.end()).c_str(), L"Kurisu Engine", MB_OK | MB_ICONERROR);
 			return false;
 		}
+
+		// 프로젝트를 열었으면 이후 덤프는 프로젝트 폴더에 저장한다.
+		PrepareCrashDumpDirectory(FPaths::ProjectSavedDir(), true);
 		return true;
 	}
 }
