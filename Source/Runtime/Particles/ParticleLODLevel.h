@@ -7,6 +7,7 @@
 class UParticleModule;
 class UParticleModuleRequired;
 class UParticleModuleSpawn;
+class UParticleModuleTypeDataBase;
 
 UCLASS()
 class UParticleLODLevel : public UObject
@@ -26,6 +27,8 @@ public:
 	// Modules 배열에는 넣지 않는다
 	UParticleModuleSpawn* GetSpawnModule() const { return SpawnModule; }
 	void SetSpawnModule(UParticleModuleSpawn* InModule) { SpawnModule = InModule; }
+	UParticleModuleTypeDataBase* GetTypeDataModule() const { return TypeDataModule; }
+	void SetTypeDataModule(UParticleModuleTypeDataBase* InModule) { TypeDataModule = InModule; }
 
 	const TArray<UParticleModule*>& GetModules() const { return Modules; }
 	void AddModule(UParticleModule* InModule);
@@ -40,6 +43,7 @@ private:
 	bool  bEnabled = true;
 	UParticleModuleRequired* RequiredModule = nullptr;
 	UParticleModuleSpawn*    SpawnModule = nullptr;
+	UParticleModuleTypeDataBase* TypeDataModule = nullptr;
 	TArray<UParticleModule*> Modules;
 	TArray<UParticleModule*> SpawnModules;
 	TArray<UParticleModule*> UpdateModules;

@@ -54,7 +54,12 @@ void FParticleEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSyste
 	CurrentLODLevel = InTemplate->GetLODLevel(0);
 	ParticleSize = InTemplate->GetParticleSize();
 	assert(ParticleSize >= sizeof(FBaseParticle));
-	
+
+	// 에미터는 모듈 Payload만 계산하므로 인스턴스 Payload는 그 뒤에 직접 붙인다
+	const int32 InstancePayloadSize = GetInstancePayloadSize();
+	InstancePayloadOffset = InstancePayloadSize > 0 ? ParticleSize : 0;
+	ParticleSize += InstancePayloadSize;
+
 	ParticleStride = (ParticleSize + 15) & ~15; // 16바이트 정렬
 	ActiveParticles = 0;
 	ParticleCounter = 0;
