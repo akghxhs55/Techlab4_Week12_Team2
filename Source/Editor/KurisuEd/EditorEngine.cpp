@@ -316,7 +316,7 @@ void UEditorEngine::InitImGui()
 	KRS_LOG(Info, "Initialize ImGui Success!");
 
 	// 기본 제목 표시줄을 없애고 ImGui 메인 메뉴 바를 제목 표시줄로 쓴다.
-	EditorTitleBar::Install(*MainWindow);
+	EditorTitleBar::Install(*MainWindow, true);
 	// 패널이 겹치거나 잘리지 않는 최소 크기.
 	MainWindow->SetMinSize(1024, 640);
 	// 엔진 콘텐츠에 로고 이미지가 있으면 제목 표시줄 왼쪽 위 칸에 그린다. 없으면 빈 칸으로 둔다.

@@ -3,6 +3,7 @@
 
 #include "Render/ImageLoader.h"
 #include "Core/Misc/Paths.h"
+#include "Core/Misc/Version.h"
 
 #include <thread>
 #include <mutex>
@@ -215,7 +216,7 @@ namespace
 		SelectObject(MemDC, SubFont);
 		SetTextColor(MemDC, RGB(160, 160, 160));
 		RECT SubRect = { Margin, ImageH + ScaleSplashPx(27, UiScale), TextRight, ImageH + ScaleSplashPx(43, UiScale) };
-		DrawTextW(MemDC, L"Kurisu Editor 1.0", -1, &SubRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
+		DrawTextW(MemDC, L"Kurisu Editor " KURISU_VERSION_STRING, -1, &SubRect, DT_LEFT | DT_VCENTER | DT_SINGLELINE);
 
 		// % 및 현재 로딩 중인 파일/단계 상태
 		SelectObject(MemDC, CopyFont);

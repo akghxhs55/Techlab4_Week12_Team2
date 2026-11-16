@@ -3,6 +3,7 @@
 #include "Editor/EditorUI/EditorTitleBar.h"
 
 #include "Core/Window.h"
+#include "Core/Misc/Version.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -31,6 +32,7 @@ namespace
 		ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus;
 
 	bool GInstalled = false;
+	bool GShowVersionTooltip = false;
 	HWND GHwnd = nullptr;
 	FString GTitle;
 	ImTextureID GLogo = ImTextureID_Invalid;
@@ -120,8 +122,9 @@ namespace
 	}
 }
 
-void EditorTitleBar::Install(FWindow& Window)
+void EditorTitleBar::Install(FWindow& Window, bool bShowVersionTooltip)
 {
+	GShowVersionTooltip = bShowVersionTooltip;
 	GHwnd = Window.GetHandle();
 	GTitle = ReadWindowTitle(GHwnd);
 	Window.EnableCustomTitleBar(&EditorTitleBar::IsCaption);
@@ -131,6 +134,7 @@ void EditorTitleBar::Install(FWindow& Window)
 void EditorTitleBar::Uninstall()
 {
 	GInstalled = false;
+	GShowVersionTooltip = false;
 	GHwnd = nullptr;
 	GTitle.clear();
 	GLogo = ImTextureID_Invalid;
@@ -218,6 +222,12 @@ void EditorTitleBar::Draw()
 		{
 			const float TextY = ImFloor(Bar.Min.y + (Height - TextSize.y) * 0.5f);
 			Window->DrawList->AddText(ImVec2(TextX, TextY), EditorColor::TextSecondary, GTitle.c_str());
+			// Use the text bounds without adding a button so the title remains draggable.
+			if (GShowVersionTooltip && ImGui::IsWindowHovered() && !ImGui::IsAnyMouseDown() &&
+				ImGui::IsMouseHoveringRect(ImVec2(TextX, TextY), ImVec2(TextX + TextSize.x, TextY + TextSize.y), false))
+			{
+				ImGui::SetTooltip("Version: %s", KURISU_VERSION_STRING);
+			}
 		}
 	}
 

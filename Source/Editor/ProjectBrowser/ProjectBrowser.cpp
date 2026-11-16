@@ -16,6 +16,7 @@
 #include <backends/imgui_impl_win32.h>
 
 #include "Core/Misc/Paths.h"
+#include "Core/Misc/Version.h"
 #include "Core/Window.h"
 #include "Editor/EditorUI/EditorTitleBar.h"
 #include "Render/ImageLoader.h"
@@ -903,7 +904,7 @@ fs::path ProjectBrowser::Run(HINSTANCE hInstance)
 	// 에디터 메인 창과 같은 FWindow를 쓴다. 기본 제목 표시줄 제거와 히트 테스트도 그대로 가져온다.
 	FWindow MainWindow;
 	FBrowserWindow Window;
-	if (MainWindow.Create(hInstance, Width, Height, L"Kurisu Engine 1.0"))
+	if (MainWindow.Create(hInstance, Width, Height, L"Kurisu Engine " KURISU_VERSION_STRING))
 	{
 		Window.Hwnd = MainWindow.GetHandle();
 		// 닫기는 앱 종료(WM_QUIT)가 아니라 요청만 남긴다. WM_QUIT이 엔진 메인 루프까지 남으면 안 된다.
