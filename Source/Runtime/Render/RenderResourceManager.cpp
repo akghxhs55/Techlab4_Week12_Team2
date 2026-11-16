@@ -98,6 +98,7 @@ void FRenderResourceManager::InitPipelineStates()
 		ShaderProgramMap[Key] = MakeUnique<FShaderProgram>(VSRaw, PSRaw);
 		ShaderProgramMap[Key]->Name = Key;
 		CreateSkinnedVariant(Path, Name, *ShaderProgramMap[Key]);
+		CreateParticleInstanceVariant(Path, Name, *ShaderProgramMap[Key]);
 		if (std::strcmp(Name, "VIEW_MODE_WORLD_NORMAL") == 0)
 			PipelineStateMap[EPSOType::StaticMesh_WorldNormal]->Shader = ShaderProgramMap[Key].get();
 	}
@@ -157,6 +158,11 @@ void FRenderResourceManager::ScanShaders(const fs::path& ShaderRoot)
 		{
 			if (TUniquePtr<FShaderProgram>* Base = ShaderProgramMap.Find(Path))
 				CreateSkinnedVariant(Path, nullptr, **Base);
+		}
+		if (Source.find("PARTICLE_INSTANCE_VS_INPUT") != std::string::npos)
+		{
+			if (TUniquePtr<FShaderProgram>* Base = ShaderProgramMap.Find(Path))
+				CreateParticleInstanceVariant(Path, nullptr, **Base);
 		}
 	}
 }
@@ -242,5 +248,39 @@ void FRenderResourceManager::CreateSkinnedVariant(const FString& Path, const cha
 	VertexShaderMap[CSOPath] = std::move(VS);
 	const FString Key = Base.Name + "#GPU_SKIN";
 	ShaderProgramMap[Key] = MakeUnique<FShaderProgram>(VSRaw, Base.PixelShader);
+	ShaderProgramMap[Key]->Name = Key;
+}
+
+// 메시 파티클 인스턴싱 변형. 텍스처 메시에 파티클 색을 곱하려고 PS도 같은 매크로로 컴파일한다
+void FRenderResourceManager::CreateParticleInstanceVariant(const FString& Path, const char* LightingMacro, const FShaderProgram& Base)
+{
+	const D3D_SHADER_MACRO InstanceOnly[] = { { "PARTICLE_INSTANCE", "1" },{ nullptr, nullptr } };
+	const D3D_SHADER_MACRO LitInstance[] = { { LightingMacro, "1" },{ "PARTICLE_INSTANCE", "1" },{ nullptr, nullptr } };
+	const D3D_SHADER_MACRO* Defines = LightingMacro ? LitInstance : InstanceOnly;
+
+	FString VSCSOPath;
+	FString PSCSOPath;
+	FShaderByteCode VSCode = RenderUtil::GetOrCompile(Path, "mainVS", EShaderType::Vertex, VSCSOPath, Defines);
+	FShaderByteCode PSCode = RenderUtil::GetOrCompile(Path, "mainPS", EShaderType::Pixel, PSCSOPath, Defines);
+	if (!VSCode.IsValid() || !PSCode.IsValid())
+	{
+		KRS_LOG(Error, "[Shader] particle instance variant compile failed: {}", Base.Name);
+		return;
+	}
+
+	TUniquePtr<FVertexShader> VS = RenderCommand::CreateVertexShader(VSCode);
+	TUniquePtr<FPixelShader> PS = RenderCommand::CreatePixelShader(PSCode);
+	if (!VS || !VS->IsValid() || !PS || !PS->IsValid())
+	{
+		KRS_LOG(Error, "[Shader] particle instance variant create failed: {}", Base.Name);
+		return;
+	}
+
+	FVertexShader* VSRaw = VS.get();
+	FPixelShader* PSRaw = PS.get();
+	VertexShaderMap[VSCSOPath] = std::move(VS);
+	PixelShaderMap[PSCSOPath] = std::move(PS);
+	const FString Key = Base.Name + "#PARTICLE_INSTANCE";
+	ShaderProgramMap[Key] = MakeUnique<FShaderProgram>(VSRaw, PSRaw);
 	ShaderProgramMap[Key]->Name = Key;
 }

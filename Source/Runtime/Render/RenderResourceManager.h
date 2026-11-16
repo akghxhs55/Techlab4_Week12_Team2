@@ -61,6 +61,7 @@ private:
 	
 	void LoadOrCompileShader(const FString& Path);
 	void CreateSkinnedVariant(const FString& Path, const char* LightingMacro, const FShaderProgram& Base);
+	void CreateParticleInstanceVariant(const FString& Path, const char* LightingMacro, const FShaderProgram& Base);
 	void InitPipelineStates();
 
 	TMap<FString, TUniquePtr<FVertexShader>> VertexShaderMap;
