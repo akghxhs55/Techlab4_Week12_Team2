@@ -83,6 +83,8 @@ int32 FDynamicSpriteEmitterData::BuildInstances(FParticleEmitterInstance& Instan
 	const int32 Count = SortScratch.Num();
 	InstanceScratch.SetNum(Count, false);
 	const int32 SubUVOffset = Instance.SubUVDataOffset;
+	// 쿼드는 카메라 축으로 펼쳐져 월드 행렬의 스케일을 받지 못하므로 Local/World 모두 직접 곱한다
+	const FVector Scale = Instance.GetComponentScale();
 
 	for (int32 i = 0; i < Count; ++i)
 	{
@@ -90,7 +92,7 @@ int32 FDynamicSpriteEmitterData::BuildInstances(FParticleEmitterInstance& Instan
 		FParticleSpriteInstance& Out = InstanceScratch[i];
 		Out.Position = Instance.SimulationToWorld(Particle.Location);
 		Out.Rotation = Particle.Rotation;
-		Out.Size = FVector2(Particle.Size.X, Particle.Size.Y);
+		Out.Size = FVector2(std::abs(Particle.Size.X * Scale.X), std::abs(Particle.Size.Y * Scale.Y));
 		Out.SubImageIndex = SubUVOffset > 0
 			? ParticleHelper::GetPayload<FFullSubUVPayload>(const_cast<uint8*>(SortScratch[i].ParticleBase), SubUVOffset).ImageIndex
 			: 0.0f;
@@ -147,6 +149,15 @@ void FDynamicSpriteEmitterData::Submit(FRenderQueue& Queue, FParticleEmitterInst
 	Queue.Add(Packet);
 }
 
+namespace
+{
+	// Payload 오일러 각(도)은 X = Roll, Y = Pitch, Z = Yaw. FRotator 생성자는 (Pitch, Yaw, Roll) 순서
+	FRotator EulerToRotator(const FVector& Euler)
+	{
+		return FRotator(Euler.Y, Euler.Z, Euler.X);
+	}
+}
+
 bool FDynamicMeshEmitterData::EnsureInstanceBuffer(const FParticleEmitterInstance& Instance)
 {
 	if (!InstanceBuffer || Capacity < Instance.ActiveParticles)
@@ -163,6 +174,8 @@ int32 FDynamicMeshEmitterData::BuildInstances(FParticleEmitterInstance& Instance
 	FParticleMeshEmitterInstance& MeshInstance = static_cast<FParticleMeshEmitterInstance&>(Instance);
 	const bool bLocalSpace = Instance.IsLocalSpace() && Instance.Component;
 	const FMatrix ComponentToWorld = bLocalSpace ? Instance.Component->GetWorldMatrix() : FMatrix::Identity;
+	// Local은 ComponentToWorld에 스케일이 들어 있다. World는 위치에는 곱하지 않고 크기에만 곱한다
+	const FVector WorldScale = Instance.GetComponentScale();
 	constexpr float RadToDeg = 180.0f / PI;
 
 	InstanceScratch.SetNum(Instance.ActiveParticles, false);
@@ -170,13 +183,23 @@ int32 FDynamicMeshEmitterData::BuildInstances(FParticleEmitterInstance& Instance
 
 	ParticleHelper::ForEachParticle(Instance, [&](FBaseParticle& Particle, uint8*)
 		{
-			// 오일러 각(도). Payload는 X = Roll, Y = Pitch, Z = Yaw. 스프라이트 회전(라디안)은 세 축에 공통으로 더한다
 			const FMeshRotationPayloadData& Payload = MeshInstance.GetMeshRotationPayload(static_cast<const FBaseParticle&>(Particle));
-			const FVector Euler = Payload.InitialOrientation + Payload.Rotation + FVector(Particle.Rotation * RadToDeg);
-			const FRotator Rotation(Euler.Y, Euler.Z, Euler.X);
+
+			// 회전 속도로 누적된 회전 + 스프라이트 회전(라디안, 세 축 공통)은 오일러 각끼리 더한다
+			const FVector SpinEuler = Payload.Rotation + FVector(Particle.Rotation * RadToDeg);
 
 			// row-vector: Scale × Rotation × Translation (액터 Transform과 같은 규칙)
-			FMatrix M = FTransform(Rotation, Particle.Location, Particle.Size).GetLocalMatrix();
+			const FVector Size = bLocalSpace ? Particle.Size
+				: FVector(Particle.Size.X * WorldScale.X, Particle.Size.Y * WorldScale.Y, Particle.Size.Z * WorldScale.Z);
+			FMatrix M = FTransform(EulerToRotator(SpinEuler), Particle.Location, Size).GetLocalMatrix();
+
+			// 초기 방향은 각도에 더하지 않고 별도 회전으로 맨 앞에 곱한다: (Orient × Scale) × Rot × Trans
+			// 오일러 각 덧셈은 한 축으로만 돌 때만 회전 합성과 같다
+			if (Payload.InitialOrientation.X != 0.0f || Payload.InitialOrientation.Y != 0.0f || Payload.InitialOrientation.Z != 0.0f)
+			{
+				const FMatrix Orient = EulerToRotator(Payload.InitialOrientation).Quaternion().ToFMatrix();
+				M = Orient * M;
+			}
 			if (bLocalSpace)
 			{
 				M = M * ComponentToWorld;

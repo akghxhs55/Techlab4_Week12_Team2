@@ -67,7 +67,8 @@ public:
 	void DetachFromParent(EAttachmentRule Rule = EAttachmentRule::KeepRelative);
 
 	virtual FBox CalcLocalBounds() const { return FBox{ FVector(), FVector() }; }
-	FBox CalcBounds() const { return CalcLocalBounds().GetWorldAABB(GetWorldMatrix()); }
+	// 월드 공간에서 바로 계산하는 컴포넌트(파티클)는 오버라이드한다
+	virtual FBox CalcBounds() const { return CalcLocalBounds().GetWorldAABB(GetWorldMatrix()); }
 
 	FVector GetWorldLocation() const;
 	FRotator GetWorldRotation() const;

@@ -315,8 +315,25 @@ void FParticleEmitterInstance::Spawn(float DeltaTime)
 	}
 }
 
+FVector FParticleEmitterInstance::GetComponentScale() const
+{
+	return Component ? Component->GetWorldScale3D() : FVector(1.0f);
+}
+
+float FParticleEmitterInstance::GetParticleRadius(const FBaseParticle& Particle) const
+{
+	// 카메라 평면 안에서 회전하는 쿼드의 반대각선
+	return 0.5f * std::sqrt(Particle.Size.X * Particle.Size.X + Particle.Size.Y * Particle.Size.Y);
+}
+
 void FParticleEmitterInstance::UpdateBoundingBox(float DeltaTime)
 {
+	const bool bLocalSpace = IsLocalSpace() && Component;
+	const FMatrix SimToWorld = bLocalSpace ? Component->GetWorldMatrix() : FMatrix::Identity;
+	// Local은 월드 행렬이, World는 렌더 시 크기에 곱하는 스케일이 같은 값이다
+	const FVector Scale = GetComponentScale();
+	const float MaxScale = std::max(std::abs(Scale.X), std::max(std::abs(Scale.Y), std::abs(Scale.Z)));
+
 	FBox NewBox(FVector(FLT_MAX), FVector(-FLT_MAX));
 	for (int32 i = 0; i < ActiveParticles; i++)
 	{
@@ -333,7 +350,9 @@ void FParticleEmitterInstance::UpdateBoundingBox(float DeltaTime)
 			Particle->Rotation += Particle->RotationRate * DeltaTime;
 		}
 
-		NewBox.Expand(FBox(Particle->Location, Particle->Location));
+		const FVector Center = bLocalSpace ? SimToWorld.TransformPosition(Particle->Location) : Particle->Location;
+		const FVector Extent(GetParticleRadius(*Particle) * MaxScale);
+		NewBox.Expand(FBox(Center - Extent, Center + Extent));
 	}
 	BoundingBox = NewBox;
 }

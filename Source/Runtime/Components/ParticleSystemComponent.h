@@ -37,6 +37,7 @@ public:
 	bool HasCompleted() const { return bWasCompleted; }
 
 	FPrimitiveSceneProxy* CreateSceneProxy() override;
+	FBox CalcBounds() const override;
 	FBox CalcLocalBounds() const override;
 
 private:

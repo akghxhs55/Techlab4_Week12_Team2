@@ -30,7 +30,9 @@ protected:
 	void ResetParticleParameters(float DeltaTime) override;
 	void PostSpawn(FBaseParticle* Particle, float SpawnTime) override;
 	void UpdateBoundingBox(float DeltaTime) override;
+	float GetParticleRadius(const FBaseParticle& Particle) const override;
 
 private:
 	UParticleModuleTypeDataMesh* MeshTypeData = nullptr;
+	float MeshRadius = 0.0f;   // 메시 원점에서 가장 먼 꼭짓점까지. UpdateBoundingBox마다 갱신
 };

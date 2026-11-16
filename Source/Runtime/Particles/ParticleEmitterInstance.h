@@ -41,7 +41,7 @@ struct FParticleEmitterInstance
 	TArray<uint8> BurstFired;     // Burst별 이번 루프에 터졌는지
 	FRandomStream RandomStream;
 
-	FBox BoundingBox;
+	FBox BoundingBox;   // 월드 공간. 파티클 크기와 컴포넌트 스케일까지 포함
 
 	virtual void Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent);
 	virtual bool Resize(int32 NewMaxActiveParticles);
@@ -57,6 +57,7 @@ struct FParticleEmitterInstance
 	FVector SimulationToWorld(const FVector& SimulationPosition) const;
 	// 에미터 기준 방향/오프셋 → 시뮬레이션 공간 (회전·스케일만, 이동 제외)
 	FVector EmitterToSimulationVector(const FVector& EmitterVector) const;
+	FVector GetComponentScale() const;
 
 protected:
 	// 서브클래스가 파티클마다 추가로 필요한 바이트 수. Init 안에서 불린다
@@ -70,6 +71,8 @@ protected:
 	virtual void PreSpawn(FBaseParticle* Particle, const FVector& InitialLocation);
 	virtual void PostSpawn(FBaseParticle* Particle, float SpawnTime);
 	virtual void UpdateBoundingBox(float DeltaTime);
+	// 스케일 적용 전 파티클 중심에서 가장 먼 점까지의 거리
+	virtual float GetParticleRadius(const FBaseParticle& Particle) const;
 
 	FBaseParticle* GetParticle(int32 SlotIndex) const;   // ParticleData + SlotIndex × ParticleStride
 	void FreeParticleMemory();                           // 블록 해제 + MaxActiveParticles = 0

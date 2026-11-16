@@ -527,6 +527,9 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 						Header.Items.Reset();
 						Header.Sampler = ESamplerState::LinearClamp;
 
+						// 데칼 셰이더에는 인스턴싱 변형이 없어 파티클 인스턴스가 원점에 겹쳐 그려진다. 헤더는 인덱스를 맞추려고 남긴다
+						if (Src.InstanceBuffer) continue;
+
 						for (uint32 ItemIndex = 0; ItemIndex < static_cast<uint32>(Src.Items.Num()); ItemIndex++)
 						{
 							const FMeshDrawBatch::FItem& Item = Src.Items[ItemIndex];

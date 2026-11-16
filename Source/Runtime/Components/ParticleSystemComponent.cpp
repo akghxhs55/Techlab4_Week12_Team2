@@ -239,51 +239,30 @@ FPrimitiveSceneProxy* UParticleSystemComponent::CreateSceneProxy()
 	return new FParticleSystemSceneProxy(this);
 }
 
-FBox UParticleSystemComponent::CalcLocalBounds() const
+FBox UParticleSystemComponent::CalcBounds() const
 {
-	FBox SimBounds(FVector(FLT_MAX), FVector(-FLT_MAX));
+	// 에미터가 자기 공간(Local/World)에 맞춰 월드 박스를 만들어 두므로 합치기만 한다
+	FBox Bounds(FVector(FLT_MAX), FVector(-FLT_MAX));
 	bool bAny = false;
-	bool bLocalSpace = false;
-	// 위치만 담긴 박스라 스프라이트 크기만큼 기본 여유를 준다
-	float PadSize = 50.0f;
 	for (FParticleEmitterInstance* Instance : EmitterInstances)
 	{
 		if (!Instance || Instance->ActiveParticles == 0)
 			continue;
-		SimBounds.Expand(Instance->BoundingBox);
-		bLocalSpace = Instance->IsLocalSpace();
+		Bounds.Expand(Instance->BoundingBox);
 		bAny = true;
-
-		// 메시 파티클은 메시 반경 × 최대 크기만큼 튀어나온다
-		const FParticleMeshEmitterInstance* MeshInstance = dynamic_cast<const FParticleMeshEmitterInstance*>(Instance);
-		const UParticleModuleTypeDataMesh* TypeData = MeshInstance ? MeshInstance->GetMeshTypeData() : nullptr;
-		const UStaticMesh* Mesh = TypeData ? TypeData->GetMesh() : nullptr;
-		if (Mesh)
-		{
-			const FBox& MeshBounds = Mesh->GetRenderBounds();
-			const FVector MaxCorner(
-				std::max(std::abs(MeshBounds.Min.X), std::abs(MeshBounds.Max.X)),
-				std::max(std::abs(MeshBounds.Min.Y), std::abs(MeshBounds.Max.Y)),
-				std::max(std::abs(MeshBounds.Min.Z), std::abs(MeshBounds.Max.Z)));
-			const float MeshRadius = MaxCorner.Length();
-
-			float MaxParticleSize = 0.0f;
-			ParticleHelper::ForEachParticle(*Instance, [&](FBaseParticle& Particle, uint8*)
-				{
-					MaxParticleSize = std::max(MaxParticleSize,
-						std::max(std::abs(Particle.Size.X), std::max(std::abs(Particle.Size.Y), std::abs(Particle.Size.Z))));
-				});
-			PadSize = std::max(PadSize, MeshRadius * MaxParticleSize);
-		}
 	}
 	if (!bAny)
-		return FBox(FVector(-1.0f), FVector(1.0f));
+	{
+		const FVector Location = GetWorldLocation();
+		return FBox(Location - FVector(1.0f), Location + FVector(1.0f));
+	}
+	return Bounds;
+}
 
-	const FVector Pad(PadSize);
-	SimBounds = FBox(SimBounds.Min - Pad, SimBounds.Max + Pad);
-
-	// 프록시가 LocalToWorld를 다시 곱하므로 World Space면 로컬로 되돌린다
-	return bLocalSpace ? SimBounds : SimBounds.GetWorldAABB(GetWorldMatrix().Inverse());
+FBox UParticleSystemComponent::CalcLocalBounds() const
+{
+	// 로컬 박스를 요구하는 곳(디버그 박스)용. 회전이 있으면 실제보다 커진다
+	return CalcBounds().GetWorldAABB(GetWorldMatrix().Inverse());
 }
 
 

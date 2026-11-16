@@ -49,8 +49,7 @@ void FPrimitiveSceneProxy::UpdateTransform()
 {
     LocalToWorld = Component->GetWorldMatrix();
     WorldToLocal = LocalToWorld.Inverse();
-    const FBox LocalBounds = Mesh ? Mesh->GetRenderBounds() : Component->CalcLocalBounds();
-    Bounds = MakeWorldBounds(LocalBounds.GetWorldAABB(LocalToWorld));
+    Bounds = MakeWorldBounds(Mesh ? Mesh->GetRenderBounds().GetWorldAABB(LocalToWorld) : Component->CalcBounds());
 }
 
 void FPrimitiveSceneProxy::UpdateRenderState()
