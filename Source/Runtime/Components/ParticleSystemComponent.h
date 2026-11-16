@@ -1,13 +1,13 @@
 #pragma once
 
 #include "PrimitiveComponent.h"
+#include "Particles/ParticleSystem.h"
 #include "ParticleSystemComponent.generated.h"
 
 class UWorld;
 class FLineBatcher;
 class AActor;
 class UObject;
-class UParticleSystem;
 struct FParticleEmitterInstance;
 
 UCLASS()
@@ -40,12 +40,8 @@ public:
 	FBox CalcLocalBounds() const override;
 
 private:
-	// 에셋이 없을 때 쓰는 테스트 템플릿
-	void CreateDefaultTemplate();
-	void DestroyOwnedTemplate();
-
+	UPROPERTY(EditAnywhere)
 	UParticleSystem* Template = nullptr;
-	bool bOwnsTemplate = false;
 
 	TArray<FParticleEmitterInstance*> EmitterInstances;
 	bool bWasCompleted = false;

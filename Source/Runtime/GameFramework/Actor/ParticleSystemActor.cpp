@@ -7,6 +7,9 @@ AParticleSystemActor::AParticleSystemActor()
 	ParticleSystemComponent = CreateDefaultSubobject<UParticleSystemComponent>("UParticleSystemComponent");
 	SetRootComponent(ParticleSystemComponent);
 
+	UParticleSystem* DefaultTemplate = UAssetManager::LoadParticleSystem("Particles/DefaultTest.particle");
+	ParticleSystemComponent->InitializeSystem(DefaultTemplate);
+
 	BillboardComponent = CreateDefaultSubobject<UBillboardComponent>("UBillboardComponent");
 	BillboardComponent->SetEditorIcon(true);
 	BillboardComponent->SetIconSize(2.0f);
