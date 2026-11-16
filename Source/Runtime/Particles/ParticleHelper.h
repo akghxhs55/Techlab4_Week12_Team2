@@ -42,4 +42,18 @@ namespace ParticleHelper
 	{
 		return GetPayload<T>(reinterpret_cast<uint8*>(&Particle), Offset);
 	}
+
+	// 렌더처럼 읽기만 하는 쪽용
+	template <typename T>
+	inline const T& GetPayload(const uint8* ParticleBase, int32 Offset)
+	{
+		assert(Offset >= static_cast<int32>(sizeof(FBaseParticle)) && "Payload가 없는 모듈에서 GetPayload 호출");
+		return *reinterpret_cast<const T*>(ParticleBase + Offset);
+	}
+
+	template <typename T>
+	inline const T& GetPayload(const FBaseParticle& Particle, int32 Offset)
+	{
+		return GetPayload<T>(reinterpret_cast<const uint8*>(&Particle), Offset);
+	}
 }

@@ -54,6 +54,8 @@ public:
 	void ScanShaders(const fs::path& ShaderRoot);
 	static void Shutdown();
 	static FShaderProgram* GetShaderProgram(const FString& InPath);
+	// 변형이 있는지 확인할 때 쓴다. 없으면 로그와 기본 셰이더 대체 없이 nullptr
+	static FShaderProgram* FindShaderProgram(const FString& InPath);
 
 	static FPipelineState* GetPSO(const EPSOType& InType);
 	static FShaderProgram* GetForwardShaderProgram(ELightingModel Model);
@@ -61,6 +63,7 @@ private:
 	
 	void LoadOrCompileShader(const FString& Path);
 	void CreateSkinnedVariant(const FString& Path, const char* LightingMacro, const FShaderProgram& Base);
+	void CreateParticleInstanceVariant(const FString& Path, const char* LightingMacro, const FShaderProgram& Base);
 	void InitPipelineStates();
 
 	TMap<FString, TUniquePtr<FVertexShader>> VertexShaderMap;
