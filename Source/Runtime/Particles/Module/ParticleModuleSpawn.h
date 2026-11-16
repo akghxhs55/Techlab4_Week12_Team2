@@ -9,10 +9,16 @@
 struct FRandomStream;
 
 // 정해진 시간에 한 번에 터뜨리는 생성
+USTRUCT()
 struct FParticleBurst
 {
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
 	int32 Count = 0;      // 생성 개수
+	UPROPERTY(EditAnywhere)
 	int32 CountLow = -1;  // -1이면 Count 고정, 아니면 [CountLow, Count] 랜덤
+	UPROPERTY(EditAnywhere)
 	float Time = 0.0f;    // 루프 안 시간
 };
 
@@ -36,7 +42,10 @@ public:
 	void ClearBursts() { BurstList.Empty(); }
 
 private:
+	UPROPERTY(EditAnywhere)
 	FFloatDistribution Rate;        // 초당 생성 수
+	UPROPERTY(EditAnywhere)
 	FFloatDistribution RateScale;   // Rate에 곱하는 배율
+	UPROPERTY(EditAnywhere)
 	TArray<FParticleBurst> BurstList;
 };

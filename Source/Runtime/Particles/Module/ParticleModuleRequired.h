@@ -1,10 +1,9 @@
 #pragma once
 
 #include "Core/Types.h"
+#include "Render/Material.h"
 #include "Particles/ParticleModule.h"
 #include "ParticleModuleRequired.generated.h"
-
-class UMaterial;
 
 UENUM()
 enum class EParticleSubUVInterpMethod : uint8
@@ -98,6 +97,7 @@ private:
 	UPROPERTY(EditAnywhere)
 	float RandomImageTime = 0.0f;
 
+	UPROPERTY(EditAnywhere)
 	UMaterial* Material = nullptr;
 
 	UPROPERTY(EditAnywhere)

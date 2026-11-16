@@ -46,7 +46,6 @@ private:
 
 	UParticleSystem* Template = nullptr;
 	bool bOwnsTemplate = false;
-	TArray<UObject*> OwnedObjects;   // CreateDefaultTemplate이 만든 것. 소멸자에서 delete
 
 	TArray<FParticleEmitterInstance*> EmitterInstances;
 	bool bWasCompleted = false;

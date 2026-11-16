@@ -30,5 +30,6 @@ public:
 protected:
 	bool bSpawnModule = false;   // true면 파티클이 생성될 때 호출되는 모듈
 	bool bUpdateModule = false;  // true면 파티클이 갱신될 때 호출되는 모듈
+	UPROPERTY(EditAnywhere)
 	bool bEnabled = true;      // false면 모듈이 비활성화되어 호출되지 않는다.
 };

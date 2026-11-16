@@ -19,5 +19,6 @@ public:
 	FVectorDistribution& GetStartSize() { return StartSize; }
 
 private:
+	UPROPERTY(EditAnywhere) 
 	FVectorDistribution StartSize;
 };

@@ -32,5 +32,6 @@ private:
 		const FBaseParticle& Particle, FFullSubUVPayload& Payload) const;
 
 	// Linear 모드: RelativeTime(0~1) → 칸 번호
+	UPROPERTY(EditAnywhere)
 	FFloatDistribution SubImageIndex;
 };

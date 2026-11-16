@@ -179,7 +179,6 @@ void UParticleSystemComponent::CreateDefaultTemplate()
 	// 인스턴스 Init 전에 ParticleSize 계산이 끝나 있어야 한다
 	System->BuildEmitters();
 
-	OwnedObjects = { Required, Spawn, Lifetime, Location, Velocity, Size, Color, SubUV, LOD, Emitter, System };
 	Template = System;
 	bOwnsTemplate = true;
 }
@@ -189,11 +188,7 @@ void UParticleSystemComponent::DestroyOwnedTemplate()
 	if (!bOwnsTemplate)
 		return;
 
-	for (UObject* Object : OwnedObjects)
-	{
-		delete Object;
-	}
-	OwnedObjects.Empty();
+	delete Template;
 	Template = nullptr;
 	bOwnsTemplate = false;
 }

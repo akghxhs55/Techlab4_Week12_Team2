@@ -15,6 +15,8 @@ class UParticleEmitter : public UObject
 {
 	GENERATED_BODY()
 public:
+	virtual ~UParticleEmitter() override;
+
 	// 모듈 구성이 바뀐 뒤 한 번 호출
 	void Build();
 
@@ -27,6 +29,9 @@ public:
 
 	int32 GetParticleSize() const { return ParticleSize; }
 	int32 GetModuleOffset(UParticleModule* Module) const;   // Payload가 없는 모듈이면 0
+
+	using Super::Serialize; // FArchive& 오버로드가 가려지지 않도록
+	virtual void Serialize(FStructuredArchive::FRecord Record) override;
 
 private:
 	// 파티클 한 칸의 크기와 모듈별 Payload 오프셋을 계산

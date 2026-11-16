@@ -13,9 +13,12 @@ class UParticleLODLevel : public UObject
 {
 	GENERATED_BODY()
 public:
+	virtual ~UParticleLODLevel() override;
+
 	// Modules를 보고 SpawnModules, UpdateModules를 다시 만든다.
 	void UpdateModuleLists();
 
+	void SetLevel(int32 InLevel) { Level = InLevel; }
 	int32 GetLevel() const { return Level; }
 	bool  IsEnabled() const { return bEnabled; }
 	void  SetEnabled(bool bInEnabled) { bEnabled = bInEnabled; }
@@ -35,9 +38,15 @@ public:
 	const TArray<UParticleModule*>& GetSpawnModules() const { return SpawnModules; }
 	const TArray<UParticleModule*>& GetUpdateModules() const { return UpdateModules; }
 
+	using Super::Serialize; // FArchive& 오버로드가 가려지지 않도록
+	virtual void Serialize(FStructuredArchive::FRecord Record) override;
+
 private:
 	int32 Level = 0;
+
+	UPROPERTY(EditAnywhere)
 	bool  bEnabled = true;
+
 	UParticleModuleRequired* RequiredModule = nullptr;
 	UParticleModuleSpawn*    SpawnModule = nullptr;
 	TArray<UParticleModule*> Modules;
