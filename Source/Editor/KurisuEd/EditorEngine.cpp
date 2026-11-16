@@ -803,7 +803,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 		if (CapturedViewportIndex != -1 && WheelDelta != 0)
 		{
 			auto& Settings = EditorSettings->GetMutableSettings();
-			Settings.CameraSpeed = FMath::Clamp(Settings.CameraSpeed * powf(1.2f, WheelDelta / 120.0f), 0.1f, 10.0f);
+			Settings.CameraSpeed = FMath::Clamp(Settings.CameraSpeed * powf(1.2f, WheelDelta / 120.0f), 0.1f, 100.0f);
 			WheelDelta = 0;
 		}
 		const float MoveSpeed = 10.0f * EditorSettings->GetSettings().CameraSpeed;
