@@ -8,6 +8,13 @@
 
 namespace
 {
+	bool IsDedicatedSlotModuleClass(const UClass* Class)
+	{
+		return Class->IsChildOf(UParticleModuleRequired::StaticClass()) ||
+			Class->IsChildOf(UParticleModuleSpawn::StaticClass()) ||
+			Class->IsChildOf(UParticleModuleTypeDataBase::StaticClass());
+	}
+
 	UParticleModule* CreateModuleByClassName(UObject* Outer, const FString& ClassName)
 	{
 		UClass* Class = FindClass(ClassName);
@@ -17,9 +24,7 @@ namespace
 			return nullptr;
 		}
 
-		if (Class->IsChildOf(UParticleModuleRequired::StaticClass()) ||
-			Class->IsChildOf(UParticleModuleSpawn::StaticClass()) ||
-			Class->IsChildOf(UParticleModuleTypeDataBase::StaticClass()))
+		if (IsDedicatedSlotModuleClass(Class))
 		{
 			KRS_LOG(Warning, "Particle module '{}' cannot be in the module list, dropped", ClassName);
 			return nullptr;
@@ -71,12 +76,50 @@ void UParticleLODLevel::AddModule(UParticleModule* InModule)
 	UpdateModuleLists();
 }
 
-void UParticleLODLevel::RemoveModule(UParticleModule* InModule)
+int32 UParticleLODLevel::FindModuleIndex(const UParticleModule* InModule) const
 {
-	if (!InModule)
-		return;
-	Modules.Remove(InModule);
+	for (int32 i = 0; i < Modules.Num(); ++i)
+	{
+		if (Modules[i] == InModule)
+			return i;
+	}
+	return -1;
+}
+
+bool UParticleLODLevel::InsertModule(UParticleModule* InModule, int32 Index)
+{
+	if (!InModule || Modules.Contains(InModule) || IsDedicatedSlotModuleClass(InModule->GetClass()))
+		return false;
+
+	Index = (std::clamp)(Index, 0, Modules.Num());
+	Modules.Insert(InModule, static_cast<uint32>(Index));
 	UpdateModuleLists();
+	return true;
+}
+
+bool UParticleLODLevel::RemoveModule(const UParticleModule* InModule)
+{
+	const int32 Index = FindModuleIndex(InModule);
+	if (Index < 0)
+		return false;
+
+	Modules.RemoveAt(static_cast<uint32>(Index));
+	UpdateModuleLists();
+	return true;
+}
+
+bool UParticleLODLevel::MoveModule(int32 From, int32 To)
+{
+	if (!Modules.IsValidIndex(From) || !Modules.IsValidIndex(To))
+		return false;
+	if (From != To)
+	{
+		UParticleModule* Module = Modules[From];
+		Modules.RemoveAt(static_cast<uint32>(From));
+		Modules.Insert(Module, static_cast<uint32>(To));
+		UpdateModuleLists();
+	}
+	return true;
 }
 
 void UParticleLODLevel::Serialize(FStructuredArchive::FRecord Record)

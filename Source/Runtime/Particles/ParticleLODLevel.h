@@ -34,8 +34,12 @@ public:
 	void SetTypeDataModule(UParticleModuleTypeDataBase* InModule) { TypeDataModule = InModule; }
 
 	const TArray<UParticleModule*>& GetModules() const { return Modules; }
+	int32 FindModuleIndex(const UParticleModule* InModule) const;
 	void AddModule(UParticleModule* InModule);
-	void RemoveModule(UParticleModule* InModule);
+	bool InsertModule(UParticleModule* InModule, int32 Index);
+	// 해제는 호출자 책임. 없으면 false
+	bool RemoveModule(const UParticleModule* InModule);
+	bool MoveModule(int32 From, int32 To);
 
 	// UpdateModuleLists()만 채운다. 바깥에서는 읽기만 한다.
 	const TArray<UParticleModule*>& GetSpawnModules() const { return SpawnModules; }

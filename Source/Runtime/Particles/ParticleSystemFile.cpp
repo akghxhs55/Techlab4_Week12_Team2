@@ -16,6 +16,48 @@
 #include "Serialization/Formatter/JsonArchiveInputFormatter.h"
 #include "Serialization/Formatter/JsonArchiveOutputFormatter.h"
 
+bool ParticleSystemFile::SaveToBytes(UParticleSystem& ParticleSystem, TArray<uint8>& OutBytes, FString& OutError)
+{
+    OutError.clear();
+    OutBytes.Empty();
+    FMemoryWriter Writer(OutBytes);
+    {
+        FJsonArchiveOutputFormatter Formatter(Writer);
+        FStructuredArchive Archive(Formatter);
+        ParticleSystem.Serialize(Archive.Open().EnterRecord());
+    }
+
+    if (Writer.IsError())
+    {
+        OutError = "ParticleSystem: cannot serialize data";
+        return false;
+    }
+    return true;
+}
+
+bool ParticleSystemFile::LoadFromBytes(const TArray<uint8>& Bytes, UParticleSystem& ParticleSystem, FString& OutError)
+{
+    OutError.clear();
+    FMemoryReader Reader(Bytes, true);
+
+    FJsonArchiveInputFormatter Formatter(Reader);
+    if (Reader.IsError())
+    {
+        OutError = "ParticleSystem: invalid JSON";
+        return false;
+    }
+    FStructuredArchive Archive(Formatter);
+    ParticleSystem.Serialize(Archive.Open().EnterRecord());
+    if (Reader.IsError())
+    {
+        OutError = "ParticleSystem: cannot serialize data";
+        return false;
+    }
+
+    ParticleSystem.BuildEmitters();
+    return true;
+}
+
 bool ParticleSystemFile::Read(const std::filesystem::path& Path, UParticleSystem& ParticleSystem, FString& OutError)
 {
     OutError.clear();
@@ -37,41 +79,20 @@ bool ParticleSystemFile::Read(const std::filesystem::path& Path, UParticleSystem
         return false;
     }
 
-    FMemoryReader Reader(Bytes, true);
-
-    FJsonArchiveInputFormatter Formatter(Reader);
-    if (Reader.IsError())
+    if (!LoadFromBytes(Bytes, ParticleSystem, OutError))
     {
-        OutError = "ParticleSystem: invalid JSON";
-        return false;
-    }
-    FStructuredArchive Archive(Formatter);
-    ParticleSystem.Serialize(Archive.Open().EnterRecord());
-    if (Reader.IsError())
-    {
-        OutError = "ParticleSystem: cannot serialize data";
         return false;
     }
 
     ParticleSystem.SetAssetPath(FAssetUtils::GetAssetKey(Path.generic_string()));
-    ParticleSystem.BuildEmitters();
     return true;
 }
 
 bool ParticleSystemFile::Write(const std::filesystem::path& Path, UParticleSystem& ParticleSystem, FString& OutError)
 {
-    OutError.clear();
     TArray<uint8> Bytes;
-    FMemoryWriter Writer(Bytes);
+    if (!SaveToBytes(ParticleSystem, Bytes, OutError))
     {
-        FJsonArchiveOutputFormatter Formatter(Writer);
-        FStructuredArchive Archive(Formatter);
-        ParticleSystem.Serialize(Archive.Open().EnterRecord());
-    }
-
-    if (Writer.IsError())
-    {
-        OutError = "ParticleSystem: cannot serialize data";
         return false;
     }
 

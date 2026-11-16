@@ -19,9 +19,19 @@ public:
 	const TArray<UParticleEmitter*>& GetEmitters() const { return Emitters; }
 	UParticleEmitter* GetEmitter(int32 Index) const { return Emitters.IsValidIndex(Index) ? Emitters[Index] : nullptr; }
 	int32 GetNumEmitters() const { return Emitters.Num(); }
+	int32 FindEmitterIndex(const UParticleEmitter* InEmitter) const;
 
 	void AddEmitter(UParticleEmitter* InEmitter);
-	void RemoveEmitter(UParticleEmitter* InEmitter);
+	bool InsertEmitter(UParticleEmitter* InEmitter, int32 Index);
+	// 배열에서 빼서 돌려준다(없으면 nullptr). 해제는 호출자 책임
+	UParticleEmitter* RemoveEmitter(UParticleEmitter* InEmitter);
+	bool MoveEmitter(int32 From, int32 To);
+	void ClearEmitters();
+
+	// 에디터용 복사본
+	UParticleSystem* Duplicate(FString& OutError);
+
+	bool CopyContentsFrom(UParticleSystem& Source, FString& OutError);
 
 	void SetAssetPath(const FString& Path) { AssetPath = Path; }
 	const FString& GetAssetPath() const { return AssetPath; }
