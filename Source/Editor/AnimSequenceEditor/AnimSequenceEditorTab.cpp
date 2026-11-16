@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "AnimSequenceEditorTab.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "AnimSequenceEditor.h"
 #include "Editor/SkeletalPreviewEditor/SkeletalPreviewViewportPanel.h"
 #include "Panels/AnimTimelinePanel.h"
@@ -23,19 +24,23 @@ void FAnimSequenceEditorTab::BeforeRender()
     AnimEditor.SetViewportState(0, 0, {});
 }
 
-void FAnimSequenceEditorTab::DrawMenuBar()
+bool FAnimSequenceEditorTab::DrawFileMenuItems()
 {
-    if (ImGui::BeginMenu("Viewer"))
+    if (ImGui::MenuItem("Save", "Ctrl+S", false, AnimEditor.IsDirty()))
     {
-        if (ImGui::MenuItem("Save", "Ctrl+S", false, AnimEditor.IsDirty()))
-        {
-            AnimEditor.Save();
-        }
-        if (ImGui::MenuItem("Revert to Saved", nullptr, false, AnimEditor.IsDirty()))
-        {
-            AnimEditor.RevertToSaved();
-        }
-        ImGui::Separator();
+        AnimEditor.Save();
+    }
+    if (ImGui::MenuItem("Revert to Saved", nullptr, false, AnimEditor.IsDirty()))
+    {
+        AnimEditor.RevertToSaved();
+    }
+    return true;
+}
+
+void FAnimSequenceEditorTab::DrawEditMenu()
+{
+    if (ImGui::BeginMenu("Edit"))
+    {
         if (ImGui::MenuItem("Undo", "Ctrl+Z", false, AnimEditor.CanUndoNotifyEdit()))
         {
             AnimEditor.UndoNotifyEdit();
@@ -44,15 +49,8 @@ void FAnimSequenceEditorTab::DrawMenuBar()
         {
             AnimEditor.RedoNotifyEdit();
         }
-        ImGui::Separator();
-        if (ImGui::MenuItem("Close Viewer"))
-        {
-            AnimEditor.Close();
-        }
         ImGui::EndMenu();
     }
-
-    EditorDock::DrawWindowMenu(Panels);
 }
 
 void FAnimSequenceEditorTab::BuildDefaultLayout(ImGuiID InDockSpaceId, const ImVec2& Size)
@@ -87,9 +85,11 @@ void FAnimSequenceEditorTab::OnRender(bool bActive)
     // 이번 프레임의 편집을 실행 취소 단계로 확정 (드래그/입력 중이면 놓을 때까지 미룬다)
     AnimEditor.CommitNotifyUndo(ImGui::IsAnyItemActive());
 
-    // 단축키: 이 탭이 보이고 있을 때만 (레벨 에디터 등 다른 탭과 겹치지 않게)
+    // 단축키: 이 탭(또는 분리된 하위 패널)에 포커스가 있을 때만 (레벨 에디터 등 다른 탭과 겹치지 않게)
     const ImGuiIO& IO = ImGui::GetIO();
-    if (bActive && IO.KeyCtrl && !IO.WantTextInput)
+    const bool bTabFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_DockHierarchy) ||
+        HasFocusedSubWindow();
+    if (bActive && bTabFocused && IO.KeyCtrl && !IO.WantTextInput)
     {
         if (ImGui::IsKeyPressed(ImGuiKey_S, false) && AnimEditor.IsDirty())
         {
@@ -152,7 +152,7 @@ void FAnimSequenceEditorTab::DrawUnsavedChangesPrompt()
 
         if (!AnimEditor.GetSaveMessage().empty() && AnimEditor.GetSaveMessage().rfind("Save failed", 0) == 0)
         {
-            ImGui::TextColored(ImVec4(1.0f, 0.4f, 0.3f, 1.0f), "%s", AnimEditor.GetSaveMessage().c_str());
+            ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "%s", AnimEditor.GetSaveMessage().c_str());
         }
         ImGui::EndPopup();
     }

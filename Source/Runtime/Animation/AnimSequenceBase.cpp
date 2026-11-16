@@ -378,7 +378,7 @@ void UAnimSequenceBase::SerializeNotifyEvents(FArchive& Ar, TArray<FAnimNotifyTr
                 else
                 {
                     // 클래스가 지워졌거나 이름이 바뀌었다. 프로퍼티는 읽고 버린다.
-                    HTR_LOG(Warning, "AnimSequence notify class not found, dropped: {}", ClassName);
+                    KRS_LOG(Warning, "AnimSequence notify class not found, dropped: {}", ClassName);
                 }
             }
 
@@ -432,7 +432,7 @@ void UAnimSequenceBase::SerializeNotifyEvents(FArchive& Ar, TArray<FAnimNotifyTr
                 {
                     const FProperty* Property = NotifyObject->GetClass()->FindPropertyByName(PropName);
                     if (!Property || TypeName != Property->GetClass()->GetName() || !ReadPropertyBlob(*Property, NotifyObject, Blob))
-                        HTR_LOG(Warning, "AnimSequence notify property skipped: {}.{}", ClassName, PropName);
+                        KRS_LOG(Warning, "AnimSequence notify property skipped: {}.{}", ClassName, PropName);
                 }
             }
 

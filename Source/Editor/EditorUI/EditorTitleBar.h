@@ -14,7 +14,7 @@ class FWindow;
 namespace EditorTitleBar
 {
 	// 창의 기본 제목 표시줄을 끈다. ImGui 초기화 뒤에 한 번 호출한다.
-	void Install(FWindow& Window);
+	void Install(FWindow& Window, bool bShowVersionTooltip = false);
 	// 창을 닫기 전에 호출한다. 다른 창(프로젝트 브라우저 다음의 에디터)이 다시 Install할 수 있다.
 	void Uninstall();
 

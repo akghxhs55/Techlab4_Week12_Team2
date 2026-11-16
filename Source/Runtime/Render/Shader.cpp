@@ -152,7 +152,7 @@ void FVertexShader::InputLayoutReflection(ID3D11Device* Device, const FShaderByt
 	HRESULT hr = Device->CreateInputLayout(InputLayoutDesc.GetData(), InputLayoutDesc.Num(), ByteCode.GetData(), ByteCode.GetSize(), InputLayout.GetAddressOf());
 
 	if (FAILED(hr))
-		HTR_LOG(Error, "[Shader] CreateInputLayout Failed!");
+		KRS_LOG(Error, "[Shader] CreateInputLayout Failed!");
 
 }
 

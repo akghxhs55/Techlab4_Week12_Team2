@@ -40,8 +40,8 @@ struct FTextVertex
 	FVector2 UV;
 };
 
-// Todo: subuv
-struct FParticleVertex
+// 빌보드 쿼드(BillboardQuad) 정점
+struct FBillboardVertex
 {
 	FVector Position;
 	FVector2 UV;

@@ -1,6 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/Viewports/LevelEditorViewport.h"
-#include "Editor/HitoriEd/Editor.h"
+#include "Editor/KurisuEd/Editor.h"
 #include "Launch/LaunchEngineLoop.h"
 #include "Render/Renderer.h"
 #include "Render/SceneRenderer.h"
@@ -191,7 +191,7 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 				case ELevelViewportType::Left: GridPlane = EGridPlane::XZ; break;
 				default: break;
 				}
-				DrawHelper.OnRenderBatchGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
+				DrawHelper.OnRenderGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
 					SceneView.ViewForward, GridPlane,
 					static_cast<float>(Settings.GridSpacing),
 					SceneView.bIsPerspective, ViewportSetting);

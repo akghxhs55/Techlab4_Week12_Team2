@@ -1,0 +1,38 @@
+#include <winresrc.h>
+#include "../../Runtime/Core/Windows/ResourceIds.h"
+#include "../../Runtime/Core/Misc/Version.h"
+
+#pragma code_page(65001)
+
+IDI_ICON2 ICON "../../../EngineResources/Icons/KurisuLogoReverse.ico"
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION KURISU_VERSION_TUPLE
+ PRODUCTVERSION KURISU_VERSION_TUPLE
+ FILEFLAGSMASK 0x3fL
+#ifdef _DEBUG
+ FILEFLAGS 0x1L
+#else
+ FILEFLAGS 0x0L
+#endif
+ FILEOS 0x40004L
+ FILETYPE 0x1L
+ FILESUBTYPE 0x0L
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "041204b0"
+        BEGIN
+            VALUE "CompanyName", "Kurisu Engine"
+            VALUE "FileDescription", "Kurisu Engine Game"
+            VALUE "FileVersion", KURISU_VERSION_STRING
+            VALUE "LegalCopyright", "Copyright (C) 2026 Kurisu Engine"
+            VALUE "ProductName", "Kurisu Engine"
+            VALUE "ProductVersion", KURISU_VERSION_STRING
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x412, 1200
+    END
+END

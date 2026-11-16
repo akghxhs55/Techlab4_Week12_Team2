@@ -2,7 +2,7 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "Editor/AssetEditor/AssetEditorTab.h"
 #include "Editor/AssetEditor/EditorManager.h"
-#include "Editor/HitoriEd/EditorEngine.h"
+#include "Editor/KurisuEd/EditorEngine.h"
 #include "Engine/World.h"
 #include "Render/Renderer.h"
 #include "Render/SceneRenderer.h"

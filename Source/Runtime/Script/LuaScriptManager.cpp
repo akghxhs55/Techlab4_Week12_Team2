@@ -40,7 +40,7 @@ void FLuaScriptManager::Initialize()
 				sol::protected_function_result Str = ToString(Arg);
 				Line += Str.valid() ? Str.get<FString>() : FString("<?>");
 			}
-			HTR_LOG(Info, "[Lua] {}", Line);
+			KRS_LOG(Info, "[Lua] {}", Line);
 		});
 
 	FLuaBindings::Register(*State);
@@ -121,18 +121,18 @@ bool FLuaScriptManager::CreateScriptFromTemplate(const FString& Path)
 	// 같은 이름 파일이 이미 있으면 덮어쓰지 않고 연결만 한다 (실수로 작업한 코드를 날리지 않게)
 	if (fs::exists(Dest, Ec))
 	{
-		HTR_LOG(Info, "[Lua] Connect To Existing Script: {}", Path);
+		KRS_LOG(Info, "[Lua] Connect To Existing Script: {}", Path);
 		return true;
 	}
 
 	fs::create_directories(Dest.parent_path(), Ec);
 	if (!fs::copy_file(ToPath(GetTemplatePath()), Dest, Ec))
 	{
-		HTR_LOG(Error, "[Lua] Failed To Copy Template: {} → {}", GetTemplatePath(), Path);
+		KRS_LOG(Error, "[Lua] Failed To Copy Template: {} → {}", GetTemplatePath(), Path);
 		return false;
 	}
 
-	HTR_LOG(Info, "[Lua] Create Script: {}", Path);
+	KRS_LOG(Info, "[Lua] Create Script: {}", Path);
 	return true;
 }
 
@@ -156,7 +156,7 @@ bool FLuaScriptManager::OpenScriptInEditor(const FString& Path)
 
 	if (Result <= 32)
 	{
-		HTR_LOG(Error, "[Lua] 편집기를 열 수 없습니다 (코드 : {}): {}", static_cast<int>(Result), Path);
+		KRS_LOG(Error, "[Lua] Cannot open the editor (code: {}): {}", static_cast<int>(Result), Path);
 		return false;
 	}
 

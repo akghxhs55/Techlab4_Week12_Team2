@@ -59,7 +59,7 @@ struct FEnumInfo
     }
 };
 
-// UENUM이 붙은 enum만 HHT가 특수화한다. 특수화가 없는 enum을 UPROPERTY로 쓰면 UClass::AddProperty의 static_assert가 막는다.
+// UENUM이 붙은 enum만 KHT가 특수화한다. 특수화가 없는 enum을 UPROPERTY로 쓰면 UClass::AddProperty의 static_assert가 막는다.
 template <typename T>
 struct TEnumInfo
 {

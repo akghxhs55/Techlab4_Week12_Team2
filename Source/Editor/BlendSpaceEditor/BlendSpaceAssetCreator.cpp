@@ -86,7 +86,7 @@ bool FBlendSpaceAssetCreator::CreateAsset(const std::filesystem::path& Target)
     FString ErrorMessage;
     if (!BlendSpaceFile::Write(Target, *BlendSpace, ErrorMessage))
     {
-        HTR_LOG(Warning, "Failed to create BlendSpace: {}", ErrorMessage);
+        KRS_LOG(Warning, "Failed to create BlendSpace: {}", ErrorMessage);
         MessageBoxW(GetActiveWindow(), L"Failed to save BlendSpace. See Output Log.", L"Create BlendSpace", MB_OK | MB_ICONERROR);
         return false;
     }

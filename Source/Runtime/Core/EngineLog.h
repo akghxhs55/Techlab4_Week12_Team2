@@ -28,4 +28,4 @@ public:
     }
 };
 
-#define HTR_LOG(Verbosity, ...) FLog::Log(ELogVerbosity::Verbosity, __VA_ARGS__)
+#define KRS_LOG(Verbosity, ...) FLog::Log(ELogVerbosity::Verbosity, __VA_ARGS__)

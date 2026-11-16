@@ -24,11 +24,11 @@ namespace
     constexpr float EndHandleWidth = 5.0f;   // 막대 안쪽으로 잡히는 폭
     constexpr float EndHandleSlop = 3.0f;    // 막대 바깥으로 더 잡히는 폭 (짧은 막대도 잡기 쉽게)
 
-    const ImU32 RowColorA = IM_COL32(30, 33, 36, 255);
-    const ImU32 RowColorB = IM_COL32(35, 38, 42, 255);
-    const ImU32 NamedNotifyColor = IM_COL32(230, 190, 80, 255);    // 이름 Notify
-    const ImU32 ClassNotifyColor = IM_COL32(90, 190, 230, 255);    // UAnimNotify
-    const ImU32 NotifyStateColor = IM_COL32(170, 120, 220, 255);   // UAnimNotifyState
+    const ImU32 RowColorA = EditorColor::BgElevated;
+    const ImU32 RowColorB = EditorColor::BgElevatedAlt;
+    const ImU32 NamedNotifyColor = EditorColor::Warning;    // 이름 Notify
+    const ImU32 ClassNotifyColor = EditorColor::CategoryBlue;    // UAnimNotify
+    const ImU32 NotifyStateColor = EditorColor::CategoryPurple;   // UAnimNotifyState
 
     const UObject* NotifyObjectOf(const FAnimNotifyEvent& Event)
     {
@@ -202,12 +202,12 @@ void FAnimTimelinePanel::DrawTransport()
     EditorStyle::SameLineOrWrap(EditorStyle::Scale(180.0f));
     if (bDirty)
     {
-        ImGui::TextColored(ImVec4(1.0f, 0.8f, 0.3f, 1.0f), "Unsaved changes");
+        ImGui::TextColored(EditorColor::ToVec4(EditorColor::Warning), "Unsaved changes");
     }
     else if (!Editor.GetSaveMessage().empty())
     {
         const bool bFailed = Editor.GetSaveMessage().rfind("failed") != FString::npos;
-        ImGui::TextColored(bFailed ? ImVec4(1.0f, 0.4f, 0.3f, 1.0f) : ImVec4(0.6f, 0.8f, 0.6f, 1.0f), "%s", Editor.GetSaveMessage().c_str());
+        ImGui::TextColored(bFailed ? EditorColor::ToVec4(EditorColor::Error) : EditorColor::ToVec4(EditorColor::Success), "%s", Editor.GetSaveMessage().c_str());
     }
 }
 
@@ -234,7 +234,7 @@ void FAnimTimelinePanel::DrawTrack()
     const float PixelsPerSecond = Length > 0.0f ? Width / Length : 1.0f;   // 클립 전체를 한 화면에
     ImGui::SetCursorScreenPos(Origin);
 
-    Draw->AddRectFilled(Origin, ImVec2(Origin.x + Width, Origin.y + RulerHeight), IM_COL32(40, 44, 48, 255));
+    Draw->AddRectFilled(Origin, ImVec2(Origin.x + Width, Origin.y + RulerHeight), EditorColor::BgHeader);
 
     // 눈금: 60픽셀 이상 간격이 나오는 가장 작은 단위를 고른다
     const float Steps[] = { 1.0f / Rate, 0.1f, 0.25f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f };
@@ -246,10 +246,10 @@ void FAnimTimelinePanel::DrawTrack()
     for (float T = 0.0f; T <= Length + 0.0001f; T += Step)
     {
         const float X = Origin.x + T * PixelsPerSecond;
-        Draw->AddLine(ImVec2(X, Origin.y + RulerHeight - 6.0f), ImVec2(X, Origin.y + RulerHeight), IM_COL32(150, 150, 150, 255));
+        Draw->AddLine(ImVec2(X, Origin.y + RulerHeight - 6.0f), ImVec2(X, Origin.y + RulerHeight), EditorColor::TextMuted);
         char Label[16];
         std::snprintf(Label, sizeof(Label), "%.2f", T);
-        Draw->AddText(ImVec2(X + 3.0f, Origin.y + 3.0f), IM_COL32(190, 190, 190, 255), Label);
+        Draw->AddText(ImVec2(X + 3.0f, Origin.y + 3.0f), EditorColor::TextSecondary, Label);
     }
 
     // 스크럽: 누른 동안 마우스를 잡아 두므로 영역 밖으로 끌어도 계속된다
@@ -276,7 +276,7 @@ void FAnimTimelinePanel::DrawTrack()
 
     // 플레이헤드: 눈금자부터 트랙 끝까지
     const float PlayheadX = Origin.x + Editor.GetPlaybackTime() * PixelsPerSecond;
-    Draw->AddLine(ImVec2(PlayheadX, Origin.y), ImVec2(PlayheadX, TracksOrigin.y + TracksHeight), IM_COL32(255, 80, 60, 255), 2.0f);
+    Draw->AddLine(ImVec2(PlayheadX, Origin.y), ImVec2(PlayheadX, TracksOrigin.y + TracksHeight), EditorColor::AccentBright, 2.0f);
 }
 
 void FAnimTimelinePanel::DrawTrackHeaders(const ImVec2& HeaderOrigin)
@@ -298,7 +298,7 @@ void FAnimTimelinePanel::DrawTrackHeaders(const ImVec2& HeaderOrigin)
         // 긴 이름은 칸 안에서 자른다
         Draw->PushClipRect(Min, Max, true);
         Draw->AddText(ImVec2(Min.x + 6.0f, Min.y + (NotifyRowHeight - ImGui::GetTextLineHeight()) * 0.5f),
-            IM_COL32(200, 200, 200, 255), Sequence->GetNotifyTrackName(Track).c_str());
+            EditorColor::TextSecondary, Sequence->GetNotifyTrackName(Track).c_str());
         Draw->PopClipRect();
 
         ImGui::PushID(Track);
@@ -306,7 +306,7 @@ void FAnimTimelinePanel::DrawTrackHeaders(const ImVec2& HeaderOrigin)
         ImGui::InvisibleButton("##TrackHeader", CellSize);
         if (ImGui::IsItemHovered())
         {
-            Draw->AddRect(Min, Max, IM_COL32(255, 255, 255, 50));
+            Draw->AddRect(Min, Max, EditorColor::White(50));
             ImGui::SetTooltip("Right-click: track menu\nDouble-click: rename");
         }
         if (ImGui::IsItemClicked(ImGuiMouseButton_Right))
@@ -420,7 +420,7 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
     for (int32 Row = 0; Row < NumRows; ++Row)
     {
         const float Y = TracksOrigin.y + Row * NotifyRowHeight;
-        const ImU32 RowColor = (Row == DropRow) ? IM_COL32(55, 62, 72, 255) : ((Row % 2) ? RowColorB : RowColorA);
+        const ImU32 RowColor = (Row == DropRow) ? EditorColor::BgAccentHover : ((Row % 2) ? RowColorB : RowColorA);
         Draw->AddRectFilled(ImVec2(TracksOrigin.x, Y), ImVec2(TracksMax.x, Y + NotifyRowHeight), RowColor);
     }
 
@@ -432,7 +432,7 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
         for (int32 Frame = 0; Frame <= NumFrames; ++Frame)
         {
             const float X = TracksOrigin.x + Frame * PixelsPerFrame;
-            Draw->AddLine(ImVec2(X, TracksOrigin.y), ImVec2(X, TracksMax.y), IM_COL32(255, 255, 255, 14));
+            Draw->AddLine(ImVec2(X, TracksOrigin.y), ImVec2(X, TracksMax.y), EditorColor::White(14));
         }
     }
 
@@ -443,7 +443,7 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
     const FAnimNotifyEvent* Hovered = nullptr;
     bool bHoveredEndHandle = false;   // NotifyState 막대 오른쪽 끝 (길이 조절)
     const FGuid& Selected = Editor.GetSelectedNotify();
-    const ImU32 SelectedOutline = IM_COL32(255, 255, 255, 255);
+    const ImU32 SelectedOutline = EditorColor::White(255);
 
     // State 막대를 먼저 그리고 단발 마름모를 위에 그린다 (짧은 마름모가 막대에 가려지지 않게)
     for (int32 Pass = 0; Pass < 2; ++Pass)
@@ -472,7 +472,7 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
 
                 // 라벨은 막대 안에서 잘라 그린다
                 Draw->PushClipRect(BarMin, BarMax, true);
-                Draw->AddText(ImVec2(BarMin.x + 4.0f, CenterY - ImGui::GetTextLineHeight() * 0.5f), IM_COL32(255, 255, 255, 230), Label.c_str());
+                Draw->AddText(ImVec2(BarMin.x + 4.0f, CenterY - ImGui::GetTextLineHeight() * 0.5f), EditorColor::White(230), Label.c_str());
                 Draw->PopClipRect();
 
                 // 선택되면 끝 핸들을 보여 준다
@@ -493,8 +493,8 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
                     ImVec2(StartX - Radius, CenterY),
                 };
                 Draw->AddConvexPolyFilled(Points, 4, Color);
-                Draw->AddPolyline(Points, 4, bSelected ? SelectedOutline : IM_COL32(20, 20, 20, 255), ImDrawFlags_Closed, bSelected ? 2.0f : 1.0f);
-                Draw->AddText(ImVec2(StartX + DiamondRadius + 3.0f, CenterY - ImGui::GetTextLineHeight() * 0.5f), IM_COL32(220, 220, 220, 255), Label.c_str());
+                Draw->AddPolyline(Points, 4, bSelected ? SelectedOutline : EditorColor::Ink, ImDrawFlags_Closed, bSelected ? 2.0f : 1.0f);
+                Draw->AddText(ImVec2(StartX + DiamondRadius + 3.0f, CenterY - ImGui::GetTextLineHeight() * 0.5f), EditorColor::TextSecondary, Label.c_str());
 
                 HitMin = ImVec2(StartX - DiamondRadius - 1.0f, RowTop);
                 HitMax = ImVec2(StartX + DiamondRadius + 1.0f, RowTop + NotifyRowHeight);
@@ -505,9 +505,9 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
             {
                 const int Alpha = static_cast<int>(Flash * 220.0f);
                 if (bIsState)
-                    Draw->AddRect(ImVec2(HitMin.x - 2.0f, HitMin.y - 2.0f), ImVec2(HitMax.x - EndHandleSlop + 2.0f, HitMax.y + 2.0f), IM_COL32(255, 255, 160, Alpha), 4.0f, 0, 2.0f);
+                    Draw->AddRect(ImVec2(HitMin.x - 2.0f, HitMin.y - 2.0f), ImVec2(HitMax.x - EndHandleSlop + 2.0f, HitMax.y + 2.0f), EditorColor::WithAlpha(EditorColor::Warning, Alpha), 4.0f, 0, 2.0f);
                 else
-                    Draw->AddCircle(ImVec2(StartX, CenterY), DiamondRadius + 4.0f + (1.0f - Flash) * 4.0f, IM_COL32(255, 255, 160, Alpha), 0, 2.0f);
+                    Draw->AddCircle(ImVec2(StartX, CenterY), DiamondRadius + 4.0f + (1.0f - Flash) * 4.0f, EditorColor::WithAlpha(EditorColor::Warning, Alpha), 0, 2.0f);
             }
 
             // 나중에 그린 것(위에 보이는 것)이 우선

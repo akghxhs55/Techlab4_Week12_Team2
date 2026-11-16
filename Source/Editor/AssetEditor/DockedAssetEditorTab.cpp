@@ -20,14 +20,21 @@ void FDockedAssetEditorTab::RegisterPanel(TUniquePtr<FAssetEditorPanelBase> Pane
 
 void FDockedAssetEditorTab::DrawMenuBar()
 {
-    if (ImGui::BeginMenu("Viewer"))
+    // 레벨 에디터와 같은 순서: File → (Edit) → Window
+    if (ImGui::BeginMenu("File"))
     {
-        if (ImGui::MenuItem("Close Viewer"))
+        if (DrawFileMenuItems())
+        {
+            ImGui::Separator();
+        }
+        if (ImGui::MenuItem("Close Editor"))
         {
             Editor.Close();
         }
         ImGui::EndMenu();
     }
+
+    DrawEditMenu();
 
     EditorDock::DrawWindowMenu(Panels);
 }

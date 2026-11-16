@@ -43,6 +43,9 @@ namespace ViewportToolbarWidgets
     // [아이콘][라벨][v] 버튼 폭. 라벨이 없으면 아이콘만 둔다.
     inline float IconButtonWidth(const char* Label, bool bChevron)
     {
+        // 기즈모 버튼은 UE처럼 정사각형으로, 텍스트 드롭다운은 내용 폭으로 배치한다.
+        if ((!Label || !*Label) && !bChevron)
+            return ImMax(ImGui::GetFrameHeight(), IconSize());
         const float Pad = ImGui::GetStyle().FramePadding.x;
         const float Gap = EditorStyle::Scale(5.0f);
         float Width = Pad * 2.0f + IconSize();
@@ -60,11 +63,12 @@ namespace ViewportToolbarWidgets
         const bool bEnabled = (ImGui::GetItemFlags() & ImGuiItemFlags_Disabled) == 0;
         const ImU32 Color = TextColor(bEnabled);
         const float Gap = EditorStyle::Scale(5.0f);
-        float X = Pos.x + ImGui::GetStyle().FramePadding.x;
+        const bool bIconOnly = (!Label || !*Label) && !bChevron;
+        float X = Pos.x + (bIconOnly ? (Width - IconSize()) * 0.5f : ImGui::GetStyle().FramePadding.x);
         const float CenterY = Pos.y + Height * 0.5f;
         if (const ImTextureID Texture = GetIcon(Icon); Texture != ImTextureID_Invalid)
             DrawList->AddImage(Texture, { X, CenterY - IconSize() * 0.5f }, { X + IconSize(), CenterY + IconSize() * 0.5f },
-                { 0, 0 }, { 1, 1 }, bEnabled ? IM_COL32(220, 220, 220, 255) : IM_COL32(120, 120, 120, 255));
+                { 0, 0 }, { 1, 1 }, bEnabled ? EditorColor::TextSecondary : EditorColor::TextDisabled);
         X += IconSize();
         if (Label && *Label)
         {
@@ -75,6 +79,63 @@ namespace ViewportToolbarWidgets
         if (bChevron)
             DrawChevron(DrawList, { X + Gap + ChevronSize() * 0.5f, CenterY }, ChevronSize(), Color);
         return bClicked;
+    }
+
+    // 뷰포트 위에 겹쳐 그리는 툴바 바탕. 레벨 뷰포트 툴바와 같은 색·여백·둥글기를 쓴다.
+    // 반드시 EndOverlayToolbar와 짝으로 부른다.
+    inline bool BeginOverlayToolbar(const char* Id, ImVec2 ScreenPos, ImVec2 Size)
+    {
+        const float Pad = EditorStyle::Scale(4.0f);
+        ImGui::SetCursorScreenPos(ScreenPos);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, { Pad, Pad });
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, { Pad, Pad });
+        ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(2.0f));
+        ImGui::PushStyleColor(ImGuiCol_ChildBg, EditorColor::BgOverlay);
+        return ImGui::BeginChild(Id, Size, ImGuiChildFlags_AlwaysUseWindowPadding,
+            ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoScrollWithMouse);
+    }
+
+    inline void EndOverlayToolbar()
+    {
+        ImGui::EndChild();
+        ImGui::PopStyleColor();
+        ImGui::PopStyleVar(3);
+    }
+
+    // 이동/회전/크기 기즈모 버튼 세 개를 뷰포트 왼쪽 위에 겹쳐 그린다. 레벨 뷰포트 툴바의 왼쪽 묶음과 같은 모양이다.
+    // CurrentMode는 0=이동, 1=회전, 2=크기. 누른 버튼의 번호를 돌려주고, 누르지 않았으면 -1.
+    inline int TransformModeOverlay(const char* Id, ImVec2 ViewportOrigin, int CurrentMode)
+    {
+        static constexpr const char* Icons[] = { "TransformMove", "TransformRotate", "TransformScale" };
+        static constexpr const char* Tooltips[] = {
+            "Translate (W)\nSpace: cycle Move / Rotate / Scale",
+            "Rotate (E)\nSpace: cycle Move / Rotate / Scale",
+            "Scale (R)\nSpace: cycle Move / Rotate / Scale" };
+        constexpr int Count = IM_ARRAYSIZE(Icons);
+
+        const float Pad = EditorStyle::Scale(4.0f);
+        const float ButtonWidth = IconButtonWidth(nullptr, false);
+        const ImVec2 Size{ Pad * 2.0f + ButtonWidth * Count + Pad * (Count - 1), Pad * 2.0f + ImGui::GetFrameHeight() };
+        const ImVec2 Pos{ ViewportOrigin.x + EditorStyle::Scale(6.0f), ViewportOrigin.y + EditorStyle::Scale(6.0f) };
+
+        int Clicked = -1;
+        if (BeginOverlayToolbar(Id, Pos, Size))
+        {
+            for (int Mode = 0; Mode < Count; ++Mode)
+            {
+                if (Mode > 0) ImGui::SameLine();
+                const bool bSelected = Mode == CurrentMode;
+                EditorStyle::PushSelectedButton(bSelected);
+                ImGui::PushID(Mode);
+                if (IconButton("##Mode", Icons[Mode], nullptr, false, ButtonWidth))
+                    Clicked = Mode;
+                ImGui::PopID();
+                EditorStyle::PopSelectedButton(bSelected);
+                if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", Tooltips[Mode]);
+            }
+        }
+        EndOverlayToolbar();
+        return Clicked;
     }
 
     // UE 메뉴의 회색 구역 제목과 가로줄
@@ -108,21 +169,21 @@ namespace ViewportToolbarWidgets
         {
             // UE처럼 선택된 항목은 흰 점, 나머지는 어두운 점
             DrawList->AddCircleFilled({ MarkX, CenterY }, EditorStyle::Scale(3.0f),
-                bSelected ? IM_COL32(240, 240, 240, 255) : IM_COL32(20, 20, 20, 255));
+                bSelected ? EditorColor::TextPrimary : EditorColor::Ink);
         }
         else if (Indicator == EIndicator::Check)
         {
             const float Half = EditorStyle::Scale(6.0f);
             const ImVec2 Min{ MarkX - Half, CenterY - Half }, Max{ MarkX + Half, CenterY + Half };
-            DrawList->AddRectFilled(Min, Max, IM_COL32(20, 20, 20, 255), EditorStyle::Scale(2.0f));
+            DrawList->AddRectFilled(Min, Max, EditorColor::Ink, EditorStyle::Scale(2.0f));
             if (bSelected)
                 ImGui::RenderCheckMark(DrawList, { Min.x + EditorStyle::Scale(2.0f), Min.y + EditorStyle::Scale(2.0f) },
-                    IM_COL32(240, 240, 240, 255), Half * 2.0f - EditorStyle::Scale(4.0f));
+                    EditorColor::TextPrimary, Half * 2.0f - EditorStyle::Scale(4.0f));
         }
         float X = Pos.x + Indent;
         if (const ImTextureID Texture = GetIcon(Icon); Texture != ImTextureID_Invalid)
             DrawList->AddImage(Texture, { X, CenterY - IconSize() * 0.5f }, { X + IconSize(), CenterY + IconSize() * 0.5f },
-                { 0, 0 }, { 1, 1 }, IM_COL32(200, 200, 200, 255));
+                { 0, 0 }, { 1, 1 }, EditorColor::TextSecondary);
         if (Icon) X += IconSize() + Gap;
         DrawList->AddText({ X, CenterY - ImGui::GetTextLineHeight() * 0.5f }, Color, Label);
         return bClicked;

@@ -18,6 +18,7 @@ public:
 
 	const char* GetPanelName() const override { return PanelName.c_str(); }
 	const char* GetWindowName() const { return WindowName.c_str(); }
+	bool IsFocused() const override { return bFocused; }
 	void SetDockClass(ImGuiID InClassId) { DockClassId = InClassId; }
 
 	// 현재 패널이 소속 탭의 도킹 영역 밖에 있는지 확인합니다.
@@ -30,10 +31,14 @@ protected:
 	// 스크롤 금지처럼 창 플래그가 필요한 패널만 재정의합니다.
 	virtual ImGuiWindowFlags GetWindowFlags() const { return ImGuiWindowFlags_None; }
 
+	// 프리뷰 화면을 그리는 패널은 true. 창 여백과 스크롤바 없이 렌더 결과로 창을 꽉 채운다.
+	virtual bool IsViewportPanel() const { return false; }
+
 private:
 	FString PanelName;
 	FString WindowName;
 	ImGuiID DockClassId = 0;
+	bool bFocused = false;
 };
 
 // 에디터 타입별 패널 베이스입니다. 에디터마다 베이스 클래스를 새로 만들지 않고 별칭만 둡니다.

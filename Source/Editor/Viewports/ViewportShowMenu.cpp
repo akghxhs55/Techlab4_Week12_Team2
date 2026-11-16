@@ -57,7 +57,7 @@ void FViewportsPanel::DrawShowMenu()
         const float CenterY = (Min.y + Max.y) * 0.5f, X = Min.x + EditorStyle::Scale(22.0f);
         if (const ImTextureID Icon = GetIcon("Stats"); Icon != ImTextureID_Invalid)
             ImGui::GetWindowDrawList()->AddImage(Icon, { X - EditorStyle::Scale(20.0f), CenterY - IconSize() * 0.5f },
-                { X - EditorStyle::Scale(4.0f), CenterY + IconSize() * 0.5f }, { 0, 0 }, { 1, 1 }, IM_COL32(200, 200, 200, 255));
+                { X - EditorStyle::Scale(4.0f), CenterY + IconSize() * 0.5f }, { 0, 0 }, { 1, 1 }, EditorColor::TextSecondary);
     }
 
     auto Flag = [](const char* Icon, const char* Label, bool& bValue)

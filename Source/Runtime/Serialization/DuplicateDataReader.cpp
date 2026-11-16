@@ -61,5 +61,5 @@ FArchive& FDuplicateDataReader::operator<<(UObject*& Object)
 void FDuplicateDataReader::SerializeFail()
 {
 	SetError();
-	/*HTR_LOG(Error, "FDuplicateDataReader Overread. SerializedObject = %ls SerializedProperty = %ls", *GetFullNameSafe(FUObjectThreadContext::Get().GetSerializeContext()->SerializedObject), *GetFullNameSafe(GetSerializedProperty()));*/
+	/*KRS_LOG(Error, "FDuplicateDataReader Overread. SerializedObject = %ls SerializedProperty = %ls", *GetFullNameSafe(FUObjectThreadContext::Get().GetSerializeContext()->SerializedObject), *GetFullNameSafe(GetSerializedProperty()));*/
 }

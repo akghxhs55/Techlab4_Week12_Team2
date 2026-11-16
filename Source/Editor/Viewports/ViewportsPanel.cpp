@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/Viewports/ViewportsPanel.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/Viewports/LevelEditorViewport.h"
 #include "Engine/GameViewportClient.h"
 
@@ -23,15 +24,15 @@
 
 namespace {
 constexpr float SplitterThickness = 6.0f;
-constexpr ImU32 SplitterColor = IM_COL32(55, 55, 55, 230);
-constexpr ImU32 SplitterHoverColor = IM_COL32(255, 192, 0, 255);
+constexpr ImU32 SplitterColor = EditorColor::BgRaised;
+constexpr ImU32 SplitterHoverColor = EditorColor::AccentHover;
 
 // Stat Overlay
 constexpr float StatOverlayMargin = 8.0f;
 constexpr float StatOverlayPadding = 6.0f;
-constexpr ImU32 StatOverlayBackgroundColor = IM_COL32(0, 0, 0, 140);
-constexpr ImU32 TitleColor = IM_COL32(255, 210, 60, 255);
-constexpr ImU32 ValueColor = IM_COL32(235, 235, 235, 255);
+constexpr ImU32 StatOverlayBackgroundColor = EditorColor::Scrim;
+constexpr ImU32 TitleColor = EditorColor::AccentText;
+constexpr ImU32 ValueColor = EditorColor::TextPrimary;
 } // namespace
 
 // 네 View의 렌더 타깃을 최소 크기로 초기화한다.
@@ -51,14 +52,44 @@ bool FViewportsPanel::Init() {
 	return true;
 }
 
-// 패널의 프레임 갱신 인터페이스이며 별도 계산은 하지 않는다.
+// 패널의 프레임 갱신 인터페이스에서 뷰포트 단축키(Q/W/E/R, Space)로 기즈모 모드를 전환한다.
 void FViewportsPanel::Tick(float DeltaTime)
 {
 	(void)DeltaTime;
-	if (Gizmo && bFocused && IsHovered() && !ImGui::GetIO().WantTextInput &&
-		(!GameViewportClient || ActiveViewIndex != GameViewportIndex) &&
-		FInputSystem::IsKeyPressed(EKeyCode::Space))
-		Gizmo->SetMode(static_cast<EGizmoMode>((static_cast<int>(Gizmo->GetMode()) + 1) % 3));
+	const ImGuiIO& IO = ImGui::GetIO();
+	if (Gizmo && WasRenderedThisFrame() && (bFocused || IsHovered()) && !IO.WantTextInput &&
+		!IO.KeyCtrl && !IO.KeyAlt && !IO.KeyShift &&
+		!ImGui::IsPopupOpen(nullptr, ImGuiPopupFlags_AnyPopupId | ImGuiPopupFlags_AnyPopupLevel) &&
+		!FInputSystem::IsMouseDown(EMouseButton::Right) &&
+		!FInputSystem::IsMouseDown(EMouseButton::Left) &&
+		!FInputSystem::IsMouseDown(EMouseButton::Middle) &&
+		!Gizmo->IsUsing() &&
+		(!GameViewportClient || ActiveViewIndex != GameViewportIndex))
+	{
+		if (FInputSystem::IsKeyPressed(EKeyCode::Q))
+		{
+			Gizmo->SetMode(EGizmoMode::Select);
+		}
+		else if (FInputSystem::IsKeyPressed(EKeyCode::W))
+		{
+			Gizmo->SetMode(EGizmoMode::Location);
+		}
+		else if (FInputSystem::IsKeyPressed(EKeyCode::E))
+		{
+			Gizmo->SetMode(EGizmoMode::Rotation);
+		}
+		else if (FInputSystem::IsKeyPressed(EKeyCode::R))
+		{
+			Gizmo->SetMode(EGizmoMode::Scale);
+		}
+		else if (FInputSystem::IsKeyPressed(EKeyCode::Space))
+		{
+			const EGizmoMode NextMode = (Gizmo->GetMode() == EGizmoMode::Select)
+				? EGizmoMode::Location
+				: static_cast<EGizmoMode>((static_cast<int>(Gizmo->GetMode()) + 1) % 3);
+			Gizmo->SetMode(NextMode);
+		}
+	}
 }
 
 // Core Rect에 맞춰 View 활성 상태와 타깃 크기를 갱신한다.
@@ -186,14 +217,14 @@ void FViewportsPanel::OnRender() {
 		if (ViewIndex == 0 && bShowNoCamera && !bGameViewport)
 		{
 			// 메인 원근 뷰포트 영역을 어두운 회색으로 채움
-			DrawList->AddRectFilled(ViewMin, ViewMax, IM_COL32(45, 45, 48, 255));
+			DrawList->AddRectFilled(ViewMin, ViewMax, EditorColor::BgHeader);
 			const char* WarningText = "No Camera";
 			ImVec2 TextSize = ImGui::CalcTextSize(WarningText);
 			ImVec2 CenterPos{
 				ViewMin.x + (Rect.Width - TextSize.x) * 0.5f,
 				ViewMin.y + (Rect.Height - TextSize.y) * 0.5f
 			};
-			DrawList->AddText(CenterPos, IM_COL32(220, 220, 220, 255), WarningText);
+			DrawList->AddText(CenterPos, EditorColor::TextSecondary, WarningText);
 			continue;
 		}
 

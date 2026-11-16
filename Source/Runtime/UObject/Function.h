@@ -19,10 +19,10 @@ enum EFunctionFlags : uint32
 };
 
 // UFUNCTION 인자·반환값 타입. UE는 UFunction의 인자도 FProperty 자식으로 두지만,
-// Hitori는 Lua와 주고받는 몇 가지 타입만 쓰므로 FScriptValue의 종류를 그대로 쓴다. 순서는 FScriptValue와 같다.
+// Kurisu는 Lua와 주고받는 몇 가지 타입만 쓰므로 FScriptValue의 종류를 그대로 쓴다. 순서는 FScriptValue와 같다.
 enum class EScriptValueType { None, Bool, Int, Float, String, Vector, Rotator };
 
-// 리플렉션으로 주고받는 값 하나. UE는 FFrame 스택에 인자를 쌓지만, Hitori는 지원 타입이 적어서 variant로 충분하다.
+// 리플렉션으로 주고받는 값 하나. UE는 FFrame 스택에 인자를 쌓지만, Kurisu는 지원 타입이 적어서 variant로 충분하다.
 using FScriptValue = std::variant<std::monostate, bool, int32, float, FString, FVector, FRotator>;
 
 // C++ 타입 → FScriptValue 저장 타입과 EScriptValueType. 여기 없는 타입을 UFUNCTION 인자/반환값에 쓰면 static_assert로 막는다.
@@ -86,7 +86,7 @@ struct TMemberFunctionTraits<R (C::*)(A...) const> : TMemberFunctionTraits<R (C:
 {
 };
 
-// Func마다 썽크 하나가 컴파일 시간에 만들어진다. HHT는 함수 이름만 알면 되고 시그니처는 컴파일러가 알아낸다.
+// Func마다 썽크 하나가 컴파일 시간에 만들어진다. KHT는 함수 이름만 알면 되고 시그니처는 컴파일러가 알아낸다.
 template <auto Func>
 struct TNativeFunction
 {

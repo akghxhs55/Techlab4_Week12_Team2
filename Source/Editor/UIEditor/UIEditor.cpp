@@ -2,7 +2,7 @@
 #include "Editor/UIEditor/UIEditor.h"
 #include "Editor/UIEditor/UIEditorTab.h"
 
-#include "Editor/HitoriEd/EditorEngine.h"
+#include "Editor/KurisuEd/EditorEngine.h"
 #include "Asset/AssetUtils.h"
 #include "Render/RenderCommand.h"
 #include "UI/UIRenderer.h"
@@ -61,7 +61,7 @@ bool FUIEditor::CreateDefaultAsset(const FString& InFilePath)
 
 	if (!bSaved)
 	{
-		HTR_LOG(Error, "Cannot create widget asset: {}", InFilePath);
+		KRS_LOG(Error, "Cannot create widget asset: {}", InFilePath);
 		return false;
 	}
 
@@ -80,7 +80,7 @@ bool FUIEditor::InitializeResources()
 	FWidgetAssetData Asset;
 	if (!FWidgetSerializer::ReadFileBytes(FilePath, Bytes) || !FWidgetSerializer::LoadAssetFromBytes(Bytes, Asset) || !Asset.Root)
 	{
-		HTR_LOG(Error, "Cannot open widget asset: {}", FilePath);
+		KRS_LOG(Error, "Cannot open widget asset: {}", FilePath);
 		delete Asset.Root;
 		return false;
 	}
@@ -157,7 +157,7 @@ void FUIEditor::Save()
 	Asset.Root = Root;
 	if (!FWidgetSerializer::SaveAsset(Asset, FilePath))
 	{
-		HTR_LOG(Error, "Cannot save widget asset: {}", FilePath);
+		KRS_LOG(Error, "Cannot save widget asset: {}", FilePath);
 		return;
 	}
 

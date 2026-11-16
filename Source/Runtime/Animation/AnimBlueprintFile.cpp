@@ -250,7 +250,7 @@ namespace
     json WriteDocument(const FAnimBlueprintData& Data)
     {
         json Root;
-        Root["Format"] = "HitoriAnimBlueprint";
+        Root["Format"] = "KurisuAnimBlueprint";
         Root["Version"] = FileVersion;
         Root["PreviewMeshPath"] = Data.PreviewMeshPath;
         Root["RootMotionMode"] = static_cast<int32>(Data.RootMotionMode);
@@ -300,7 +300,7 @@ namespace
 
     FAnimBlueprintData ReadDocument(const json& Root)
     {
-        if (Root.at("Format").get<FString>() != "HitoriAnimBlueprint" || ReadInt(Root, "Version") != FileVersion)
+        if (Root.at("Format").get<FString>() != "KurisuAnimBlueprint" || ReadInt(Root, "Version") != FileVersion)
         {
             throw std::runtime_error("Unsupported AnimBlueprint format or version.");
         }

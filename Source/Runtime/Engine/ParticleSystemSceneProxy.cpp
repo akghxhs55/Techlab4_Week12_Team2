@@ -26,8 +26,8 @@ void FParticleSystemSceneProxy::UpdateRenderState()
 	UpdateCommonFlags();
 	bCastsShadow = false;
 
-	// TODO: Required 모듈에 Material이 생기면 에미터별로 읽는다
-	Material = UAssetManager::GetAssetByPath<UMaterial>("ParticleSpriteAdditive");
+	// Required에 머티리얼이 없는 에미터가 쓰는 기본값
+	DefaultMaterial = UAssetManager::GetAssetByPath<UMaterial>("ParticleSpriteAdditive");
 }
 
 bool FParticleSystemSceneProxy::EnsureBuffers(int32 EmitterIndex, const FParticleEmitterInstance& Instance)
@@ -120,15 +120,10 @@ int32 FParticleSystemSceneProxy::BuildSpriteInstances(FParticleEmitterInstance& 
 
 void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, const FViewContext& View)
 {
+	// 프록시가 머티리얼 등록보다 먼저 만들어졌을 수 있다
 	if (!DefaultMaterial)
 	{
 		DefaultMaterial = UAssetManager::GetAssetByPath<UMaterial>("ParticleSpriteAdditive");
-	}
-	if (!Material)
-	{
-		Material = UAssetManager::GetAssetByPath<UMaterial>("ParticleSpriteAdditive");
-		if (!Material)
-			return;
 	}
 
 	const UParticleSystemComponent* PSC = static_cast<const UParticleSystemComponent*>(GetComponent());
@@ -157,7 +152,13 @@ void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, cons
 		if (!EnsureBuffers(EmitterIndex, *Instance))
 			continue;
 
-		const int32 Count = BuildSpriteInstances(*Instance);
+		const UParticleModuleRequired* Required = Instance->CurrentLODLevel ? Instance->CurrentLODLevel->GetRequiredModule() : nullptr;
+		UMaterial* EmitterMaterial = (Required && Required->GetMaterial()) ? Required->GetMaterial() : DefaultMaterial;
+		if (!EmitterMaterial)
+			continue;
+		const EParticleSortMode SortMode = Required ? Required->GetSortMode() : EParticleSortMode::None;
+
+		const int32 Count = BuildSpriteInstances(*Instance, View, SortMode);
 		if (Count == 0)
 			continue;
 
@@ -167,7 +168,6 @@ void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, cons
 
 		Data.Constants.CameraRight = FVector4(Right.X, Right.Y, Right.Z, 0.0f);
 		Data.Constants.CameraUp = FVector4(Up.X, Up.Y, Up.Z, 0.0f);
-		const UParticleModuleRequired* Required = Instance->CurrentLODLevel ? Instance->CurrentLODLevel->GetRequiredModule() : nullptr;
 		if (Required && Required->UsesSubUV() && Instance->SubUVDataOffset > 0)
 		{
 			const float H = static_cast<float>(Required->GetSubImagesHorizontal());
@@ -187,10 +187,12 @@ void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, cons
 		Packet.IndexCount = 6;
 		Packet.InstanceBuffer = Data.InstanceBuffer.get();
 		Packet.InstanceCount = static_cast<uint32>(Count);
-		Packet.Material = Material;
+		Packet.Material = EmitterMaterial;
 		Packet.MaterialParamData = &Data.Constants;
 		Packet.MaterialParamDataSize = sizeof(FParticleSpriteConstants);
-		Packet.CameraToParticleDistance = DistanceSq;
+		// 큐는 거리가 큰 패킷부터 그린다. 같은 PSC의 에미터는 배열 순서대로 그리도록 앞 인덱스를 더 멀게
+		const float OrderBias = 1.0f + static_cast<float>(Instances.Num() - EmitterIndex) * 1e-4f;
+		Packet.CameraToParticleDistance = DistanceSq * OrderBias;
 		Queue.Add(Packet);
 	}
 }

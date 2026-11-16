@@ -5,6 +5,9 @@
 #include "Editor/LevelEditor/LevelEditorToolbar.h"
 #include "Runtime/Asset/FbxImporter/FbxMeshBake.h"
 
+class FContentDrawerPanel;
+class FOutputLogPanel;
+
 class FLevelEditorTab : public IEditorTab
 {
 public:
@@ -12,17 +15,28 @@ public:
 
 	const char* GetTabName() const override { return TabName.c_str(); }
 	bool CanDetach() const override { return false; }
+	bool HasFocusedSubWindow() const override { return bDrawerFocused || EditorDock::HasFocusedPanel(Panels); }
 	void DrawMenuBar() override;
 
 	TDelegate<> OnNewScene;
 	TDelegate<> OnOpenScene;
 	TDelegate<> OnSaveScene;
 	TDelegate<> OnSaveSceneAs;
+	TDelegate<> OnUndo;
+	TDelegate<> OnRedo;
 	TDelegate<EFbxImportMode> OnImportFbx;
 	TDelegate<> OnPackageGame;
 	TDelegate<const FString&> OnLevelLoaded;
 
 	void SetIsPackagingQuery(std::function<bool()> InQuery) { IsPackaging = std::move(InQuery); }
+	void SetUndoQueries(std::function<bool()> InCanUndo, std::function<bool()> InCanRedo,
+		std::function<const char*()> InUndoLabel = {}, std::function<const char*()> InRedoLabel = {})
+	{
+		CanUndoQuery = std::move(InCanUndo);
+		CanRedoQuery = std::move(InCanRedo);
+		GetUndoLabelQuery = std::move(InUndoLabel);
+		GetRedoLabelQuery = std::move(InRedoLabel);
+	}
 
 	FLevelEditorToolbar* GetToolbar() { return &Toolbar; }
 	TArray<TUniquePtr<IEditorPanel>>& GetPanels() { return Panels; }
@@ -44,11 +58,38 @@ public:
 	void SetDockSpaceOptions(bool bEnabled, bool bPassthru);
 
 	void UpdateTabName(std::string_view InPath);
+	void SetDrawerPanels(FContentDrawerPanel* InContentDrawer, FOutputLogPanel* InOutputLog)
+	{
+		DrawerContentPanel = InContentDrawer;
+		DrawerLogPanel = InOutputLog;
+	}
 
 private:
+	enum class EBottomDrawer
+	{
+		None,
+		ContentDrawer,
+		OutputLog
+	};
+
+	void DrawStatusBar(float Height, ImVec2& OutBarMin, ImVec2& OutBarMax, bool& OutHovered);
+	void DrawBottomDrawerOverlay(const ImVec2& TabWinPos, const ImVec2& BarMin, const ImVec2& BarMax, bool bBarHovered);
+
 	std::function<bool()> IsPackaging;
+	std::function<bool()> CanUndoQuery;
+	std::function<bool()> CanRedoQuery;
+	std::function<const char*()> GetUndoLabelQuery;
+	std::function<const char*()> GetRedoLabelQuery;
 	FLevelEditorToolbar Toolbar;
 	TArray<TUniquePtr<IEditorPanel>> Panels;
+	FContentDrawerPanel* DrawerContentPanel = nullptr;
+	FOutputLogPanel* DrawerLogPanel = nullptr;
+	EBottomDrawer ActiveDrawer = EBottomDrawer::None;
+	float DrawerHeight = 480.0f;
+	bool bDrawerOpenedThisFrame = false;
+	bool bResizingDrawer = false;
+	bool bDrawerFocused = false;
+	char StatusCmdBuf[256] = {};
 	bool bUseDockSpace = true;
 	bool bPassthruCentralNode = false;
 

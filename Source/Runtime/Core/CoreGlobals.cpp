@@ -10,7 +10,7 @@ void RequestEngineExit(const FString& Reason)
 {
 	if (!GIsRequestingExit)
 	{
-		HTR_LOG(Info, "[Engine] exit requested: {}", Reason);
+		KRS_LOG(Info, "[Engine] exit requested: {}", Reason);
 	}
 	GIsRequestingExit = true;
 }

@@ -6,6 +6,7 @@
 class UParticleSystemComponent;
 class UMaterial;
 struct FParticleEmitterInstance;
+struct FBaseParticle;
 enum class EParticleSortMode : uint8;
 
 struct FParticleSpriteCorner
@@ -67,5 +68,4 @@ private:
 	TUniquePtr<FVertexBuffer> QuadVertexBuffer;
 	TUniquePtr<FIndexBuffer> QuadIndexBuffer;
 	TArray<FParticleSpriteInstance> InstanceScratch;
-	UMaterial* Material = nullptr;
 };

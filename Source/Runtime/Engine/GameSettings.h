@@ -11,7 +11,7 @@ struct FGameSettings
 {
 	FString StartupMap = "Content/Scenes/Main.scene";   // [Game] GameDefaultMap
 
-	std::wstring WindowTitle = L"Hitori";
+	std::wstring WindowTitle = L"Kurisu Engine";
 	uint32 Width = 1600;
 	uint32 Height = 900;
 	bool bBorderless = false;

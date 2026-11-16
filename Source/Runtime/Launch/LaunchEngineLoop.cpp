@@ -39,7 +39,7 @@ namespace
 	// 이 간격마다 FPS 평균을 갱신한다.
 	constexpr double FrameStatsWindowSeconds = 0.5;
 
-	// UE처럼 첫 인자로 프로젝트 파일을 받는다. "Path/To/Game.hproject" 또는 -project=Path/To/Game.hproject
+	// UE처럼 첫 인자로 프로젝트 파일을 받는다. "Path/To/Game.kproject" 또는 -project=Path/To/Game.kproject
 	std::filesystem::path FindProjectInCommandLine()
 	{
 		int32 Count = 0;
@@ -66,7 +66,7 @@ namespace
 	{
 		if (!FPaths::InitEngineDir())
 		{
-			MessageBoxW(nullptr, L"Cannot find the engine folder (EngineResources/Shaders).", L"Hitori", MB_OK | MB_ICONERROR);
+			MessageBoxW(nullptr, L"Cannot find the engine folder (EngineResources/Shaders).", L"Kurisu Engine", MB_OK | MB_ICONERROR);
 			return false;
 		}
 
@@ -76,7 +76,8 @@ namespace
 		FString Error;
 		if (!FPaths::SetProject(ProjectFile, &Error))
 		{
-			MessageBoxA(nullptr, ("Cannot open project:\n" + Error).c_str(), "Hitori", MB_OK | MB_ICONERROR);
+			const FString Msg = "Cannot open project:\n" + Error;
+			MessageBoxW(nullptr, std::wstring(Msg.begin(), Msg.end()).c_str(), L"Kurisu Engine", MB_OK | MB_ICONERROR);
 			return false;
 		}
 		return true;
@@ -124,8 +125,8 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 		FSplashScreen::Show(hInstance, Config.SplashImage);
 	}
 
-	FSplashScreen::SetText(L"Initializing Renderer...");
-	FSplashScreen::SetProgress(0.1f);
+	FSplashScreen::SetText(L"Initializing Render Device...");
+	FSplashScreen::SetProgress(0.05f);
 
 	FLoadStageTimer RendererTimer{ "Phase/Device+Renderer+Window" };
 	// 0이면 주 모니터 해상도
@@ -153,14 +154,15 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 
 	RendererTimer.Stop();
 
-	FSplashScreen::SetText(L"Loading Assets...");
+	FSplashScreen::SetText(L"Loading Render Resources...");
+	FSplashScreen::SetProgress(0.12f);
 	{
 		FLoadStageTimer Timer{ "Phase/RenderResourceManager::Init" };
 		FRenderResourceManager::Init();
 	}
 
-	constexpr float AssetStart = 0.1f;
-	constexpr float AssetEnd = 0.8f;
+	constexpr float AssetStart = 0.12f;
+	constexpr float AssetEnd = 0.78f;
 	{
 		FLoadStageTimer Timer{ "Phase/AssetManager::Init" };
 		UAssetManager::Init([](int32 Loaded, int32 Total, const FString& Path)
@@ -170,6 +172,8 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 			});
 	}
 
+	FSplashScreen::SetText(L"Initializing Scene Passes...");
+	FSplashScreen::SetProgress(0.80f);
 	{
 		FLoadStageTimer Timer{ "Phase/InitScenePasses" };
 		Renderer->InitScenePasses();
@@ -183,7 +187,7 @@ bool FEngineLoop::PreInit(HINSTANCE hInstance, UClass* EngineClass)
 bool FEngineLoop::Init()
 {
 	FSplashScreen::SetText(L"Initializing Engine...");
-	FSplashScreen::SetProgress(0.8f);
+	FSplashScreen::SetProgress(0.85f);
 
 	// 워커 스레드는 에셋 로드가 끝난 뒤, 엔진이 생기기 전에 켠다. 끄는 것도 이 클래스의 Exit가 한다.
 	Tasks::FTaskScheduler::Get().Initialize();
@@ -203,6 +207,9 @@ bool FEngineLoop::Init()
 		return false;
 	}
 	bEngineInitialized = true;
+
+	FSplashScreen::SetText(L"Opening Startup Level...");
+	FSplashScreen::SetProgress(0.95f);
 
 	// 초기화가 끝난 엔진에게 게임을 시작하라고 알린다. 게임 엔진은 여기서 시작 맵을 연다.
 	if (!GEngine->Start())

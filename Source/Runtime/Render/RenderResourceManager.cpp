@@ -26,10 +26,8 @@ constexpr FPipelineTableEntry PipelineTable[] =
 	{ EPSOType::StaticMesh_Opaque,       nullptr,                                            EPrimitiveTopology::TriangleList, ERasterizerState::SolidBack, EBlendState::Opaque,       EDepthStencilState::Default },
 	{ EPSOType::StaticMesh_Translucent,  "EngineResources/Shaders/StaticMeshTranslucentShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidBack, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
 	{ EPSOType::StaticMesh_Wireframe,    nullptr,                                    EPrimitiveTopology::TriangleList, ERasterizerState::Wireframe, EBlendState::Opaque,       EDepthStencilState::Default },
-	{ EPSOType::Particle_AlphaBlend,     "EngineResources/Shaders/ParticleSpriteShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
-	{ EPSOType::Particle_Additive,       "EngineResources/Shaders/ParticleSpriteShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Additive,     EDepthStencilState::ReadOnly },
 	{ EPSOType::Reserved_5, nullptr, EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Opaque, EDepthStencilState::Disabled },
-	{ EPSOType::Grid,                    "EngineResources/Shaders/GridShader.hlsl",          EPrimitiveTopology::TriangleList, ERasterizerState::SolidBack, EBlendState::AlphaBlend,   EDepthStencilState::Default },
+	{ EPSOType::Grid,                    "EngineResources/Shaders/GridShader.hlsl",          EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
 	{ EPSOType::Outline_Mask,            "EngineResources/Shaders/OutlineShader.hlsl",       EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::NoColorWrite, EDepthStencilState::StencilMask },
 	{ EPSOType::Outline_Draw,            "EngineResources/Shaders/OutlineShader.hlsl",       EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Opaque,       EDepthStencilState::StencilOutline },
 	{ EPSOType::Reserved_9, nullptr, EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Opaque, EDepthStencilState::Disabled },
@@ -49,6 +47,8 @@ constexpr FPipelineTableEntry PipelineTable[] =
 	{ EPSOType::Reserved_23, nullptr, EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Opaque, EDepthStencilState::Disabled },
 	{ EPSOType::Decal,			"EngineResources/Shaders/DecalShader.hlsl",			EPrimitiveTopology::TriangleList,		ERasterizerState::SolidBack, EBlendState::AlphaBlend, EDepthStencilState::ReadOnly },
 	{ EPSOType::DecalAdditive,	"EngineResources/Shaders/DecalShader.hlsl",			EPrimitiveTopology::TriangleList,		ERasterizerState::SolidBack, EBlendState::Additive, EDepthStencilState::ReadOnly },
+	{ EPSOType::Particle_AlphaBlend,     "EngineResources/Shaders/ParticleSpriteShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
+	{ EPSOType::Particle_Additive,       "EngineResources/Shaders/ParticleSpriteShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Additive,     EDepthStencilState::ReadOnly },
 };
 
 static_assert(sizeof(PipelineTable) / sizeof(PipelineTable[0]) == static_cast<size_t>(EPSOType::Count));
@@ -81,7 +81,7 @@ void FRenderResourceManager::InitPipelineStates()
 		FShaderByteCode PSCode = RenderUtil::GetOrCompile(Path, "mainPS", EShaderType::Pixel, PSCSOPath, Defines);
 		if (!VSCode.IsValid() || !PSCode.IsValid())
 		{
-			HTR_LOG(Error, "[Shader] UberShader variant compile failed: {}", Name);
+			KRS_LOG(Error, "[Shader] UberShader variant compile failed: {}", Name);
 			continue;
 		}
 		auto VS = RenderCommand::CreateVertexShader(VSCode);
@@ -135,7 +135,7 @@ void FRenderResourceManager::ScanShaders(const fs::path& ShaderRoot)
 	const fs::path AbsoluteRoot = FPaths::EngineFile(ShaderRoot);
 	if (!fs::exists(AbsoluteRoot, ErrorCode))
 	{
-		HTR_LOG(Error, "[Shader] Scan Root Not Found : {}", FPaths::ToUtf8(AbsoluteRoot));
+		KRS_LOG(Error, "[Shader] Scan Root Not Found : {}", FPaths::ToUtf8(AbsoluteRoot));
 		return;
 	}
 
@@ -173,7 +173,7 @@ FShaderProgram* FRenderResourceManager::GetShaderProgram(const FString& InPath)
 	if (TUniquePtr<FShaderProgram>* Found = Get().ShaderProgramMap.Find(InPath))
 		return Found->get();
 
-	HTR_LOG(Error, "[Shader] not found: {}", InPath);
+	KRS_LOG(Error, "[Shader] not found: {}", InPath);
 
 	if (TUniquePtr<FShaderProgram>* Fallback =
 		Get().ShaderProgramMap.Find("EngineResources/Shaders/DefaultShader.hlsl"))
@@ -193,7 +193,7 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 
 	if (!VSCode.IsValid() || !PSCode.IsValid())
 	{
-		HTR_LOG(Error, "[Shader] compile failed: {}", Path);
+		KRS_LOG(Error, "[Shader] compile failed: {}", Path);
 		return;
 	}
 
@@ -202,7 +202,7 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 
 	if (!Vs || !Vs->IsValid() || !Ps || !Ps->IsValid())
 	{
-		HTR_LOG(Error, "[Shader] device create failed: {}", Path);
+		KRS_LOG(Error, "[Shader] device create failed: {}", Path);
 		return;
 	}
 
@@ -214,7 +214,7 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 	ShaderProgramMap[Path] = MakeUnique<FShaderProgram>(VsRaw, PsRaw);
 	ShaderProgramMap[Path]->Name = Path;
 
-	HTR_LOG(Info, "[Shader] loaded: {}", Path);
+	KRS_LOG(Info, "[Shader] loaded: {}", Path);
 
 }
 
@@ -228,13 +228,13 @@ void FRenderResourceManager::CreateSkinnedVariant(const FString& Path, const cha
 	FShaderByteCode Code = RenderUtil::GetOrCompile(Path, "mainVS", EShaderType::Vertex, CSOPath, LightingMacro ? LitSkin : SkinOnly);
 	if (!Code.IsValid())
 	{
-		HTR_LOG(Error, "[Shader] GPU skin variant compile failed: {}", Base.Name);
+		KRS_LOG(Error, "[Shader] GPU skin variant compile failed: {}", Base.Name);
 		return;
 	}
 	TUniquePtr<FVertexShader> VS = RenderCommand::CreateVertexShader(Code);
 	if (!VS || !VS->IsValid())
 	{
-		HTR_LOG(Error, "[Shader] GPU skin variant create failed: {}", Base.Name);
+		KRS_LOG(Error, "[Shader] GPU skin variant create failed: {}", Base.Name);
 		return;
 	}
 

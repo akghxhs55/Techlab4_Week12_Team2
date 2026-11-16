@@ -29,7 +29,7 @@ bool FEditorSettingsManager::SaveSettings() const
 
 	if (!File.is_open())
 	{
-		HTR_LOG(Error, "Failed to open editor.ini for saving.");
+		KRS_LOG(Error, "Failed to open editor.ini for saving.");
 		return false;
 	}
 
@@ -67,6 +67,8 @@ bool FEditorSettingsManager::SaveSettings() const
 	File << "CameraMoveSpeed=" << Settings.CameraSpeed << "\n";
 	File << "CameraRotateSensitivity=" << Settings.MouseSensitivity << "\n";
 	File << "GridSpacing=" << Settings.GridSpacing << "\n";
+	File << "LocationSnap=" << Settings.bLocationSnap << "\n";
+	File << "LocationSnapSize=" << Settings.LocationSnapSize << "\n";
 	File << "\n";
 
 	File << "[MultipleViewports]\n";
@@ -232,6 +234,13 @@ bool FEditorSettingsManager::LoadSettings()
 				else if (Key == "CameraMoveSpeed") Settings.CameraSpeed = std::stof(ValueStr);
 				else if (Key == "CameraRotateSensitivity") Settings.MouseSensitivity = std::stof(ValueStr);
 				else if (Key == "GridSpacing") Settings.GridSpacing = std::stoi(ValueStr);
+				else if (Key == "LocationSnap") Settings.bLocationSnap = (std::stoi(ValueStr) != 0);
+				else if (Key == "LocationSnapSize")
+				{
+					const float Value = std::stof(ValueStr);
+					if (std::isfinite(Value) && Value >= 0.0f)
+						Settings.LocationSnapSize = FMath::Clamp(Value, 0.0f, 1000.0f);
+				}
 				else if (Key == "Horizontal") Settings.MultipleViewportsHorizontal = std::stof(ValueStr);
 				else if (Key == "Vertical") Settings.MultipleViewportsVertical = std::stof(ValueStr);
 				else if (Key == "Layout")
@@ -262,6 +271,9 @@ bool FEditorSettingsManager::LoadSettings()
 	}
 
 	File.close();
+	Settings.bLocationSnap = Settings.bLocationSnap && Settings.LocationSnapSize > 0.0f;
+	if (!Settings.bLocationSnap)
+		Settings.LocationSnapSize = 0.0f;
 	if (!std::isfinite(Settings.SceneDepthMaxRange))
 		Settings.SceneDepthMaxRange = 50.0f;
 	Settings.SceneDepthMaxRange = FMath::Clamp(Settings.SceneDepthMaxRange, 0.1f, 10000.0f);

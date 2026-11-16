@@ -94,7 +94,7 @@ void FEditorViewportClient::TickInput(float DeltaTime, bool bCaptured,
 // 기즈모 조작 및 액터 피킹 갱신
 void FEditorViewportClient::UpdateGizmoAndPicking(
     FGizmo *InGizmo, const FVector2 &LocalMousePosition,
-    const std::function<void(AActor *)> &OnSelectActor) {
+    const std::function<void(AActor *, bool)> &OnSelectActor) {
   if (!bActive || !InGizmo) {
     return;
   }
@@ -117,17 +117,18 @@ void FEditorViewportClient::UpdateGizmoAndPicking(
       ImGui::GetIO().MouseDragMaxDistanceSqr[ImGuiMouseButton_Left] <= ClickSelectThreshold * ClickSelectThreshold;
   if (bClickReleased && !InGizmo->IsUsing() &&
       InGizmo->GetHoveredAxis() < 0) {
+    const bool bCtrlToggle = ImGui::GetIO().KeyCtrl;
     FHitResult Hit;
     UWorld* PickingWorld = GetWorld();
     if (PickingWorld && PickingWorld->LineTraceSingle(Ray, Hit)) {
       if (Hit.HitComponent && Hit.HitComponent->GetOwner()) {
         if (OnSelectActor) {
-          OnSelectActor(Hit.HitComponent->GetOwner());
+          OnSelectActor(Hit.HitComponent->GetOwner(), bCtrlToggle);
         }
       }
-    } else {
+    } else if (!bCtrlToggle) {
       if (OnSelectActor) {
-        OnSelectActor(nullptr);
+        OnSelectActor(nullptr, false);
       }
     }
   }

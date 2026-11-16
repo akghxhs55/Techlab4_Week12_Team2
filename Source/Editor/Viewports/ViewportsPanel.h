@@ -74,7 +74,11 @@ public:
 	// 메인 툴바의 Add/Grid 드롭다운이 쓴다. Add는 활성 뷰 카메라 앞에 액터를 놓는다.
 	void DrawSpawnMenuForActiveView();
 	void DrawGridMenu();
+	void DrawSnapMenu();
 	int32 GetGridSpacing() const;
+	bool IsLocationSnapEnabled() const;
+	void SetLocationSnapEnabled(bool bEnabled);
+	float GetLocationSnapSize() const;
 	void SetActorSpawnedCallback(std::function<void(AActor*)> Callback) { OnActorSpawned = std::move(Callback); }
 	void SetIsPlayingQuery(std::function<bool()> Query) { IsPlayingQuery = std::move(Query); }
 

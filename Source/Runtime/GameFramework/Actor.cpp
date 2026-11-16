@@ -224,7 +224,7 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 
 			if (!ComponentClass || !ComponentClass->IsChildOf(UActorComponent::StaticClass()))
 			{
-				HTR_LOG(Warning, "Load: unknown component class '{}'", ClassName);
+				KRS_LOG(Warning, "Load: unknown component class '{}'", ClassName);
 				continue;
 			}
 
@@ -233,7 +233,7 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 
 		if (!Component || Component->GetClass() != FindClass(ClassName))
 		{
-			HTR_LOG(Warning, "Load: component {} ({}) failed", Name, ClassName);
+			KRS_LOG(Warning, "Load: component {} ({}) failed", Name, ClassName);
 			continue;
 		}
 
@@ -274,7 +274,7 @@ void AActor::Serialize(FStructuredArchive::FRecord Record)
 		if (UScriptComponent* Script = Cast<UScriptComponent>(AddComponent(UScriptComponent::StaticClass(), FName("None"))))
 		{
 			Script->SetScriptPath(ScriptPath);
-			HTR_LOG(Info, "[Lua] {} : moved legacy script path to {} ({})", GetName(), Script->GetName(), Script->GetScriptPath());
+			KRS_LOG(Info, "[Lua] {} : moved legacy script path to {} ({})", GetName(), Script->GetName(), Script->GetScriptPath());
 		}
 		ScriptPath.clear();
 	}
@@ -392,7 +392,7 @@ void AActor::DestroyComponent(UActorComponent* Component)
 
 	if (Component == RootComponent)
 	{
-		HTR_LOG(Warning, "DefaultSceneRoot cannot be deleted.");
+		KRS_LOG(Warning, "DefaultSceneRoot cannot be deleted.");
 		return;
 	}
 

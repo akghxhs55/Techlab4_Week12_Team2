@@ -40,14 +40,14 @@ bool FSkyboxRenderer::Init(const FString& PanoramaPath)
 	Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/SkyboxShader.hlsl");
 	if (!Shader)
 	{
-		HTR_LOG(Error, "[Skybox] shader not found");
+		KRS_LOG(Error, "[Skybox] shader not found");
 		return false;
 	}
 
 	FImageData Image = ImageLoader::LoadAuto(PanoramaPath);
 	if (!Image.IsValid())
 	{
-		HTR_LOG(Error, "[Skybox] panorama load failed: {}", PanoramaPath);
+		KRS_LOG(Error, "[Skybox] panorama load failed: {}", PanoramaPath);
 		return false;
 	}
 
@@ -73,7 +73,7 @@ bool FSkyboxRenderer::Init(const FString& PanoramaPath)
 	// 깊이 테스트/쓰기 모두 끈다. 배경을 먼저 깔고 물체가 그 위에 그려지게 한다.
 	PipelineState.DepthStencilState = EDepthStencilState::Disabled;
 
-	HTR_LOG(Info, "[Skybox] loaded: {} ({}x{}, format {}, shader sRGB decode {})",
+	KRS_LOG(Info, "[Skybox] loaded: {} ({}x{}, format {}, shader sRGB decode {})",
 		PanoramaPath, Image.Width, Image.Height, static_cast<uint32>(Image.Format), bDecodeSRGBInShader ? "on" : "off");
 	return true;
 }

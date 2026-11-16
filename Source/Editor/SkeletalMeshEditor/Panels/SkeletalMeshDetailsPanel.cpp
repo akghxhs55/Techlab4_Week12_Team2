@@ -2,6 +2,7 @@
 #include "SkeletalMeshDetailsPanel.h"
 #include "Editor/SkeletalMeshEditor/SkeletalMeshEditor.h"
 #include "Math/Transform.h"
+#include "Editor/Details/PropertyEditor.h"
 
 FSkeletalMeshDetailsPanel::FSkeletalMeshDetailsPanel(FSkeletalMeshEditor& InEditor)
 	: FSkeletalMeshEditorPanel(InEditor, "Details")
@@ -31,16 +32,17 @@ void FSkeletalMeshDetailsPanel::DrawContent()
 	// 선택이 바뀌면 이전 본의 편집 상태가 새 본에 이어지지 않도록 ID를 구분합니다.
 	ImGui::PushID(BoneIndex);
 	bool bChanged = false;
-	bChanged |= ImGui::DragFloat3("Location", Transform.Location.V, 0.1f);
+	// 레벨 디테일 패널과 같은 X/Y/Z 축 컨트롤을 쓴다 (축 버튼을 누르면 그 축만 초기화).
+	bChanged |= FPropertyEditor::DrawVector3("Location", Transform.Location.V, 0.0f);
 	// 드래그 중 값이 튀지 않도록 마지막 오일러 값을 기억한다
 	static FRotationConversionCache RotationCache;
 	FRotator Euler = RotationCache.QuatToRotator(Transform.Rotation);
-	if (ImGui::DragFloat3("Rotation", Euler.V, 0.5f))
+	if (FPropertyEditor::DrawRotator("Rotation", Euler))
 	{
 		Transform.Rotation = RotationCache.RotatorToQuat(Euler);
 		bChanged = true;
 	}
-	bChanged |= ImGui::DragFloat3("Scale", Transform.Scale.V, 0.01f);
+	bChanged |= FPropertyEditor::DrawVector3("Scale", Transform.Scale.V, 1.0f);
 	ImGui::PopID();
 
 	if (bChanged)

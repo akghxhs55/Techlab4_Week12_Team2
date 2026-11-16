@@ -41,7 +41,7 @@ void UAnimNotifyState_AttackWindow::NotifyTick(USkeletalMeshComponent* MeshComp,
 	else if (AMyCharacter* Victim = Cast<AMyCharacter>(HitActor))
 	{
 		// 다른 액터(예: SingleNode로 펀치를 재생하는 ACharacter)가 때려도 맞은 MyCharacter는 피격 반응을 한다
-		HTR_LOG(Info, "[Attack] {} -> {}", Attacker->GetName(), Victim->GetName());
+		KRS_LOG(Info, "[Attack] {} -> {}", Attacker->GetName(), Victim->GetName());
 		Victim->SetIsHit();
 	}
 }

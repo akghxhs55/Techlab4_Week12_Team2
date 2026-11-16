@@ -84,7 +84,7 @@ UAnimSequence* UAnimGraphInstance::LoadSequence(const FString& Path)
 	FString Error;
 	if (!AnimSequenceFile::Read(std::filesystem::path(FilePath.empty() ? Path : FilePath), *Sequence, Error))
 	{
-		HTR_LOG(Error, "[AnimGraph] Animation load failed: {} ({})", Path, Error);
+		KRS_LOG(Error, "[AnimGraph] Animation load failed: {} ({})", Path, Error);
 		delete Sequence;
 		return nullptr;
 	}
@@ -108,7 +108,7 @@ UBlendSpace1D* UAnimGraphInstance::LoadBlendSpace(const FString& Path)
 	FString Error;
 	if (!BlendSpaceFile::Read(std::filesystem::path(FilePath.empty() ? Path : FilePath), *BlendSpace, Error))
 	{
-		HTR_LOG(Error, "[AnimGraph] BlendSpace load failed: {} ({})", Path, Error);
+		KRS_LOG(Error, "[AnimGraph] BlendSpace load failed: {} ({})", Path, Error);
 		delete BlendSpace;
 		return nullptr;
 	}
@@ -127,7 +127,7 @@ UBlendSpace1D* UAnimGraphInstance::LoadBlendSpace(const FString& Path)
 
         if (!Sequence || !BlendSpace->AddSample(Sequence, Sample.SampleValue))
         {
-            HTR_LOG(Warning, "[AnimGraph] Failed to create per-instance BlendSpace samples: {}", Path);
+            KRS_LOG(Warning, "[AnimGraph] Failed to create per-instance BlendSpace samples: {}", Path);
             delete BlendSpace;
             return nullptr;
         }

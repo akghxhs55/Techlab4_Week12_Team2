@@ -10,7 +10,7 @@ cbuffer Worldconstants : register(b2)
     matrix World;
 };
 
-// UBillboardComponent가 제출하는 FSubUVConstants와 동일한 레이아웃이다.
+// UBillboardComponent가 제출하는 FBillboardConstants와 동일한 레이아웃이다.
 cbuffer MaterialParams : register(b1)
 {
     float CurrentFrame;

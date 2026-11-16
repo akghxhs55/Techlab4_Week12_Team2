@@ -55,7 +55,7 @@ bool UGameInstance::InitializeStandalone(const FString& MapPath)
 	WorldContext->SetCurrentWorld(World);
 	if (!FJsonArchive::LoadWorld(World, MapPath))
 	{
-		HTR_LOG(Error, "Failed to load startup map: {}", MapPath);
+		KRS_LOG(Error, "Failed to load startup map: {}", MapPath);
 		return false;
 	}
 	Init();

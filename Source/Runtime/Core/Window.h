@@ -43,6 +43,12 @@ public:
 	// false면 등록된 WndProc 훅(ImGui)을 거치지 않는다. ImGui 컨텍스트가 없는 창용이다.
 	void SetReceivesWndProcHook(bool bValue) { bReceivesWndProcHook = bValue; }
 	bool ReceivesWndProcHook() const { return bReceivesWndProcHook; }
+	// 사용자가 창을 이보다 작게 줄이지 못하게 한다. 값은 배율 100% 기준 픽셀이고 창의 DPI 배율을 곱해 적용한다. 0이면 제한이 없다.
+	void SetMinSize(int InMinWidth, int InMinHeight)
+	{
+		MinWidth = InMinWidth;
+		MinHeight = InMinHeight;
+	}
 
 	HWND GetHandle() const { return hWnd;  }
 
@@ -66,6 +72,9 @@ private:
 
 	bool bCustomTitleBar = false;
 	FCaptionHitTest CaptionHitTest = nullptr;
+
+	int MinWidth = 0;
+	int MinHeight = 0;
 
 	bool bIsResized = false;
 	bool bIsInSizeMove = false;

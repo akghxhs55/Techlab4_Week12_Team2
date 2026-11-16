@@ -111,7 +111,7 @@ void UMaterial::SerializeMaterialReference(FStructuredArchive::FSlot Slot, UMate
 		UMaterial* Base = UAssetManager::GetAssetByPath<UMaterial>(BasePath);
 		if (!Base)
 		{
-			HTR_LOG(Warning, "Load: base material '{}' not found, using DefaultMaterial", BasePath);
+			KRS_LOG(Warning, "Load: base material '{}' not found, using DefaultMaterial", BasePath);
 			Base = UAssetManager::GetAssetByPath<UMaterial>("DefaultMaterial");
 		}
 		Material = CreateInstance(Base);   // 먼저 만들고

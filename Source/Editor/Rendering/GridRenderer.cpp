@@ -156,6 +156,11 @@ bool FGridRenderer::Init(FRenderer *InRenderer) {
   BatchGridPipelineState.RasterizerState = ERasterizerState::SolidNone;
   BatchGridPipelineState.BlendState = EBlendState::AlphaBlend;
   BatchGridPipelineState.DepthStencilState = EDepthStencilState::ReadOnly;
+
+  static_assert(sizeof(FPerspectiveGridData) == 144,
+                "Perspective grid constant buffer layout mismatch");
+  PerspectiveGridConstantBuffer =
+      RenderCommand::CreateConstantBuffer(sizeof(FPerspectiveGridData));
   return true;
 }
 
@@ -230,16 +235,85 @@ void FGridRenderer::DrawWorldLines(uint32 VertexCount, const FMatrix &ViewProj,
   RenderCommand::Draw(VertexCount);
 }
 
-// 직교 Grid를 평면에 고정하고 Current의 평면 관통 축은 뒤쪽·Grid·앞쪽 순서로
-// 합성한다.
-void FGridRenderer::OnRenderBatchGrid(const FMatrix &ViewProj,
-                                      const FVector &CameraPos,
-                                      const FVector &CameraForward,
-                                      EGridPlane Plane, float GridSpacing,
-                                      bool bDrawAllWorldAxes,
-                                      const FViewportSettings &Viewport) {
+// 투영 행렬의 W열로 원근·직교를 구분해 각각 PS Grid와 Batch Grid로 보낸다.
+void FGridRenderer::OnRenderGrid(const FMatrix &ViewProj,
+                                 const FVector &CameraPos,
+                                 const FVector &CameraForward,
+                                 EGridPlane Plane, float GridSpacing,
+                                 bool bDrawAllWorldAxes,
+                                 const FViewportSettings &Viewport) {
   if (Viewport.Width == 0 || Viewport.Height == 0)
     return;
+  const bool Orthographic = std::fabs(ViewProj.M[0][3]) +
+                                std::fabs(ViewProj.M[1][3]) +
+                                std::fabs(ViewProj.M[2][3]) <
+                            1.0e-6f;
+  if (Orthographic)
+    RenderOrthographicGrid(ViewProj, CameraForward, Plane, GridSpacing,
+                           bDrawAllWorldAxes, Viewport);
+  else
+    RenderPerspectiveGrid(ViewProj, CameraPos, GridSpacing, Viewport);
+}
+
+// Z축 뒤쪽 → PS Grid(X·Y축 포함) → Z축 앞쪽 순서로 합성한다. 두 패스 모두 깊이를
+// 쓰지 않으므로 순서가 곧 겹침 순서다.
+void FGridRenderer::RenderPerspectiveGrid(const FMatrix &ViewProj,
+                                          const FVector &CameraPos,
+                                          float GridSpacing,
+                                          const FViewportSettings &Viewport) {
+  FPipelineState *Pipeline = FRenderResourceManager::GetPSO(EPSOType::Grid);
+  if (!Pipeline || !Pipeline->Shader || !Pipeline->Shader->VertexShader ||
+      !Pipeline->Shader->PixelShader)
+    return;
+  FMatrix Inverse;
+  if (!TryInvertGridViewProjection(ViewProj, Inverse))
+    return;
+  FGridFrustum Frustum{};
+  if (!BuildGridFrustum(ViewProj, Frustum))
+    return;
+
+  const FVector FadeOrigin(CameraPos.X, CameraPos.Y, 0);
+  const float FadeRadius =
+      std::clamp(std::fabs(CameraPos.Z) * 50.0f, 20.0f, 500.0f);
+  const float FrontExtent =
+      CameraPos.Z >= 0.0f ? Frustum.AxisExtent.Z : -Frustum.AxisExtent.Z;
+  const auto ZAxisColor = [](float SignedExtent) {
+    return FVector4(0.25f, 0.45f, 0.90f, SignedExtent < 0.0f ? 0.3f : 1.0f);
+  };
+
+  uint32 Count = 0;
+  AddWorldLine(FVector(0, 0, -FrontExtent), FVector(0, 0, 0),
+               ZAxisColor(-FrontExtent), 1.5f, Count);
+  DrawWorldLines(Count, ViewProj, Viewport, FadeOrigin, FadeRadius);
+
+  FPerspectiveGridData Data{};
+  Data.ViewProjection = ViewProj;
+  Data.InverseViewProjection = Inverse;
+  Data.CameraPos = CameraPos;
+  Data.GridSpacing = GridSpacing > 0.0f ? GridSpacing : 1.0f;
+  RenderCommand::UpdateBufferData(PerspectiveGridConstantBuffer.get(), &Data,
+                                  sizeof(Data));
+  RenderCommand::BindPipelineState(*Pipeline);
+  RenderCommand::BindConstantBuffer(0, PerspectiveGridConstantBuffer.get(),
+                                    EShaderBindFlagBits::Vertex);
+  RenderCommand::BindConstantBuffer(0, PerspectiveGridConstantBuffer.get(),
+                                    EShaderBindFlagBits::Pixel);
+  RenderCommand::BindVertexBuffer(nullptr);
+  RenderCommand::Draw(3);
+
+  Count = 0;
+  AddWorldLine(FVector(0, 0, 0), FVector(0, 0, FrontExtent),
+               ZAxisColor(FrontExtent), 1.5f, Count);
+  DrawWorldLines(Count, ViewProj, Viewport, FadeOrigin, FadeRadius);
+}
+
+// 직교 Grid를 평면에 고정하고 Current의 평면 관통 축은 뒤쪽·Grid·앞쪽 순서로
+// 합성한다.
+void FGridRenderer::RenderOrthographicGrid(const FMatrix &ViewProj,
+                                           const FVector &CameraForward,
+                                           EGridPlane Plane, float GridSpacing,
+                                           bool bDrawAllWorldAxes,
+                                           const FViewportSettings &Viewport) {
   FGridFrustum Frustum{};
   if (!BuildGridFrustum(ViewProj, Frustum))
     return;
@@ -247,16 +321,7 @@ void FGridRenderer::OnRenderBatchGrid(const FMatrix &ViewProj,
   const FVector Normal = Plane == EGridPlane::XY   ? FVector(0, 0, 1)
                          : Plane == EGridPlane::XZ ? FVector(0, 1, 0)
                                                    : FVector(1, 0, 0);
-  const bool Orthographic = std::fabs(ViewProj.M[0][3]) +
-                                std::fabs(ViewProj.M[1][3]) +
-                                std::fabs(ViewProj.M[2][3]) <
-                            1.0e-6f;
-  const FVector FadeOrigin(CameraPos.X, CameraPos.Y, 0);
-  const float FadeRadius =
-      Orthographic ? 0.0f
-                   : std::clamp(std::fabs(CameraPos.Z) * 50.0f, 20.0f, 500.0f);
-  const float CameraSide =
-      Orthographic ? -CameraForward.Dot(Normal) : CameraPos.Dot(Normal);
+  const float CameraSide = -CameraForward.Dot(Normal);
   // Grid는 월드 원점에 고정하고 생성 범위만 절두체와 평면의 교차 영역을 따른다.
   const auto Position = [Plane](float U, float V) {
     if (Plane == EGridPlane::XZ)
@@ -282,25 +347,11 @@ void FGridRenderer::OnRenderBatchGrid(const FMatrix &ViewProj,
   if (bDrawAllWorldAxes) {
     AddWorldLine(Normal * -FrontExtent, FVector(0, 0, 0),
                  NormalColor(-FrontExtent), 1.5f, Count);
-    DrawWorldLines(Count, ViewProj, Viewport, FadeOrigin, FadeRadius);
+    DrawWorldLines(Count, ViewProj, Viewport);
     Count = 0;
   }
   float MinU, MaxU, MinV, MaxV;
-  bool bHasVisibleGrid =
-      GetVisibleGridBounds(Frustum, Plane, MinU, MaxU, MinV, MaxV);
-  if (bHasVisibleGrid && !Orthographic) {
-    // 거리 페이드 밖의 선은 보이지 않으므로 해당 영역을 제외해 회전에 따른 간격
-    // 급변을 막는다. 페이드 구를 포함하는 평면 좌표 사각형으로 제한하고, 실제
-    // 원형 경계는 Shader가 처리한다.
-    const float CenterU = Plane == EGridPlane::YZ ? FadeOrigin.Y : FadeOrigin.X;
-    const float CenterV = Plane == EGridPlane::XY ? FadeOrigin.Y : FadeOrigin.Z;
-    MinU = std::max(MinU, CenterU - FadeRadius);
-    MaxU = std::min(MaxU, CenterU + FadeRadius);
-    MinV = std::max(MinV, CenterV - FadeRadius);
-    MaxV = std::min(MaxV, CenterV + FadeRadius);
-    bHasVisibleGrid = MinU <= MaxU && MinV <= MaxV;
-  }
-  if (bHasVisibleGrid) {
+  if (GetVisibleGridBounds(Frustum, Plane, MinU, MaxU, MinV, MaxV)) {
     // 극단적 줌아웃 시 생성할 선 수를 줄여 정점 버퍼 상한을 보장한다.
     double Step = static_cast<double>(Spacing) * 0.1;
     const double Span = std::max(static_cast<double>(MaxU) - MinU,
@@ -330,11 +381,11 @@ void FGridRenderer::OnRenderBatchGrid(const FMatrix &ViewProj,
     AddGridDirection(false, MinV, MaxV);
   }
   AddWorldAxes(Plane, false, Frustum.AxisExtent, Count);
-  DrawWorldLines(Count, ViewProj, Viewport, FadeOrigin, FadeRadius);
+  DrawWorldLines(Count, ViewProj, Viewport);
   if (bDrawAllWorldAxes) {
     Count = 0;
     AddWorldLine(FVector(0, 0, 0), Normal * FrontExtent,
                  NormalColor(FrontExtent), 1.5f, Count);
-    DrawWorldLines(Count, ViewProj, Viewport, FadeOrigin, FadeRadius);
+    DrawWorldLines(Count, ViewProj, Viewport);
   }
 }

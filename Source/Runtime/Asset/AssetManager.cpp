@@ -175,7 +175,7 @@ void UAssetManager::ScanAssets(const fs::path& AssetRoot, const FAssetLoadProgre
 {
 	if (!fs::exists(AssetRoot))
 	{
-		HTR_LOG(Error, "Asset root not found: {}", AssetRoot.generic_string());
+		KRS_LOG(Error, "Asset root not found: {}", AssetRoot.generic_string());
 		return;
 	}
 
@@ -223,7 +223,7 @@ void UAssetManager::LoadAsset(const FString& Key, const FString& Path) {
 	// 이 로드 경로는 원본 파일이나 FBX SDK 없이 저장된 데이터로 렌더 자원을 만든다.
 	if (FFbxMeshBake::IsBakedPath(Path)) {
 		FString Error;
-		if (!LoadFbxMesh(Path, Error)) HTR_LOG(Error, "{}", Error);
+		if (!LoadFbxMesh(Path, Error)) KRS_LOG(Error, "{}", Error);
 		return;
 	}
 
@@ -279,7 +279,7 @@ URenderAsset* UAssetManager::FindOrLoadAsset(const FString& Path)
 	if (Loaded == nullptr)
 	{
 		// 찾을 때마다 파일을 다시 읽지 않도록 등록을 지운다
-		HTR_LOG(Warning, "Asset load failed: {}", SourcePath);
+		KRS_LOG(Warning, "Asset load failed: {}", SourcePath);
 		AssetPathMap.Remove(Key);
 		return nullptr;
 	}
@@ -381,7 +381,7 @@ void UAssetManager::CreateDefaultMeshes()
 	FStaticMeshData* GizmoSphereData = FGeometryGenerator::GetMeshData("GizmoSphere");
 	RegisterAsset("GizmoSphere", CreateStaticMesh(GizmoSphereData));
 
-	const FParticleVertex Vertices[] =
+	const FBillboardVertex Vertices[] =
 	{
 		{ FVector(0.0f, -0.5f,  0.5f), FVector2(0.0f, 0.0f) },
 		{ FVector(0.0f, 0.5f,  0.5f), FVector2(1.0f, 0.0f) },
@@ -398,7 +398,7 @@ void UAssetManager::CreateDefaultMeshes()
 	UStaticMesh* Mesh = NewObject<UStaticMesh>();
 	Mesh->VertexBuffer = RenderCommand::CreateStaticVertexBuffer(
 		Vertices,
-		sizeof(Vertices), sizeof(FParticleVertex));
+		sizeof(Vertices), sizeof(FBillboardVertex));
 	Mesh->IndexBuffer = RenderCommand::CreateStaticIndexBuffer(
 		Indices,
 		ARRAYSIZE(Indices));
@@ -419,7 +419,7 @@ void UAssetManager::CreateDefaultMeshes()
 	Mesh->MeshData.AABB.Max = FVector(0.001f, 0.5, 0.5);
 	Mesh->RebuildRenderData();
 
-	RegisterAsset("ParticleQuad", Mesh);
+	RegisterAsset("BillboardQuad", Mesh);
 }
 
 void UAssetManager::CreateDefaultMaterial() {
@@ -440,7 +440,7 @@ void UAssetManager::CreateBillboardMaterial()
 	BillboardMat->BlendState = EBlendState::AlphaBlend;
 	BillboardMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	BillboardMat->SamplerState = ESamplerState::LinearClamp;
-	BillboardMat->ParamLayout = EMaterialParamLayout::ParticleSubUV;
+	BillboardMat->ParamLayout = EMaterialParamLayout::Billboard;
 	RegisterAsset("BillboardMaterial", BillboardMat);
 }
 
@@ -630,7 +630,7 @@ UAnimSequence* UAssetManager::LoadAnimSequence(const FString& Path)
 	FString Error;
 	if (!AnimSequenceFile::Read(std::filesystem::path(FilePath.empty() ? Path : FilePath), *Sequence, Error))
 	{
-		HTR_LOG(Warning, "Failed to load animation sequence: {} ({})", Path, Error);
+		KRS_LOG(Warning, "Failed to load animation sequence: {} ({})", Path, Error);
 		delete Sequence;    // 캐시에 넣지 않은 객체는 아무도 지우지 않으므로 여기서 지운다
 		return nullptr;
 	}
@@ -761,7 +761,7 @@ UBlendSpace1D* UAssetManager::LoadBlendSpace(const FString& Path)
 	FString Error;
 	if (!BlendSpaceFile::Read(std::filesystem::path(FilePath.empty() ? Path : FilePath), *BlendSpace, Error))
 	{
-		HTR_LOG(Warning, "Failed to load BlendSpace: {} ({})", Path, Error);
+		KRS_LOG(Warning, "Failed to load BlendSpace: {} ({})", Path, Error);
 		delete BlendSpace;
 		return nullptr;
 	}

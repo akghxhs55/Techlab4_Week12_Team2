@@ -24,6 +24,12 @@ public:
 	void ResetPose();
 	void ResetBone(int32 BoneIndex);
 
+	void CommitBonePoseUndo(bool bInteractionActive);
+	void UndoPoseEdit();
+	void RedoPoseEdit();
+	bool CanUndoPoseEdit() const { return !PoseUndoStack.IsEmpty(); }
+	bool CanRedoPoseEdit() const { return !PoseRedoStack.IsEmpty(); }
+
 	void SetGizmoMode(EGizmoMode Mode);
 	void SetGizmoSpace(EGizmoSpace Space);
 	EGizmoMode  GetGizmoMode() const { return BoneGizmo.GetMode(); }
@@ -46,10 +52,19 @@ private:
 	bool UpdateBoneGizmo();
 	void ApplyBoneGizmoTransform();
 	FQuat GetBoneWorldRotation(int32 BoneIndex) const;
+	TArray<FTransform> CaptureBonePose() const;
+	void ApplyBonePose(const TArray<FTransform>& Pose);
+	void ResetBonePoseHistory();
 
 	USceneComponent* BoneGizmoTarget = nullptr;
 	FGizmo BoneGizmo;
 	FTransform DragStartBoneTransform;
 	FMatrix DragParentInverse;
 	FQuat DragParentRotation;
+
+	TArray<TArray<FTransform>> PoseUndoStack;
+	TArray<TArray<FTransform>> PoseRedoStack;
+	TArray<FTransform> CommittedBonePose;
+	bool bPoseUndoPending = false;
+	static constexpr int32 MaxUndoSteps = 100;
 };

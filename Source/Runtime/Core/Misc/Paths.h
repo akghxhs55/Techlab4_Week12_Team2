@@ -7,13 +7,14 @@
 
 // UE의 FPaths처럼 엔진 폴더와 프로젝트 폴더를 나눠서 다룬다.
 // 엔진 자원은 EngineResources, 프로젝트 콘텐츠는 Content, 생성 데이터는 Build 아래에 둔다.
-// 프로젝트 폴더는 .hproject 파일이 있는 곳이며 실행 중 작업 디렉터리로 사용한다.
+// 프로젝트 폴더는 .kproject 파일이 있는 곳이며 실행 중 작업 디렉터리로 사용한다.
 // 프로젝트를 정하면 작업 디렉터리를 프로젝트 폴더로 바꾸므로 "Content/..." 같은 기존 상대 경로는 그대로 쓴다.
 // 엔진 파일은 EngineFile()로 절대 경로를 만들어 연다.
 class FPaths
 {
 public:
-	static constexpr const wchar_t* ProjectExtension = L".hproject";
+	static constexpr const wchar_t* ProjectExtension = L".kproject";
+	static constexpr const wchar_t* ProjectThumbnailRelativePath = L"Saved/ProjectThumbnail.png";
 
 	// exe 위치에서 위로 올라가며 EngineResources/Shaders가 있는 폴더를 찾아 엔진 폴더로 정한다.
 	static bool InitEngineDir();
@@ -24,7 +25,7 @@ public:
 	static const FString& ProjectName();
 	static bool HasProject();
 
-	// .hproject 파일을 읽어 현재 프로젝트로 정하고 작업 디렉터리를 프로젝트 폴더로 바꾼다.
+	// .kproject 파일을 읽어 현재 프로젝트로 정하고 작업 디렉터리를 프로젝트 폴더로 바꾼다.
 	static bool SetProject(const std::filesystem::path& ProjectFile, FString* OutError = nullptr);
 
 	// 엔진 폴더 기준 경로. 절대 경로는 그대로 돌려준다.
@@ -58,11 +59,11 @@ public:
 	static FString ToUtf8(const std::filesystem::path& Path);
 	static std::filesystem::path FromUtf8(const FString& Utf8);
 
-	// Dir 바로 아래에 있는 첫 .hproject 파일. 없으면 빈 경로.
+	// Dir 바로 아래에 있는 첫 .kproject 파일. 없으면 빈 경로.
 	static std::filesystem::path FindProjectFileIn(const std::filesystem::path& Dir);
 };
 
-// .hproject 파일 내용. JSON 형식이다.
+// .kproject 파일 내용. JSON 형식이다.
 struct FProjectDescriptor
 {
 	static constexpr int32 CurrentFileVersion = 1;

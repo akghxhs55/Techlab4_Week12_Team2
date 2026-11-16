@@ -44,7 +44,7 @@ bool FAnimSequenceEditor::Save()
         std::error_code Ignored;
         std::filesystem::remove(TempPath, Ignored);
         SaveMessage = "Save failed: " + Error;
-        HTR_LOG(Error, "AnimSequence save failed: {} ({})", GetAssetPath(), Error);
+        KRS_LOG(Error, "AnimSequence save failed: {} ({})", GetAssetPath(), Error);
         return false;
     }
 
@@ -55,15 +55,15 @@ bool FAnimSequenceEditor::Save()
         std::error_code Ignored;
         std::filesystem::remove(TempPath, Ignored);
         SaveMessage = "Save failed: cannot replace file (" + Ec.message() + ")";
-        HTR_LOG(Error, "AnimSequence save failed: {} ({})", GetAssetPath(), Ec.message());
+        KRS_LOG(Error, "AnimSequence save failed: {} ({})", GetAssetPath(), Ec.message());
         return false;
     }
 
     bNotifiesDirty = false;
-    Sequence->CaptureNotifySnapshot(SavedSnapshot);   // 실행 취소로 이 상태에 돌아오면 변경 없음
+    CaptureSequenceSnapshot(SavedSnapshot);   // 실행 취소로 이 상태에 돌아오면 변경 없음
     SavedRootMotionSettings = CaptureRootMotionSettings();
     SaveMessage = "Saved.";
-    HTR_LOG(Info, "AnimSequence saved: {}", GetAssetPath());
+    KRS_LOG(Info, "AnimSequence saved: {}", GetAssetPath());
     return true;
 }
 
@@ -82,7 +82,7 @@ bool FAnimSequenceEditor::RevertToSaved()
     if (!AnimSequenceFile::Read(std::filesystem::path(Resolved.empty() ? GetAssetPath() : Resolved), *Sequence, Error))
     {
         SaveMessage = "Revert failed: " + Error;
-        HTR_LOG(Error, "AnimSequence revert failed: {} ({})", GetAssetPath(), Error);
+        KRS_LOG(Error, "AnimSequence revert failed: {} ({})", GetAssetPath(), Error);
         return false;
     }
 
@@ -142,7 +142,7 @@ void FAnimSequenceEditor::TriggerPreviewNotifies(float PrevTime, float DeltaMove
         else
         {
             // 이름 Notify는 받을 AnimInstance가 없으므로 로그와 반짝임으로만 보여 준다
-            HTR_LOG(Info, "[AnimPreview] Notify: {}", Event->NotifyName.ToString());
+            KRS_LOG(Info, "[AnimPreview] Notify: {}", Event->NotifyName.ToString());
             FlashNotify(Event->Guid);
         }
     }
@@ -213,14 +213,14 @@ bool FAnimSequenceEditor::InitializeResources()
 {
     if (!Sequence || !Sequence->GetDataModel())
     {
-        HTR_LOG(Warning, "AnimSequence has no animation data: {}", GetAssetPath());
+        KRS_LOG(Warning, "AnimSequence has no animation data: {}", GetAssetPath());
         return false;
     }
 
     const FString& PreviewPath = Sequence->GetPreviewMeshPath();
     if (PreviewPath.empty())
     {
-        HTR_LOG(Warning, "AnimSequence has no preview mesh. Re-import its FBX to record one: {}", GetAssetPath());
+        KRS_LOG(Warning, "AnimSequence has no preview mesh. Re-import its FBX to record one: {}", GetAssetPath());
         return false;
     }
 
@@ -230,13 +230,13 @@ bool FAnimSequenceEditor::InitializeResources()
     USkeletalMesh* PreviewMesh = Cast<USkeletalMesh>(UAssetManager::LoadFbxMesh(FilePath.empty() ? PreviewPath : FilePath, Error));
     if (!PreviewMesh)
     {
-        HTR_LOG(Warning, "AnimSequence preview mesh failed to load: {} ({})", PreviewPath, Error);
+        KRS_LOG(Warning, "AnimSequence preview mesh failed to load: {} ({})", PreviewPath, Error);
         return false;
     }
 
     if (!IsCompatible(*PreviewMesh))
     {
-        HTR_LOG(Warning, "AnimSequence tracks do not match the preview mesh bones: {}", GetAssetPath());
+        KRS_LOG(Warning, "AnimSequence tracks do not match the preview mesh bones: {}", GetAssetPath());
         return false;
     }
 
@@ -258,11 +258,69 @@ void FAnimSequenceEditor::ResetNotifyHistory()
 {
     UndoStack.Empty();
     RedoStack.Empty();
-    if (Sequence) Sequence->CaptureNotifySnapshot(CommittedSnapshot);
+    if (Sequence) CaptureSequenceSnapshot(CommittedSnapshot);
     SavedSnapshot = CommittedSnapshot;
     SavedRootMotionSettings = CaptureRootMotionSettings();   // 열기·되돌리기 직후 값이 저장된 값
     bUndoCommitPending = false;
     bNotifiesDirty = false;
+}
+
+bool FAnimSequenceEditor::CaptureSequenceSnapshot(TArray<uint8>& OutBytes) const
+{
+    OutBytes.Reset();
+    if (!Sequence)
+    {
+        return false;
+    }
+
+    TArray<uint8> NotifyBytes;
+    if (!Sequence->CaptureNotifySnapshot(NotifyBytes))
+    {
+        return false;
+    }
+
+    const FRootMotionSettings Settings = CaptureRootMotionSettings();
+    OutBytes.SetNum(3 + NotifyBytes.Num());
+    OutBytes[0] = Settings.bEnableRootMotion ? 1 : 0;
+    OutBytes[1] = Settings.bForceRootLock ? 1 : 0;
+    OutBytes[2] = Settings.RootLock;
+    if (!NotifyBytes.IsEmpty())
+    {
+        std::memcpy(OutBytes.GetData() + 3, NotifyBytes.GetData(), NotifyBytes.Num());
+    }
+    return true;
+}
+
+bool FAnimSequenceEditor::RestoreSequenceSnapshot(const TArray<uint8>& Bytes)
+{
+    if (!Sequence || Bytes.Num() < 3)
+    {
+        return false;
+    }
+
+    Sequence->SetEnableRootMotion(Bytes[0] != 0);
+    Sequence->SetForceRootLock(Bytes[1] != 0);
+    Sequence->SetRootMotionRootLock(static_cast<ERootMotionRootLock>(Bytes[2]));
+    bPoseDirty = true;
+
+    TArray<uint8> NotifyBytes;
+    const int32 NotifySize = Bytes.Num() - 3;
+    NotifyBytes.SetNum(NotifySize);
+    if (NotifySize > 0)
+    {
+        std::memcpy(NotifyBytes.GetData(), Bytes.GetData() + 3, NotifySize);
+    }
+    return Sequence->RestoreNotifySnapshot(NotifyBytes);
+}
+
+bool FAnimSequenceEditor::AreNotifiesEqualToSaved(const TArray<uint8>& Snapshot) const
+{
+    if (Snapshot.Num() != SavedSnapshot.Num() || Snapshot.Num() < 3)
+    {
+        return false;
+    }
+    const int32 NotifySize = Snapshot.Num() - 3;
+    return NotifySize == 0 || std::memcmp(Snapshot.GetData() + 3, SavedSnapshot.GetData() + 3, NotifySize) == 0;
 }
 
 FAnimSequenceEditor::FRootMotionSettings FAnimSequenceEditor::CaptureRootMotionSettings() const
@@ -292,9 +350,9 @@ void FAnimSequenceEditor::CommitNotifyUndo(bool bInteractionActive)
     bUndoCommitPending = false;
 
     TArray<uint8> Current;
-    if (!Sequence->CaptureNotifySnapshot(Current) || Current == CommittedSnapshot)
+    if (!CaptureSequenceSnapshot(Current) || Current == CommittedSnapshot)
     {
-        bNotifiesDirty = !(Current == SavedSnapshot);
+        bNotifiesDirty = !AreNotifiesEqualToSaved(Current);
         return;
     }
 
@@ -305,20 +363,20 @@ void FAnimSequenceEditor::CommitNotifyUndo(bool bInteractionActive)
     CommittedSnapshot = std::move(Current);
 
     // 편집하다 저장된 상태로 돌아오면 변경 없음으로 본다
-    bNotifiesDirty = !(CommittedSnapshot == SavedSnapshot);
+    bNotifiesDirty = !AreNotifiesEqualToSaved(CommittedSnapshot);
 }
 
 void FAnimSequenceEditor::ApplyNotifySnapshot(const TArray<uint8>& Snapshot)
 {
     // 복원하면 Notify 객체가 새로 만들어지므로 진행 중인 State를 먼저 닫는다
     EndPreviewNotifyStates();
-    if (!Sequence->RestoreNotifySnapshot(Snapshot))
+    if (!RestoreSequenceSnapshot(Snapshot))
     {
-        HTR_LOG(Error, "AnimSequence undo snapshot restore failed: {}", GetAssetPath());
+        KRS_LOG(Error, "AnimSequence undo snapshot restore failed: {}", GetAssetPath());
         return;
     }
     // Guid가 유지되므로 선택은 그대로 둔다 (그 Notify가 없는 상태면 선택이 자연히 비어 보인다)
-    bNotifiesDirty = !(Snapshot == SavedSnapshot);
+    bNotifiesDirty = !AreNotifiesEqualToSaved(Snapshot);
 }
 
 void FAnimSequenceEditor::UndoNotifyEdit()

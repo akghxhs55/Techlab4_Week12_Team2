@@ -3,6 +3,7 @@
 #include "Editor/EditorUI/EditorTitleBar.h"
 
 #include "Core/Window.h"
+#include "Core/Misc/Version.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -24,12 +25,14 @@ namespace
 	};
 
 	constexpr const char* TitleBarWindowName = "##WindowTitleBar";
-	// 메뉴 항목의 세로 여백. 에디터 메뉴(FEditorTabContainer::DrawTabMenu)와 같은 값이라 띠 높이와 메뉴 높이가 맞는다.
-	constexpr float MenuFramePaddingY = 4.0f;
+	// 띠의 위아래 여백. 띠 높이(글자 크기 + 여백 × 2)가 Windows 기본 제목 표시줄(배율 100%에서 약 32px)과 비슷해지는 값이다.
+	// 메뉴 글자는 이 여백만큼 내려가 띠 가운데에 온다.
+	constexpr float MenuFramePaddingY = 8.0f;
 	constexpr ImGuiWindowFlags TitleBarFlags = ImGuiWindowFlags_MenuBar | ImGuiWindowFlags_NoScrollbar |
 		ImGuiWindowFlags_NoScrollWithMouse | ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoNavFocus;
 
 	bool GInstalled = false;
+	bool GShowVersionTooltip = false;
 	HWND GHwnd = nullptr;
 	FString GTitle;
 	ImTextureID GLogo = ImTextureID_Invalid;
@@ -79,16 +82,16 @@ namespace
 		{
 			ImU32 Background;
 			if (Kind == ECaptionButton::Close)
-				Background = bHeld ? IM_COL32(241, 112, 122, 255) : IM_COL32(232, 17, 35, 255);
+				Background = bHeld ? EditorColor::CloseHeld : EditorColor::CloseHover;
 			else
-				Background = bHeld ? IM_COL32(255, 255, 255, 40) : IM_COL32(255, 255, 255, 24);
+				Background = bHeld ? EditorColor::White(40) : EditorColor::White(24);
 			DrawList->AddRectFilled(Min, Max, Background);
 		}
 
 		const ImU32 Color = ImGui::GetColorU32(ImGuiCol_Text);
 		const float Thickness = ImMax(1.0f, EditorStyle::Scale(1.0f));
-		// 아이콘 크기는 버튼 높이에 비례시켜 DPI 배율을 따라간다.
-		const float Half = ImFloor(Size.y * 0.22f);
+		// 아이콘은 띠 높이와 무관하게 Windows 제목 표시줄 버튼과 같은 10px(배율 100%)로 그린다.
+		const float Half = ImFloor(EditorStyle::Scale(5.0f));
 		const ImVec2 Center(ImFloor((Min.x + Max.x) * 0.5f) + 0.5f, ImFloor((Min.y + Max.y) * 0.5f) + 0.5f);
 
 		switch (Kind)
@@ -119,8 +122,9 @@ namespace
 	}
 }
 
-void EditorTitleBar::Install(FWindow& Window)
+void EditorTitleBar::Install(FWindow& Window, bool bShowVersionTooltip)
 {
+	GShowVersionTooltip = bShowVersionTooltip;
 	GHwnd = Window.GetHandle();
 	GTitle = ReadWindowTitle(GHwnd);
 	Window.EnableCustomTitleBar(&EditorTitleBar::IsCaption);
@@ -130,6 +134,7 @@ void EditorTitleBar::Install(FWindow& Window)
 void EditorTitleBar::Uninstall()
 {
 	GInstalled = false;
+	GShowVersionTooltip = false;
 	GHwnd = nullptr;
 	GTitle.clear();
 	GLogo = ImTextureID_Invalid;
@@ -200,7 +205,8 @@ void EditorTitleBar::Draw()
 			ImVec2(GLogoColumnMaxX - Inset, Bar.Max.y - Inset));
 	}
 
-	const ImVec2 ButtonSize(ImFloor(Height * 1.7f), Height);
+	// 버튼 폭은 Windows 제목 표시줄 버튼과 같은 46px(배율 100%). 높이는 띠 전체를 채운다.
+	const ImVec2 ButtonSize(ImFloor(EditorStyle::Scale(46.0f)), Height);
 	const float ButtonsMinX = Bar.Max.x - ButtonSize.x * 3.0f;
 	// 메뉴는 이 프레임 뒤쪽(DrawMenuBar)에서 그리므로 직전 프레임의 메뉴 끝을 쓴다.
 	const float MenusMaxX = ImMax(GLogoColumnMaxX, GMenusMaxX);
@@ -215,7 +221,13 @@ void EditorTitleBar::Draw()
 		if (TextX + TextSize.x <= ButtonsMinX - Spacing)
 		{
 			const float TextY = ImFloor(Bar.Min.y + (Height - TextSize.y) * 0.5f);
-			Window->DrawList->AddText(ImVec2(TextX, TextY), ImGui::GetColorU32(ImGuiCol_TextDisabled), GTitle.c_str());
+			Window->DrawList->AddText(ImVec2(TextX, TextY), EditorColor::TextSecondary, GTitle.c_str());
+			// Use the text bounds without adding a button so the title remains draggable.
+			if (GShowVersionTooltip && ImGui::IsWindowHovered() && !ImGui::IsAnyMouseDown() &&
+				ImGui::IsMouseHoveringRect(ImVec2(TextX, TextY), ImVec2(TextX + TextSize.x, TextY + TextSize.y), false))
+			{
+				ImGui::SetTooltip("Version: %s", KURISU_VERSION_STRING);
+			}
 		}
 	}
 
@@ -229,6 +241,12 @@ void EditorTitleBar::Draw()
 	if (CaptionButton("Close", ECaptionButton::Close, ImVec2(ButtonsMinX + ButtonSize.x * 2.0f, Bar.Min.y), ButtonSize, bMaximized))
 		PostMessageW(GHwnd, WM_SYSCOMMAND, SC_CLOSE, 0);
 	ImGui::PopID();
+
+	// 스플래시 구분선과 같은 톤의 1px 하단 적갈색 경계선 (2줄 로고 영역은 건너뛴다)
+	{
+		const float LineStartX = (bLogoSpansRows && GLogo != ImTextureID_Invalid) ? GLogoColumnMaxX : Bar.Min.x;
+		Window->DrawList->AddLine(ImVec2(LineStartX, Bar.Max.y - 1.0f), ImVec2(Bar.Max.x, Bar.Max.y - 1.0f), EditorColor::AccentDim);
+	}
 	ImGui::PopClipRect();
 
 	// 로고 칸과, 메뉴 끝부터 버튼 앞까지의 빈 곳으로 창을 끈다.
@@ -248,6 +266,9 @@ bool EditorTitleBar::DrawMenuBar(const std::function<void()>& DrawMenus)
 	if (!GInstalled) return false;
 
 	// Draw가 만든 띠 창에 이어서 그린다. 같은 프레임에 같은 이름으로 Begin하면 내용이 덧붙는다.
+	// BeginMenuBar의 글자 기준선과 클릭 영역도 띠 높이를 계산할 때와 같은 여백을 사용한다.
+	ImGui::PushStyleVar(ImGuiStyleVar_FramePadding,
+		ImVec2(ImGui::GetStyle().FramePadding.x, EditorStyle::Scale(MenuFramePaddingY)));
 	const bool bVisible = ImGui::Begin(TitleBarWindowName, nullptr, TitleBarFlags);
 	if (bVisible && ImGui::BeginMenuBar())
 	{
@@ -276,6 +297,7 @@ bool EditorTitleBar::DrawMenuBar(const std::function<void()>& DrawMenus)
 	}
 
 	ImGui::End();
+	ImGui::PopStyleVar();
 	return true;
 }
 

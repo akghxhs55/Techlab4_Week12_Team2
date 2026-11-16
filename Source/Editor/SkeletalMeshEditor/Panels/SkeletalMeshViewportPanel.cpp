@@ -1,6 +1,7 @@
 #include "EnginePCH.h"
 #include "SkeletalMeshViewportPanel.h"
 #include "Editor/SkeletalMeshEditor/SkeletalMeshEditor.h"
+#include "Editor/Viewports/ViewportToolbarWidgets.h"
 
 FSkeletalMeshViewportPanel::FSkeletalMeshViewportPanel(FSkeletalMeshEditor& InEditor)
 	: FSkeletalMeshEditorPanel(InEditor, "Viewport")
@@ -9,15 +10,8 @@ FSkeletalMeshViewportPanel::FSkeletalMeshViewportPanel(FSkeletalMeshEditor& InEd
 
 void FSkeletalMeshViewportPanel::DrawContent()
 {
-
-	int32 Mode = static_cast<int32>(Editor.GetGizmoMode());
-	ImGui::SetNextItemWidth(-1.0f);
-	
-	constexpr const char* GizmoModeNames[] = { "Location", "Rotation", "Scale" };
-	if (ImGui::Combo("##GizmoMode", &Mode, GizmoModeNames, IM_ARRAYSIZE(GizmoModeNames)))
-	{
-		Editor.SetGizmoMode(static_cast<EGizmoMode>(Mode));
-	}
+	// 이동/회전/크기 세 가지 (EGizmoMode 순서)
+	constexpr int32 GizmoModeCount = 3;
 
 	FEditorViewportClient* Client = Editor.GetViewportClient();
 	const ImVec2 Size = ImGui::GetContentRegionAvail();
@@ -106,7 +100,7 @@ void FSkeletalMeshViewportPanel::DrawContent()
 		if (bFocused && bHovered && !IO.WantTextInput && !IO.AppFocusLost &&
 			!Editor.IsGizmoDragging() && ImGui::IsKeyPressed(ImGuiKey_Space, false))
 		{
-			const int32 NextMode = (static_cast<int32>(Editor.GetGizmoMode()) + 1) % IM_ARRAYSIZE(GizmoModeNames);
+			const int32 NextMode = (static_cast<int32>(Editor.GetGizmoMode()) + 1) % GizmoModeCount;
 			Editor.SetGizmoMode(static_cast<EGizmoMode>(NextMode));
 		}
 	}
@@ -115,4 +109,12 @@ void FSkeletalMeshViewportPanel::DrawContent()
 	uint32 Width = static_cast<uint32>(Size.x);
 	uint32 Height = static_cast<uint32>(Size.y);
 	Editor.SetViewportState(Width, Height, Input, PointerInput);
+
+	// 레벨 뷰포트처럼 왼쪽 위에 기즈모 모드 버튼을 겹쳐 그린다. 이미지 위에 겹친 자식 창이라 뷰포트 입력과 섞이지 않는다.
+	const int Clicked = ViewportToolbarWidgets::TransformModeOverlay("##SkeletalGizmoToolbar", Origin,
+		static_cast<int>(Editor.GetGizmoMode()));
+	if (Clicked >= 0)
+	{
+		Editor.SetGizmoMode(static_cast<EGizmoMode>(Clicked));
+	}
 }

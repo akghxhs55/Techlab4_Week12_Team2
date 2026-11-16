@@ -41,69 +41,93 @@ void FOutlineRenderer::SetMesh(UStaticMesh* InMesh)
 // 카메라 거리 대신 View별 픽셀 크기와 고정 확장량으로 선택 Outline을 그린다.
 void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InViewProj, const FViewportSettings& Viewport)
 {
-	if (!InOutline.GetTarget() || Viewport.Width == 0 || Viewport.Height == 0)
+	const TArray<UPrimitiveComponent*>& RawTargets = InOutline.GetTargets();
+	if (RawTargets.IsEmpty() || Viewport.Width == 0 || Viewport.Height == 0)
 	{
 		return;
 	}
 
-	FVertexBuffer* VertexBuffer = nullptr;
-	FIndexBuffer* IndexBuffer = nullptr;
-	const FStructuredBuffer* BoneBuffer = nullptr;
-	if (UStaticMesh* StaticMesh = InOutline.GetMesh())
+	struct FRenderableOutlineTarget
 	{
-		VertexBuffer = StaticMesh->GetVertexBuffer();
-		IndexBuffer = StaticMesh->GetIndexBuffer();
-	}
-	else if (USkinnedMeshComponent* Skinned = Cast<USkinnedMeshComponent>(InOutline.GetTarget()))
+		FVertexBuffer* VertexBuffer = nullptr;
+		FIndexBuffer* IndexBuffer = nullptr;
+		const FStructuredBuffer* BoneBuffer = nullptr;
+		FMatrix World;
+		FMatrix NormalMatrix;
+	};
+
+	TArray<FRenderableOutlineTarget> RenderTargets;
+	for (UPrimitiveComponent* Target : RawTargets)
 	{
-		// CPU 경로는 현재 포즈가 들어 있는 인스턴스 VB, GPU 경로는 공유 VB와 본 버퍼로 그린다
-		if (FSkeletalMeshObject* MeshObject = Skinned->GetMeshObject())
+		if (!Target)
 		{
-			VertexBuffer = MeshObject->GetVertexBuffer(0);
-			IndexBuffer = MeshObject->GetIndexBuffer(0);
-			BoneBuffer = MeshObject->GetBoneMatrixBuffer();
+			continue;
+		}
+
+		FVertexBuffer* VertexBuffer = nullptr;
+		FIndexBuffer* IndexBuffer = nullptr;
+		const FStructuredBuffer* BoneBuffer = nullptr;
+		if (UStaticMesh* StaticMesh = Target->GetRenderMesh())
+		{
+			VertexBuffer = StaticMesh->GetVertexBuffer();
+			IndexBuffer = StaticMesh->GetIndexBuffer();
+		}
+		else if (USkinnedMeshComponent* Skinned = Cast<USkinnedMeshComponent>(Target))
+		{
+			// CPU 경로는 현재 포즈가 들어 있는 인스턴스 VB, GPU 경로는 공유 VB와 본 버퍼로 그린다
+			if (FSkeletalMeshObject* MeshObject = Skinned->GetMeshObject())
+			{
+				VertexBuffer = MeshObject->GetVertexBuffer(0);
+				IndexBuffer = MeshObject->GetIndexBuffer(0);
+				BoneBuffer = MeshObject->GetBoneMatrixBuffer();
+			}
+		}
+
+		if (VertexBuffer && IndexBuffer)
+		{
+			const FMatrix OriginalWorld = Target->GetWorldMatrix();
+			RenderTargets.Add({ VertexBuffer, IndexBuffer, BoneBuffer, OriginalWorld, OriginalWorld.Inverse().GetTransposed() });
 		}
 	}
 
 	// 메시 없는 컴포넌트(텍스트 등)는 아웃라인을 그리지 않는다
-	if (!VertexBuffer || !IndexBuffer)
+	if (RenderTargets.IsEmpty())
 	{
 		return;
 	}
 
-	FPipelineState MaskPipeline = MaskPipelineState;
-	FPipelineState OutlinePipeline = OutlinePipelineState;
-	if (BoneBuffer)
-	{
-		FShaderProgram* Skinned = FRenderResourceManager::GetShaderProgram(Shader->Name + "#GPU_SKIN");
-		if (!Skinned) return;
-		MaskPipeline.Shader = OutlinePipeline.Shader = Skinned;
-		RenderCommand::BindShaderResource(BoneMatrixBufferSlot, BoneBuffer, EShaderBindFlagBits::Vertex);
-	}
-
-	RenderCommand::BindVertexBuffer(VertexBuffer);
-	RenderCommand::BindIndexBuffer(IndexBuffer);
-	RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Vertex);
-
-	const FMatrix OriginalWorld = InOutline.GetWorldMatrix();
-    const FMatrix& World = OriginalWorld;
-    const FMatrix NormalMatrix = OriginalWorld.Inverse().GetTransposed();
-    const FMatrix& ViewProj = InViewProj;
+	const FMatrix& ViewProj = InViewProj;
 	const float ViewportWidth = static_cast<float>(Viewport.Width);
 	const float ViewportHeight = static_cast<float>(Viewport.Height);
-	const uint32 IndexCount = IndexBuffer->GetIndexCount();
+	FShaderProgram* SkinnedShader = FRenderResourceManager::GetShaderProgram(Shader->Name + "#GPU_SKIN");
 
-	// 1패스: 두께 0(확장 없음)으로 선택 메시 영역을 스텐실에 찍는다.
-	FOutlineData MaskConst = { World, NormalMatrix, ViewProj, FVector4(ViewportWidth, ViewportHeight, 0.0f, 0.0f) };
-	RenderCommand::BindPipelineState(MaskPipeline);
-	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &MaskConst, sizeof(MaskConst));
-	RenderCommand::DrawIndexed(IndexCount);
+	auto DrawPass = [&](const FPipelineState& BasePipeline, float ExpandPixels)
+	{
+		for (const FRenderableOutlineTarget& Item : RenderTargets)
+		{
+			FPipelineState Pipeline = BasePipeline;
+			if (Item.BoneBuffer)
+			{
+				if (!SkinnedShader) continue;
+				Pipeline.Shader = SkinnedShader;
+				RenderCommand::BindShaderResource(BoneMatrixBufferSlot, Item.BoneBuffer, EShaderBindFlagBits::Vertex);
+			}
 
-	// 2패스: 확장 메시 중 스텐실 바깥 부분만 노란색으로 그린다.
-	FOutlineData OutlineConst = { World, NormalMatrix, ViewProj, FVector4(ViewportWidth, ViewportHeight, 2.0f, 0.0f) };
-	RenderCommand::BindPipelineState(OutlinePipeline);
-	RenderCommand::UpdateBufferData(ConstantBuffer.get(), &OutlineConst, sizeof(OutlineConst));
-	RenderCommand::DrawIndexed(IndexCount);
+			RenderCommand::BindVertexBuffer(Item.VertexBuffer);
+			RenderCommand::BindIndexBuffer(Item.IndexBuffer);
+			RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Vertex);
+
+			FOutlineData ConstData = { Item.World, Item.NormalMatrix, ViewProj, FVector4(ViewportWidth, ViewportHeight, ExpandPixels, 0.0f) };
+			RenderCommand::BindPipelineState(Pipeline);
+			RenderCommand::UpdateBufferData(ConstantBuffer.get(), &ConstData, sizeof(ConstData));
+			RenderCommand::DrawIndexed(Item.IndexBuffer->GetIndexCount());
+		}
+	};
+
+	// 1패스: 모든 선택 메시 영역을 스텐실에 먼저 찍어 겹치는 선택 외곽선이 내부를 가리지 않게 한다.
+	DrawPass(MaskPipelineState, 0.0f);
+	// 2패스: 스텐실 바깥 부분만 노란색 외곽선 띠로 그린다.
+	DrawPass(OutlinePipelineState, 2.0f);
 
 	// 이후 패스(Gizmo 등)에 스텐실·블렌드 상태가 새지 않도록 기본값으로 되돌린다.
 	RenderCommand::SetBlendState(EBlendState::Opaque);

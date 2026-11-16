@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "AnimBlueprintGraphPanel.h"
+#include "Editor/EditorUI/EditorStyle.h"
 #include "Editor/AnimBlueprintEditor/AnimBlueprintEditor.h"
 #include <cstring>
 
@@ -202,8 +203,8 @@ void FAnimBlueprintGraphPanel::DrawNodes(FAnimBlueprintGraph& Graph)
 
         if (bCurrentState)
         {
-            NodeEditor::PushStyleColor(NodeEditor::StyleColor_NodeBg, ImVec4(0.12f, 0.35f, 0.18f, 1.0f));
-            NodeEditor::PushStyleColor(NodeEditor::StyleColor_NodeBorder, ImVec4(0.3f, 1.0f, 0.5f, 1.0f));
+            NodeEditor::PushStyleColor(NodeEditor::StyleColor_NodeBg, EditorColor::ToVec4(EditorColor::SuccessDim));
+            NodeEditor::PushStyleColor(NodeEditor::StyleColor_NodeBorder, EditorColor::ToVec4(EditorColor::Success));
         }
 
         NodeEditor::BeginNode(NodeId);
@@ -282,14 +283,14 @@ void FAnimBlueprintGraphPanel::DrawLinks(const FAnimBlueprintGraph& Graph)
 {
     for (const FAnimBlueprintLink& Link : Graph.Links)
     {
-        const ImVec4 Color = Graph.Type == EAnimBlueprintGraphType::StateMachine ? ImVec4(0.3f, 0.9f, 0.4f, 1.0f) : ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        const ImVec4 Color = Graph.Type == EAnimBlueprintGraphType::StateMachine ? EditorColor::ToVec4(EditorColor::Success) : EditorColor::ToVec4(EditorColor::White(255));
         NodeEditor::Link(NodeEditor::LinkId(Link.Id), NodeEditor::PinId(Link.FromPinId), NodeEditor::PinId(Link.ToPinId), Color);
     }
 
     for (const FAnimBlueprintTransition& Transition : Graph.Transitions)
     {
         const NodeEditor::LinkId LinkId(Transition.Id);
-        const ImVec4 Color = Transition.Rule == EAnimBlueprintTransitionRule::Disabled ? ImVec4(0.5f, 0.5f, 0.5f, 1.0f) : ImVec4(1.0f, 0.75f, 0.2f, 1.0f);
+        const ImVec4 Color = Transition.Rule == EAnimBlueprintTransitionRule::Disabled ? EditorColor::ToVec4(EditorColor::TextDisabled) : EditorColor::ToVec4(EditorColor::Warning);
         NodeEditor::Link(LinkId, NodeEditor::PinId(Transition.FromPinId), NodeEditor::PinId(Transition.ToPinId), Color);
 
         if (NodeEditor::GetHoveredLink() == LinkId)

@@ -47,7 +47,7 @@ void FLog::Emit(ELogVerbosity Verbosity, const FString& Message)
             {
                 const auto Stamp = std::chrono::duration_cast<std::chrono::microseconds>(
                     std::chrono::system_clock::now().time_since_epoch()).count();
-                File.open(Directory / ("Hitori-" + std::to_string(Stamp) + ".log"), std::ios::out | std::ios::app);
+                File.open(Directory / ("Kurisu-" + std::to_string(Stamp) + ".log"), std::ios::out | std::ios::app);
             }
         }
         if (File)

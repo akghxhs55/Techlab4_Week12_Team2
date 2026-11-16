@@ -155,14 +155,14 @@ void FJsonArchiveOutputFormatter::Serialize(float& Value)
 {
 	// nlohmann은 NaN/무한대를 null로 출력한다 → 불러올 때 기본값이 되므로 경고만 남긴다
 	if (!std::isfinite(Value))
-		HTR_LOG(Warning, "Save: non-finite float is written as null");
+		KRS_LOG(Warning, "Save: non-finite float is written as null");
 	Top() = Value;
 }
 
 void FJsonArchiveOutputFormatter::Serialize(double& Value)
 {
 	if (!std::isfinite(Value))
-		HTR_LOG(Warning, "Save: non-finite double is written as null");
+		KRS_LOG(Warning, "Save: non-finite double is written as null");
 	Top() = Value;
 }
 

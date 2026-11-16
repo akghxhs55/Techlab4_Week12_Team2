@@ -10,4 +10,5 @@ public:
 
 protected:
 	void DrawContent() override;
+	bool IsViewportPanel() const override { return true; }
 };

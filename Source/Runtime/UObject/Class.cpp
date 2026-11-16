@@ -8,7 +8,7 @@
 UStruct::UStruct()
 	:UObject(false)
 {
-	//HTR_LOG(Info, "Create RTTI UClass");
+	//KRS_LOG(Info, "Create RTTI UClass");
 }
 
 UStruct::~UStruct()

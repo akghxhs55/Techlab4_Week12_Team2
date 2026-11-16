@@ -5,6 +5,46 @@
 #include "Camera/CameraComponent.h"
 #include "GameFramework/Actor.h"
 #include "GameFramework/Actor/LightActorBase.h"
+#include <cmath>
+
+namespace
+{
+	float SnapValue(float Value, float SnapStep)
+	{
+		if (SnapStep <= 0.0f) return Value;
+		const float Snapped = std::roundf(Value / SnapStep) * SnapStep;
+		return Snapped == 0.0f ? 0.0f : Snapped;
+	}
+
+	FVector SnapVector(const FVector& Value, float SnapStep)
+	{
+		return {
+			SnapValue(Value.X, SnapStep),
+			SnapValue(Value.Y, SnapStep),
+			SnapValue(Value.Z, SnapStep)
+		};
+	}
+
+	// 회전 스냅 간격. 지금은 설정 없이 고정한다.
+	constexpr float RotationSnapDegrees = 5.0f;
+
+	// 크기는 0이 되면 안 되므로 0으로 맞춰질 값은 한 칸(SnapStep)으로 둔다. 부호는 유지한다.
+	float SnapScaleValue(float Value, float SnapStep)
+	{
+		const float Snapped = SnapValue(Value, SnapStep);
+		if (Snapped != 0.0f) return Snapped;
+		return Value < 0.0f ? -SnapStep : SnapStep;
+	}
+
+	FVector SnapScaleVector(const FVector& Value, float SnapStep)
+	{
+		return {
+			SnapScaleValue(Value.X, SnapStep),
+			SnapScaleValue(Value.Y, SnapStep),
+			SnapScaleValue(Value.Z, SnapStep)
+		};
+	}
+}
 
 static const FVector AxisDirs[3] = {
 	FVector(1, 0, 0),
@@ -41,7 +81,7 @@ void FGizmo::Update(const FRay& MouseRay, const FVector2& MousePos, const FMatri
 	ViewCameraLocation = CameraLocation;
 	bViewCameraOrthographic = bCameraOrthographic;
 
-	if (!Target) // 만약 현재 타겟이 없다면 
+	if (!Target || Mode == EGizmoMode::Select) // 만약 현재 타겟이 없거나 선택 전용 모드라면 
 	{
 		HoveredAxis = -1;
 		DraggingAxis = -1;
@@ -71,6 +111,9 @@ void FGizmo::Update(const FRay& MouseRay, const FVector2& MousePos, const FMatri
 // 모드에 따라 선형 축 또는 회전 링 피킹을 선택한다.
 int FGizmo::PickAxis(const FVector2& MousePos, const FMatrix& ViewProj, int ScreenW, int ScreenH)
 {
+	if (Mode == EGizmoMode::Select)
+		return -1;
+
 	if (Mode == EGizmoMode::Rotation)
 		return PickRotationAxis(MousePos, ViewProj, ScreenW, ScreenH);
 
@@ -218,7 +261,10 @@ bool FGizmo::ApplyScaleToLight(float Factor)
 {
     ULocalLightComponent* Light = GetTargetLight();
     if (!Light) return false;
-    Light->SetAttenuationRadius(DragStartRadius * Factor);
+    float Radius = DragStartRadius * Factor;
+    if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+        Radius = SnapScaleValue(Radius, LocationSnapSize);
+    Light->SetAttenuationRadius(Radius);
     return true;
 }
 
@@ -305,15 +351,42 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 	FVector current = MouseRay.Origin + MouseRay.Direction * t;
 	if (Mode == EGizmoMode::Location && DraggingAxis >= AXIS_PLANE_YZ && DraggingAxis <= AXIS_PLANE_XY)
 	{
-		const FVector Delta = current - DragStartPoint;
-		Target->SetWorldLocation(DragStartLocation + Delta - DragPlaneNormal * Delta.Dot(DragPlaneNormal), false);
+		const FVector RawDelta = current - DragStartPoint;
+		const FVector PlanarDelta = RawDelta - DragPlaneNormal * RawDelta.Dot(DragPlaneNormal);
+		FVector NewLocation = DragStartLocation + PlanarDelta;
+		if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+		{
+			const int PlaneNormalAxis = DraggingAxis - AXIS_PLANE_YZ;
+			if (Space == EGizmoSpace::World)
+			{
+				if (PlaneNormalAxis != 0) NewLocation.X = SnapValue(NewLocation.X, LocationSnapSize);
+				if (PlaneNormalAxis != 1) NewLocation.Y = SnapValue(NewLocation.Y, LocationSnapSize);
+				if (PlaneNormalAxis != 2) NewLocation.Z = SnapValue(NewLocation.Z, LocationSnapSize);
+			}
+			else
+			{
+				const FVector Axis1 = GetAxisDirection((PlaneNormalAxis + 1) % 3);
+				const FVector Axis2 = GetAxisDirection((PlaneNormalAxis + 2) % 3);
+				NewLocation = DragStartLocation
+					+ Axis1 * SnapValue(PlanarDelta.Dot(Axis1), LocationSnapSize)
+					+ Axis2 * SnapValue(PlanarDelta.Dot(Axis2), LocationSnapSize);
+			}
+		}
+		Target->SetWorldLocation(NewLocation, false);
 		return;
 	}
 
 	if (DraggingAxis == AXIS_SCREEN && Mode != EGizmoMode::Rotation)
 	{
 		if (Mode == EGizmoMode::Location)
-			Target->SetWorldLocation(DragStartLocation + (current - DragStartPoint), false);
+		{
+			FVector NewLocation = DragStartLocation + (current - DragStartPoint);
+			if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+			{
+				NewLocation = SnapVector(NewLocation, LocationSnapSize);
+			}
+			Target->SetWorldLocation(NewLocation, false);
+		}
 		else
 		{
 			float dx = MousePos.X - DragStartMousePos.X;
@@ -324,7 +397,12 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 			if (factor < 0.01f) factor = 0.01f;
 
 			if (!ApplyScaleToLight(factor)) 	// 조명이면 여기서 radius만 변경하고 return
-				Target->SetRelativeScale3D(DragStartScale * factor);
+			{
+				FVector NewScale = DragStartScale * factor;
+				if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+					NewScale = SnapScaleVector(NewScale, LocationSnapSize);
+				Target->SetRelativeScale3D(NewScale);
+			}
 		}
 		return;
 	}
@@ -333,6 +411,9 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 	{
 		float currentAngle = ComputeAngleOnPlane(current, DraggingAxis);
 		float deltaAngle = currentAngle - DragStartAngle;
+		// 드래그를 시작한 자세에서 돌린 각도를 일정 간격으로 맞춘다.
+		if (bLocationSnapEnabled)
+			deltaAngle = SnapValue(deltaAngle, RotationSnapDegrees * PI / 180.0f);
 
 		FQuat delta = FQuat::MakeFromAxisAngle(DragAxisDirection, deltaAngle);
 		FQuat start = DragStartRotation.Quaternion();
@@ -347,7 +428,23 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 	float amount = delta.Dot(DragAxisDirection);
 
 	if (Mode == EGizmoMode::Location)
-		Target->SetWorldLocation(DragStartLocation + DragAxisDirection * amount, false);
+	{
+		FVector NewLocation = DragStartLocation + DragAxisDirection * amount;
+		if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+		{
+			if (Space == EGizmoSpace::World)
+			{
+				if (DraggingAxis == 0)      NewLocation.X = SnapValue(NewLocation.X, LocationSnapSize);
+				else if (DraggingAxis == 1) NewLocation.Y = SnapValue(NewLocation.Y, LocationSnapSize);
+				else if (DraggingAxis == 2) NewLocation.Z = SnapValue(NewLocation.Z, LocationSnapSize);
+			}
+			else
+			{
+				NewLocation = DragStartLocation + DragAxisDirection * SnapValue(amount, LocationSnapSize);
+			}
+		}
+		Target->SetWorldLocation(NewLocation, false);
+	}
 	else   // Scale
 	{
 		float factor = 1.0f + amount;
@@ -360,6 +457,13 @@ void FGizmo::UpdateDrag(const FRay& MouseRay, const FVector2& MousePos)
 		if (DraggingAxis == 0)      NewScale.X *= factor;
 		else if (DraggingAxis == 1) NewScale.Y *= factor;
 		else                        NewScale.Z *= factor;
+
+		// 끌고 있는 축의 크기만 맞춘다. 나머지 축은 건드리지 않는다.
+		if (bLocationSnapEnabled && LocationSnapSize > 0.0f)
+		{
+			float& Component = DraggingAxis == 0 ? NewScale.X : (DraggingAxis == 1 ? NewScale.Y : NewScale.Z);
+			Component = SnapScaleValue(Component, LocationSnapSize);
+		}
 
 		Target->SetRelativeScale3D(NewScale);
 	}

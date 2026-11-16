@@ -35,9 +35,9 @@ void FAssetEditorTab::OnCloseRequested()
 
 void FAssetEditorTab::DrawMenuBar()
 {
-	// 기본 Editor Menu Bar.
+	// 기본 메뉴 바. 레벨 에디터와 같이 File 메뉴부터 둔다.
 
-	if (ImGui::BeginMenu("Editor"))
+	if (ImGui::BeginMenu("File"))
 	{
 		if (ImGui::MenuItem("Close Editor"))
 		{

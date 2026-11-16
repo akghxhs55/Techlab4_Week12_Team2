@@ -30,11 +30,25 @@ FSkeletalMeshEditorTab::FSkeletalMeshEditorTab(FSkeletalMeshEditor& InEditor)
 
 void FSkeletalMeshEditorTab::DrawMenuBar()
 {
-	if (ImGui::BeginMenu("Viewer"))
+	// 레벨 에디터와 같은 순서: File → Edit → Window
+	if (ImGui::BeginMenu("File"))
 	{
-		if (ImGui::MenuItem("Close Viewer"))
+		if (ImGui::MenuItem("Close Editor"))
 		{
 			MeshEditor.Close();
+		}
+		ImGui::EndMenu();
+	}
+
+	if (ImGui::BeginMenu("Edit"))
+	{
+		if (ImGui::MenuItem("Undo", "Ctrl+Z", false, MeshEditor.CanUndoPoseEdit()))
+		{
+			MeshEditor.UndoPoseEdit();
+		}
+		if (ImGui::MenuItem("Redo", "Ctrl+Y", false, MeshEditor.CanRedoPoseEdit()))
+		{
+			MeshEditor.RedoPoseEdit();
 		}
 		ImGui::EndMenu();
 	}
@@ -97,6 +111,24 @@ void FSkeletalMeshEditorTab::OnRender(bool bActive)
 		if (Panel->IsOpen() && (bActive || Panel->IsDetached(DockSpaceId)))
 		{
 			Panel->OnRender();
+		}
+	}
+
+	MeshEditor.CommitBonePoseUndo(MeshEditor.IsGizmoDragging() || ImGui::IsAnyItemActive());
+
+	const ImGuiIO& IO = ImGui::GetIO();
+	const bool bTabFocused = ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_DockHierarchy) ||
+		HasFocusedSubWindow();
+	if (bActive && bTabFocused && IO.KeyCtrl && !IO.WantTextInput)
+	{
+		if (ImGui::IsKeyPressed(ImGuiKey_Z, false))
+		{
+			if (IO.KeyShift) MeshEditor.RedoPoseEdit();
+			else             MeshEditor.UndoPoseEdit();
+		}
+		else if (ImGui::IsKeyPressed(ImGuiKey_Y, false))
+		{
+			MeshEditor.RedoPoseEdit();
 		}
 	}
 }

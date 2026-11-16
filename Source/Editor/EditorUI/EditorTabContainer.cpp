@@ -258,7 +258,8 @@ void FEditorTabContainer::DrawTabs()
 
 		// 숨겨진 탭도 내부 도킹 노드를 유지할 수 있도록 호출한다.
 		Tab->OnRender(bVisible);
-		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_DockHierarchy))
+		if (ImGui::IsWindowFocused(ImGuiFocusedFlags_ChildWindows | ImGuiFocusedFlags_DockHierarchy) ||
+			Tab->HasFocusedSubWindow())
 		{
 			FocusedTab = Tab;
 		}
@@ -278,7 +279,8 @@ void FEditorTabContainer::DrawTabMenu(IEditorTab& Tab)
 	{
 		ImGui::PushID(&Tab);
 		{
-			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
+			// 세로 여백은 메뉴 바를 소유한 창(메인 제목 표시줄 또는 분리된 탭)이 정한다.
+			ImGui::PushStyleVarX(ImGuiStyleVar_FramePadding, EditorStyle::Scale(8.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(EditorStyle::Scale(8.0f), EditorStyle::Scale(4.0f)));
 			Tab.DrawMenuBar();
 			DrawEditorTabsMenu();

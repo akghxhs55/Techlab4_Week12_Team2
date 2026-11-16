@@ -236,7 +236,7 @@ namespace FCollision
 		int32 Failed = 0;
 		auto Expect = [&](bool Got, bool Want, const char* Name)
 			{
-				if (Got != Want) { ++Failed; HTR_LOG(Error, "[Collision] FAIL {} (got {}, want {})", Name, Got, Want); }
+				if (Got != Want) { ++Failed; KRS_LOG(Error, "[Collision] FAIL {} (got {}, want {})", Name, Got, Want); }
 			};
 
 		const FVector Zero(0, 0, 0);
@@ -275,7 +275,7 @@ namespace FCollision
 		Expect(CapsuleBox(Capsule(1.6f, 0), UnitBox), false, "capsule-box side apart");
 		Expect(CapsuleBox({ FVector(-3, 0, 0), FVector(3, 0, 0), 0.1f }, UnitBox), true, "capsule-box through");
 
-		HTR_LOG(Info, "[Collision] self test: {} failed", Failed);
+		KRS_LOG(Info, "[Collision] self test: {} failed", Failed);
 		return Failed;
 	}
 }

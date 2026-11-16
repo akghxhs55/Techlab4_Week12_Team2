@@ -199,7 +199,7 @@ void FTextRenderer::OnRender(const FString& Text, const FMatrix& WorldMatrix, fl
 	// 버퍼 용량 초과 체크
 	if (Vertices.Num() > (int32)MaxVertices || Indices.Num() > (int32)MaxIndices)
 	{
-		HTR_LOG(Warning, "Text too long for text buffer ({} chars max): {}", MaxCharacters, Text);
+		KRS_LOG(Warning, "Text too long for text buffer ({} chars max): {}", MaxCharacters, Text);
 		return;
 	}
 

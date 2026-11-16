@@ -9,8 +9,6 @@ enum class EPSOType : uint8
 	StaticMesh_Opaque,       // 기본 불투명
 	StaticMesh_Translucent,  // 반투명
 	StaticMesh_Wireframe,    
-	Particle_AlphaBlend,     
-	Particle_Additive,       
 	Reserved_5,
 	Grid,                    
 	Outline_Mask,            
@@ -19,7 +17,7 @@ enum class EPSOType : uint8
 	Reserved_10,
 	Reserved_11,
 	ToneMap,
-	Reserved_13,                // 삭제된 FireBall 자리. 씬 파일의 PSOType 숫자(Billboard=14 등)가 밀리지 않게 남긴다
+	Reserved_13,                // 삭제된 FireBall 자리. 씬 파일의 PSOType 숫자가 밀리지 않게 남긴다
 	Billboard,
 	StaticMesh_Forward,
 	StaticMesh_WorldNormal,
@@ -32,6 +30,9 @@ enum class EPSOType : uint8
 	Reserved_23,
 	Decal, 
 	DecalAdditive,
+	// 기존 씬의 PSOType 번호가 밀리지 않도록 끝에 추가
+	Particle_AlphaBlend,
+	Particle_Additive,
 	Count
 };
 

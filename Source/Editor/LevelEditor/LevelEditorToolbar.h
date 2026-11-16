@@ -4,7 +4,7 @@
 
 #include "Editor/EditorUI/EditorPanel.h"
 #include "Editor/EditorUI/EditorCommand.h"
-#include "Editor/HitoriEd/PlayInEditorDataTypes.h"
+#include "Editor/KurisuEd/PlayInEditorDataTypes.h"
 
 class FLevelEditorToolbar
 {
@@ -28,6 +28,15 @@ public:
 		DrawGridMenu = std::move(InDrawGridMenu);
 		GetGridSpacing = std::move(InGetGridSpacing);
 	}
+	// 위치 스냅 드롭다운. 버튼에는 현재 상태(켜짐 여부와 간격)만 보여주고, 옵션은 뷰포트 패널이 그리는 메뉴에서 바꾼다.
+	void SetLocationSnapBinding(std::function<bool()> InGetLocationSnap,
+		std::function<float()> InGetLocationSnapSize,
+		std::function<void()> InDrawSnapMenu)
+	{
+		GetLocationSnap = std::move(InGetLocationSnap);
+		GetLocationSnapSize = std::move(InGetLocationSnapSize);
+		DrawSnapMenu = std::move(InDrawSnapMenu);
+	}
 	void Draw();
 
 	static constexpr float Height = 40.0f;
@@ -45,6 +54,9 @@ private:
 	std::function<void()> DrawAddMenu;
 	std::function<void()> DrawGridMenu;
 	std::function<int32()> GetGridSpacing;
+	std::function<bool()> GetLocationSnap;
+	std::function<float()> GetLocationSnapSize;
+	std::function<void()> DrawSnapMenu;
 
 
 };
