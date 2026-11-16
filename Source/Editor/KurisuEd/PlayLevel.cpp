@@ -177,10 +177,6 @@ void UEditorEngine::TickPIEInput(float DeltaTime)
 	{
 		// 다음 ImGui::NewFrame에서 같은 ESC가 부모 패널로 포커스를 옮기지 않게 소비한다.
 		ImGui::SetKeyOwner(ImGuiKey_Escape, ImGuiKeyOwner_Any, ImGuiInputFlags_LockUntilRelease);
-		GameViewport.InputKey(nullptr, static_cast<int32>(EKeyCode::Escape), true);
-	}
-	if (GameViewport.ConsumeExitRequest())
-	{
 		RequestEndPlayMap();
 		return;
 	}

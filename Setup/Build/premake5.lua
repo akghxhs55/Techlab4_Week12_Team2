@@ -261,13 +261,18 @@ project "KurisuEditor"
 
 	filter {}
 
--- 패키징용 게임 실행 파일. 에디터 소스와 ImGui를 링크하지 않는다.
--- 에셋과 셰이더는 실행 중에 읽으므로 배포 시 Package.bat으로 콘텐츠를 함께 복사한다.
-project "KurisuGame"
+-- Release editor builds also produce a source-free portable distribution.
+filter "configurations:Release"
+	postbuildcommands {
+		'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' .. ProjectRoot .. '/Setup/Packaging/PackageEditor.ps1" -Configuration Release -VCToolsInstallDir "$(VCToolsInstallDir)."'
+	}
+filter {}
+
+-- Shared launcher settings for project games and the portable editor's player template.
+function ConfigureGameRuntime()
 	location (ProjectRoot .. "/Build/Projects")
 	kind     "WindowedApp"
 	CommonSettings()
-	targetname "KurisuGame"
 
 	pchheader "EnginePCH.h"
 	pchsource (ProjectRoot .. "/Source/Game/GamePCH.cpp")
@@ -303,7 +308,24 @@ project "KurisuGame"
 		"dxguid.lib",
 		"d3dcompiler.lib",
 	}
+end
 
+-- A selected project's game executable belongs to that project's Build folder.
+project "KurisuGame"
+	ConfigureGameRuntime()
+	targetname "KurisuGame"
+	targetdir (ProjectRoot .. "/DefaultProject/Build/Bin/" .. outputdir)
+	objdir (ProjectRoot .. "/DefaultProject/Build/Intermediate/" .. outputdir .. "/KurisuGame")
+	debugdir (ProjectRoot .. "/DefaultProject")
+	debugargs { "DefaultProject.kproject" }
+
+-- Engine distribution support, not a built game. Exported games receive a copy
+-- of this PE image as KurisuGame.exe inside their own Build/Package folder.
+project "KurisuPlayer"
+	ConfigureGameRuntime()
+	targetname "KurisuPlayer"
+	targetextension ".bin"
+	targetdir (ProjectRoot .. "/Build/Runtime/" .. outputdir)
 
 -- 셰이더를 VS에서 편집하기 위한 보기 전용 프로젝트 (언리얼의 Shaders와 같은 역할).
 -- 에셋(Assets)은 에디터 Content Drawer에서 다루므로 솔루션에 넣지 않는다.

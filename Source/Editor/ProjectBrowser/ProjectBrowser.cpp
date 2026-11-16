@@ -633,11 +633,11 @@ namespace
 			ImGui::TextUnformatted("My Projects");
 			ImGui::SameLine();
 
-			const float RemoveW = ImGui::CalcTextSize("Remove from List").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+			const float RemoveW = ImGui::CalcTextSize("Remove").x + ImGui::GetStyle().FramePadding.x * 2.0f;
 			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - RemoveW));
 
 			ImGui::BeginDisabled(SelectedRecent < 0 || SelectedRecent >= Recent.Num());
-			if (ImGui::Button("Remove from List", ImVec2(RemoveW, 0)))
+			if (ImGui::Button("Remove", ImVec2(RemoveW, 0)))
 			{
 				RecentProjects::Remove(Recent[SelectedRecent]);
 				Recent = RecentProjects::Load();
@@ -662,13 +662,6 @@ namespace
 			if (Recent.IsEmpty())
 			{
 				ImGui::TextDisabled("No projects yet.");
-				ImGui::Spacing();
-				PushAccentButtonColors();
-				if (ImGui::Button("Create a New Project"))
-				{
-					ActivePage = EPage::NewProject;
-				}
-				ImGui::PopStyleColor(3);
 			}
 			else
 			{

@@ -76,10 +76,11 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 {
 	wchar_t ExePath[MAX_PATH] = {};
 	GetModuleFileNameW(nullptr, ExePath, MAX_PATH);
-	const std::filesystem::path GameExe = std::filesystem::path(ExePath).parent_path() / L"KurisuGame.exe";
+	const std::filesystem::path RuntimeDllDir = std::filesystem::path(ExePath).parent_path();
+	const std::filesystem::path GameExe = Root / L"EngineResources/Runtime/Windows-x86_64/KurisuPlayer.bin";
 	if (!std::filesystem::exists(GameExe))
 	{
-		KRS_LOG(Error, "Packaging canceled: no source tree to build from and no prebuilt KurisuGame.exe next to the editor.");
+		KRS_LOG(Error, "Packaging canceled: the editor distribution is missing its player template. Replace it with a complete Release distribution.");
 		return false;
 	}
 
@@ -89,10 +90,10 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 	bCopyDone = false;
 	bCopyFailed = false;
 	CopyResult = FPaths::ToUtf8(Out);
-	KRS_LOG(Info, "Packaging with prebuilt KurisuGame.exe (no build) -> {}", CopyResult);
+	KRS_LOG(Info, "Packaging game from the bundled player template -> {}", CopyResult);
 
 	// 콘텐츠가 100MB 넘게 복사되므로 에디터가 멈추지 않게 따로 돌린다. 로그는 메인 스레드의 Tick에서만 남긴다.
-	CopyThread = std::thread([this, Root, ProjectDir, ProjectFile, GameExe, Out]
+	CopyThread = std::thread([this, Root, ProjectDir, ProjectFile, GameExe, RuntimeDllDir, Out]
 		{
 			namespace fs = std::filesystem;
 			std::error_code Ec;
@@ -102,6 +103,19 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 			{
 				CopyResult = "KurisuGame.exe";
 				bCopyFailed = true;
+			}
+			// Portable editors carry the matching VC runtime beside KurisuEditor.exe.
+			// Ship those DLLs with exported games as well; FBX is editor-only.
+			if (!bCopyFailed)
+			{
+				for (fs::directory_iterator It(RuntimeDllDir, Ec), End; !Ec && It != End; It.increment(Ec))
+				{
+					if (!It->is_regular_file(Ec) || It->path().extension() != L".dll") continue;
+					const auto Name = It->path().filename().wstring();
+					if (Name.starts_with(L"msvcp") || Name.starts_with(L"vcruntime") || Name.starts_with(L"concrt"))
+						if (!fs::copy_file(It->path(), Out / It->path().filename(), fs::copy_options::overwrite_existing, Ec)) break;
+				}
+				if (Ec) { CopyResult = "Visual C++ runtime"; bCopyFailed = true; }
 			}
 			// 엔진 콘텐츠(EngineResources)는 엔진 폴더에서, 프로젝트 콘텐츠(Content)는 프로젝트 폴더에서 가져온다.
 			// 게임 exe는 옆에 있는 .kproject를 찾아 그 폴더를 프로젝트 폴더로 쓴다.
@@ -120,12 +134,19 @@ bool FGamePackager::StartCopyOnly(const std::filesystem::path& Root)
 				fs::create_directories(Out / Folder, Ec);
                 for (fs::recursive_directory_iterator It(Base, Ec), End; !Ec && It != End; It.increment(Ec))
                 {
+                    // Player templates are editor support files, not game assets.
+                    const fs::path Relative = It->path().lexically_relative(Base);
+                    if (FString(Folder) == "EngineResources" && !Relative.empty() && *Relative.begin() == L"Runtime")
+                    {
+                        if (It->is_directory(Ec)) It.disable_recursion_pending();
+                        continue;
+                    }
                     if (!It->is_regular_file(Ec)) continue;
                     FString Name = It->path().filename().string();
                     std::transform(Name.begin(), Name.end(), Name.begin(), [](unsigned char C) { return static_cast<char>(std::tolower(C)); });
                     if (FString(Folder) == "Config" && (Name == "editor.ini" || Name == "imgui.ini")) continue;
                     if (Name.ends_with(".obj.bin")) continue;
-                    const fs::path Target = Out / Folder / It->path().lexically_relative(Base);
+                    const fs::path Target = Out / Folder / Relative;
                     fs::create_directories(Target.parent_path(), Ec);
                     if (Ec || !fs::copy_file(It->path(), Target, fs::copy_options::overwrite_existing, Ec)) break;
                 }

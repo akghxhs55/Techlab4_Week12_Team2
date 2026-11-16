@@ -21,7 +21,10 @@ try {
     $projectName = [IO.Path]::GetFileNameWithoutExtension($projectFile)
     $solution = Join-Path $engineRoot 'Kurisu.slnx'
     if (-not $SkipBuild) {
-        if (-not (Test-Path -LiteralPath $solution)) {
+        $gameProject = Join-Path $engineRoot 'Build\Projects\KurisuGame.vcxproj'
+        if (-not (Test-Path -LiteralPath $solution) -or
+            -not (Test-Path -LiteralPath $gameProject) -or
+            -not ([IO.File]::ReadAllText($gameProject).Contains('$(KurisuGameProjectDir)'))) {
             & (Join-Path $engineRoot 'SlnGenerator.bat') --no-pause
             if ($LASTEXITCODE -ne 0) { throw 'Project generation failed.' }
         }
@@ -29,10 +32,10 @@ try {
         $msbuild = & $vswhere -latest -prerelease -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
         if (-not $msbuild) { throw 'MSBuild not found. Install the Visual Studio C++ workload.' }
         $env:VSLANG = '1033'
-        & $msbuild $solution -t:KurisuGame "-p:Configuration=$Configuration" -p:Platform=x64 -m -nologo -v:minimal
+        & $msbuild $solution -t:KurisuGame "-p:Configuration=$Configuration" -p:Platform=x64 "-p:KurisuGameProjectDir=$projectRoot" -m -nologo -v:minimal
         if ($LASTEXITCODE -ne 0) { throw 'Game build failed.' }
     }
-    $gameExe = Join-Path $engineRoot "Build\Bin\$Configuration-windows-x86_64\KurisuGame.exe"
+    $gameExe = Join-Path $projectRoot "Build\Bin\$Configuration-windows-x86_64\KurisuGame.exe"
     if (-not (Test-Path -LiteralPath $gameExe -PathType Leaf)) { throw "Missing executable: $gameExe" }
     $packageRoot = [IO.Path]::GetFullPath((Join-Path $projectRoot 'Build\Package'))
     $out = [IO.Path]::GetFullPath((Join-Path $packageRoot $projectName))
