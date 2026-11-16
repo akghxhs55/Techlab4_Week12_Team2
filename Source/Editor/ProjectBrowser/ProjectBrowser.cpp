@@ -755,6 +755,7 @@ namespace
 			ImGui::PushStyleVar(ImGuiStyleVar_ChildRounding, EditorStyle::Scale(6.0f));
 			ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(EditorStyle::Scale(20.0f), EditorStyle::Scale(18.0f)));
 			ImGui::BeginChild("##CreateProjectPanel", ImVec2(0.0f, PanelH), ImGuiChildFlags_Borders | ImGuiChildFlags_AlwaysUseWindowPadding);
+			DrawProjectBackground();
 
 			// 템플릿 배너 카드
 			{
@@ -819,7 +820,8 @@ namespace
 			ImGui::PopStyleColor(2);
 
 			ImGui::Spacing();
-			const float CreateW = EditorStyle::Scale(132.0f);
+			// My Projects 페이지의 Open 버튼과 같은 폭.
+			const float CreateW = EditorStyle::Scale(96.0f);
 			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - CreateW));
 			ImGui::BeginDisabled(!NameError.empty() || Location.empty());
 			PushAccentButtonColors();
