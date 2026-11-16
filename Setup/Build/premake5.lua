@@ -310,9 +310,8 @@ function ConfigureGameRuntime()
 	}
 end
 
--- Without a selected project this builds the editor distribution's launcher
--- template into the engine's Build folder. Game packaging redirects it to the
--- selected project's Build folder (see GenerateProjects.ps1).
+-- The launcher is built from engine sources only, so it is an engine artifact.
+-- Game packaging and the editor distribution both copy this one executable.
 project "KurisuGame"
 	ConfigureGameRuntime()
 	targetname "KurisuGame"

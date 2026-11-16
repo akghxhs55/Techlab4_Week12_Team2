@@ -31,7 +31,7 @@ Visual Studio 2026의 C++ 데스크톱 개발 워크로드와 Windows SDK가 필
    - 지원 구성: `Debug`, `Release`, `Shipping` (`x64`, C++20)
    - 주요 타깃: `KurisuEditor` (에디터), `KurisuGame` (게임)
    - 에디터·엔진 빌드 결과물: `<EngineRoot>/Build/Bin/<Configuration>-windows-x86_64/`
-   - 게임 빌드 결과물: `<ProjectRoot>/Build/Bin/<Configuration>-windows-x86_64/` (프로젝트를 지정하지 않고 `KurisuGame`을 빌드하면 엔진 `Build/Bin`에 에디터 배포용 실행 템플릿으로 생성)
+   - 게임 실행 파일: 엔진 `Build/Bin/<Configuration>-windows-x86_64/KurisuGame.exe` (엔진 소스만으로 만들어지므로 모든 프로젝트가 공유)
 3. **패키징**
    - `Setup/Packaging/Package.bat [Release|Shipping] [프로젝트.kproject 경로]` 또는 `Setup/Packaging/Package.ps1`을 실행하면 `<ProjectRoot>/Build/Package/<ProjectName>/`에 실행 파일, `EngineResources`, 프로젝트 `Content`/`Config`가 패키징됩니다.
 
@@ -54,9 +54,9 @@ MSBuild.exe .\Kurisu.slnx -t:KurisuEditor -p:Configuration=Release -p:Platform=x
 
 `SlnGenerator.bat`으로 솔루션을 갱신하고 `KurisuEditor`를 **Release / x64**로 빌드하면 `KurisuGame`도 먼저 빌드한 뒤 `Build/Distributions/KurisuEditor/` 배포 폴더를 자동 생성합니다. 폴더 전체를 옮겨 `KurisuEditor.exe`로 실행하면 됩니다. Debug 에디터 빌드는 게임을 빌드하지 않습니다.
 
-배포본에는 에디터 실행 파일, FBX DLL, 해당 도구 버전의 x64 C++ 런타임 DLL 및 `EngineResources`가 포함됩니다. `EngineResources/Runtime/Windows-x86_64/KurisuGame.exe`는 기존 `KurisuGame`의 Release 빌드 결과이며, 사용자가 만든 콘텐츠와 함께 복사해 게임을 패키징합니다. 소스, 기본 프로젝트 콘텐츠, PDB, 정적 라이브러리, 중간 빌드 파일과 개인 설정은 포함하지 않습니다. 프로젝트는 새로 생성하거나 별도로 보관한 `.kproject`를 열면 됩니다.
+배포본에는 에디터 실행 파일, FBX DLL, 해당 도구 버전의 x64 C++ 런타임 DLL, `EngineResources` 및 게임 패키징 스크립트(`Setup/Packaging/Package.ps1`)가 포함됩니다. `EngineResources/Runtime/Windows-x86_64/KurisuGame.exe`는 기존 `KurisuGame`의 Release 빌드 결과이며, 사용자가 만든 콘텐츠와 함께 복사해 게임을 패키징합니다. 소스, 기본 프로젝트 콘텐츠, PDB, 정적 라이브러리, 중간 빌드 파일과 개인 설정은 포함하지 않습니다. 프로젝트는 새로 생성하거나 별도로 보관한 `.kproject`를 열면 됩니다.
 
-원본 프로젝트에서 게임 패키징을 실행하면 필요한 `KurisuGame`을 해당 프로젝트의 `Build/Bin`에 빌드합니다. 소스 없는 배포 에디터는 함께 제공되는 실행 템플릿을 사용해 `<ProjectRoot>/Build/Package/<ProjectName>/KurisuGame.exe`와 콘텐츠를 생성하므로 Visual Studio나 엔진 소스가 필요하지 않습니다.
+원본 프로젝트에서 게임 패키징을 실행하면 `KurisuGame`을 엔진 `Build/Bin`에 증분 빌드한 뒤 그 실행 파일을 사용합니다. 실행 파일은 엔진 소스만으로 만들어지므로 모든 프로젝트가 같은 빌드를 공유합니다. 소스 없는 배포 에디터는 같은 `Package.ps1`을 빌드 없이 실행해 함께 제공되는 실행 템플릿으로 `<ProjectRoot>/Build/Package/<ProjectName>/KurisuGame.exe`와 콘텐츠를 생성하므로 Visual Studio나 엔진 소스가 필요하지 않습니다. 두 경우 모두 같은 스크립트가 복사하므로 패키지 구성은 같습니다.
 
 ### 게임 패키징 옵션
 
@@ -69,7 +69,8 @@ MSBuild.exe .\Kurisu.slnx -t:KurisuEditor -p:Configuration=Release -p:Platform=x
 ```
 
 - 기본 구성은 `Release`이며, 프로젝트 경로를 생략하면 저장소 루트의 `.kproject`를 찾고, 없으면 `DefaultProject/DefaultProject.kproject`를 사용합니다.
-- 기본 동작은 선택한 프로젝트의 `Build/Bin/<Configuration>-windows-x86_64/`에 `KurisuGame` 빌드 후 패키징입니다. 게임 중간 파일도 해당 프로젝트의 `Build/Intermediate`에 생성됩니다. `-SkipBuild`는 해당 프로젝트·구성의 실행 파일이 이미 있을 때 사용하며, 엔진 폴더의 실행 파일을 대신 사용하지 않습니다.
+- 기본 동작은 엔진 `Build/Bin/<Configuration>-windows-x86_64/`에 `KurisuGame`을 증분 빌드한 뒤 패키징입니다. 게임 프로젝트 폴더에는 패키지 출력(`Build/Package`) 외의 빌드 파일을 만들지 않습니다. `-SkipBuild`는 엔진 폴더에 해당 구성의 실행 파일이 이미 있을 때 사용합니다.
+- 패키지에는 실행에 필요한 x64 C++ 런타임 DLL이 함께 들어가므로 Visual C++ 재배포 패키지가 없는 PC에서도 실행됩니다.
 - 패키지에는 `.kproject`도 포함됩니다. `Config/editor.ini`, `Config/imgui.ini` 및 재생성 가능한 `*.obj.bin`은 제외하고, FBX·애니메이션의 `.bin` 에셋은 포함합니다.
 - 같은 프로젝트의 기존 패키지 출력 폴더는 패키징할 때 교체됩니다.
 

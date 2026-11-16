@@ -43,28 +43,9 @@ try {
             }
         }
         if (-not (Test-Path -LiteralPath $solution -PathType Leaf)) { throw "Solution was not generated: $solution" }
-        # Only the game target follows the selected .kproject. Passing OutDir
-        # globally would also redirect the shared engine and header tool.
         $gameProject = Join-Path $engineRoot 'Build\Projects\KurisuGame.vcxproj'
         [xml]$gameXml = [IO.File]::ReadAllText($gameProject)
         $namespace = $gameXml.DocumentElement.NamespaceURI
-        $defaults = $gameXml.CreateElement('PropertyGroup', $namespace)
-        $projectDir = $gameXml.CreateElement('KurisuGameProjectDir', $namespace)
-        $projectDir.SetAttribute('Condition', "'`$(KurisuGameProjectDir)' == ''")
-        # Without a selected project, KurisuGame is the editor distribution's
-        # launcher template and stays in the engine's Build folder. Game
-        # packaging always passes KurisuGameProjectDir explicitly.
-        $projectDir.InnerText = '$(ProjectDir)..\..'
-        [void]$defaults.AppendChild($projectDir)
-        $firstOutDir = $gameXml.SelectSingleNode("//*[local-name()='OutDir']")
-        [void]$gameXml.DocumentElement.InsertBefore($defaults, $firstOutDir.ParentNode)
-        foreach ($node in $gameXml.SelectNodes("//*[local-name()='OutDir']")) {
-            $node.InnerText = '$(KurisuGameProjectDir)\Build\Bin\$(Configuration)-windows-x86_64\'
-        }
-        foreach ($node in $gameXml.SelectNodes("//*[local-name()='IntDir']")) {
-            $node.InnerText = '$(KurisuGameProjectDir)\Build\Intermediate\$(Configuration)-windows-x86_64\KurisuGame\'
-        }
-        $gameXml.Save($gameProject)
         # SLNX BuildDependency is unconditional, even when Premake dependson is
         # filtered. A conditional project reference keeps Debug editor-only.
         $editorProject = Join-Path $engineRoot 'Build\Projects\KurisuEditor.vcxproj'
