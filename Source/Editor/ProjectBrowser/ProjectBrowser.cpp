@@ -546,11 +546,8 @@ namespace
 			const float ThumbH = EditorStyle::Scale(132.0f);
 			const ImVec2 Max = { Pos.x + CardW, Pos.y + CardH };
 
-			// 상단 썸네일 영역
-			DL->AddRectFilledMultiColor(
-				Pos, { Max.x, Pos.y + ThumbH },
-				EditorColor::BgRaised, EditorColor::BgPanel,
-				EditorColor::BgDeepest, EditorColor::BgDeepest);
+			// 상단 썸네일 영역. 테두리가 둥글어서 위쪽 모서리를 같은 반경으로 깎아야 밖으로 삐져나오지 않는다
+			DL->AddRectFilled(Pos, { Max.x, Pos.y + ThumbH }, EditorColor::BgDeepest, Radius, ImDrawFlags_RoundCornersTop);
 
 			const auto Thumbnail = Thumbnails.find(ProjectPath);
 			if (Thumbnail != Thumbnails.end() && Thumbnail->second)
@@ -566,8 +563,8 @@ namespace
 				const float CardAspect = CardW / ThumbH;
 				const float U = ImageAspect > CardAspect ? (1.0f - CardAspect / ImageAspect) * 0.5f : 0.0f;
 				const float V = ImageAspect < CardAspect ? (1.0f - ImageAspect / CardAspect) * 0.5f : 0.0f;
-				DL->AddImage((ImTextureID)Thumbnail->second.Get(), Pos, { Max.x, Pos.y + ThumbH },
-					{ U, V }, { 1.0f - U, 1.0f - V });
+				DL->AddImageRounded((ImTextureID)Thumbnail->second.Get(), Pos, { Max.x, Pos.y + ThumbH },
+					{ U, V }, { 1.0f - U, 1.0f - V }, IM_COL32_WHITE, Radius, ImDrawFlags_RoundCornersTop);
 			}
 			else if (LogoTexture != ImTextureID_Invalid)
 			{
@@ -633,11 +630,11 @@ namespace
 			ImGui::TextUnformatted("My Projects");
 			ImGui::SameLine();
 
-			const float RemoveW = ImGui::CalcTextSize("Remove from List").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+			const float RemoveW = ImGui::CalcTextSize("Remove").x + ImGui::GetStyle().FramePadding.x * 2.0f;
 			ImGui::SetCursorPosX(std::max(ImGui::GetCursorPosX(), ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - RemoveW));
 
 			ImGui::BeginDisabled(SelectedRecent < 0 || SelectedRecent >= Recent.Num());
-			if (ImGui::Button("Remove from List", ImVec2(RemoveW, 0)))
+			if (ImGui::Button("Remove", ImVec2(RemoveW, 0)))
 			{
 				RecentProjects::Remove(Recent[SelectedRecent]);
 				Recent = RecentProjects::Load();
@@ -662,13 +659,6 @@ namespace
 			if (Recent.IsEmpty())
 			{
 				ImGui::TextDisabled("No projects yet.");
-				ImGui::Spacing();
-				PushAccentButtonColors();
-				if (ImGui::Button("Create a New Project"))
-				{
-					ActivePage = EPage::NewProject;
-				}
-				ImGui::PopStyleColor(3);
 			}
 			else
 			{

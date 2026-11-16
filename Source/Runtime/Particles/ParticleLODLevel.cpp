@@ -4,6 +4,7 @@
 #include "ParticleModule.h"
 #include "Module/ParticleModuleRequired.h"
 #include "Module/ParticleModuleSpawn.h"
+#include "Module/ParticleModuleTypeDataBase.h"
 
 namespace
 {
@@ -17,7 +18,8 @@ namespace
 		}
 
 		if (Class->IsChildOf(UParticleModuleRequired::StaticClass()) ||
-			Class->IsChildOf(UParticleModuleSpawn::StaticClass()))
+			Class->IsChildOf(UParticleModuleSpawn::StaticClass()) ||
+			Class->IsChildOf(UParticleModuleTypeDataBase::StaticClass()))
 		{
 			KRS_LOG(Warning, "Particle module '{}' cannot be in the module list, dropped", ClassName);
 			return nullptr;
@@ -34,6 +36,9 @@ UParticleLODLevel::~UParticleLODLevel()
 
 	delete SpawnModule;
 	SpawnModule = nullptr;
+
+	delete TypeDataModule;
+	TypeDataModule = nullptr;
 	
 	for (UParticleModule* Module : Modules)
 	{
@@ -94,6 +99,39 @@ void UParticleLODLevel::Serialize(FStructuredArchive::FRecord Record)
 	if (Ar.IsError())
 	{
 		return;
+	}
+
+	TOptional<FStructuredArchive::FSlot> TypeDataSlot = Record.TryEnterField("TypeDataModule", TypeDataModule != nullptr);
+	if (TypeDataSlot.IsSet())
+	{
+		FStructuredArchive::FRecord TypeDataRecord = TypeDataSlot.GetValue().EnterRecord();
+
+		FString ClassName = bLoading ? FString{} : TypeDataModule->GetClass()->Name;
+		TypeDataRecord << SA_VALUE("Class", ClassName);
+
+		if (bLoading)
+		{
+			assert(!TypeDataModule);
+			UClass* Class = FindClass(ClassName);
+			if (Class && Class->IsChildOf(UParticleModuleTypeDataBase::StaticClass()))
+			{
+				TypeDataModule = NewObject<UParticleModuleTypeDataBase>(this, Class);
+			}
+			else
+			{
+				KRS_LOG(Warning, "TypeData class not found, dropped {}", ClassName);
+			}
+		}
+
+		if (TypeDataModule)
+		{
+			TypeDataModule->Serialize(TypeDataRecord.EnterRecord("Data"));
+		}
+
+		if (Ar.IsError())
+		{
+			return;
+		}
 	}
 
 	int32 Count = bLoading ? 0 : Modules.Num();

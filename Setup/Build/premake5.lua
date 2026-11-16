@@ -1,5 +1,18 @@
 local ProjectRoot = path.getabsolute("../..", _SCRIPT_DIR)
 
+-- Build events run in Build/Projects. Keep their paths relative: cmd.exe
+-- misreads the line after one that holds a non-ASCII (e.g. Korean) path,
+-- which breaks multi-line build events when the engine lives in such a folder.
+-- path.getrelative is not used because it returns absolute paths when the
+-- engine root is a drive root (GenerateProjects.ps1 maps non-ASCII roots to one).
+local function ProjectRelative(Path)
+	local Prefix = ProjectRoot .. "/"
+	if Path:sub(1, #Prefix):lower() ~= Prefix:lower() then
+		error("Build event path is outside the engine folder: " .. Path)
+	end
+	return path.translate("../../" .. Path:sub(#Prefix + 1), "\\")
+end
+
 -- ImGui는 다른 외부 라이브러리처럼 소스에 포함한다.
 if _ACTION and not os.isfile(ProjectRoot .. "/Source/ThirdParty/ImGui/imgui.h") then
 	error("Bundled ImGui sources are missing. Restore Source/ThirdParty/ImGui from this repository.")
@@ -187,7 +200,7 @@ project "KurisuEditor"
 		local SdkLibDir = path.join(FbxSdkRoot, "lib/x64", SdkConfig)
 		filter ("configurations:" .. Config)
 			libdirs { SdkLibDir }
-			postbuildcommands { '{COPYFILE} "' .. path.join(SdkLibDir, "libfbxsdk.dll") .. '" "%{cfg.targetdir}"' }
+			postbuildcommands { '{COPYFILE} "' .. ProjectRelative(path.join(SdkLibDir, "libfbxsdk.dll")) .. '" "%{cfg.targetdir}"' }
 	end
 	filter {}
 
@@ -230,7 +243,10 @@ project "KurisuEditor"
 	}
 
 
-	dependson { "KurisuHeaderTool" }
+	-- Release builds package KurisuGame.exe into the editor distribution, so the
+	-- game must finish first. Solution dependencies cannot be per-configuration,
+	-- so Debug editor builds also build the (small) game launcher.
+	dependson { "KurisuHeaderTool", "KurisuGame" }
 	prebuildcommands { HeaderTool .. ' Editor "' .. GeneratedDir .. '/Editor" "' .. ProjectRoot .. '/Source/Editor"' }
 
 	includedirs
@@ -261,13 +277,18 @@ project "KurisuEditor"
 
 	filter {}
 
--- 패키징용 게임 실행 파일. 에디터 소스와 ImGui를 링크하지 않는다.
--- 에셋과 셰이더는 실행 중에 읽으므로 배포 시 Package.bat으로 콘텐츠를 함께 복사한다.
-project "KurisuGame"
+-- Release editor builds also produce a source-free portable distribution.
+filter "configurations:Release"
+	postbuildcommands {
+		'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' .. ProjectRelative(ProjectRoot .. "/Setup/Packaging/PackageEditor.ps1") .. '" -Configuration Release -VCToolsInstallDir "$(VCToolsInstallDir)."'
+	}
+filter {}
+
+-- Game launcher settings. Release editor distributions reuse this executable.
+function ConfigureGameRuntime()
 	location (ProjectRoot .. "/Build/Projects")
 	kind     "WindowedApp"
 	CommonSettings()
-	targetname "KurisuGame"
 
 	pchheader "EnginePCH.h"
 	pchsource (ProjectRoot .. "/Source/Game/GamePCH.cpp")
@@ -303,7 +324,17 @@ project "KurisuGame"
 		"dxguid.lib",
 		"d3dcompiler.lib",
 	}
+end
 
+-- The launcher is built from engine sources only, so it is an engine artifact.
+-- Game packaging and the editor distribution both copy this one executable.
+project "KurisuGame"
+	ConfigureGameRuntime()
+	targetname "KurisuGame"
+	targetdir (ProjectRoot .. "/Build/Bin/" .. outputdir)
+	objdir (ProjectRoot .. "/Build/Intermediate/" .. outputdir .. "/KurisuGame")
+	debugdir (ProjectRoot .. "/DefaultProject")
+	debugargs { "DefaultProject.kproject" }
 
 -- 셰이더를 VS에서 편집하기 위한 보기 전용 프로젝트 (언리얼의 Shaders와 같은 역할).
 -- 에셋(Assets)은 에디터 Content Drawer에서 다루므로 솔루션에 넣지 않는다.

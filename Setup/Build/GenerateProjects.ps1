@@ -2,11 +2,46 @@
 $ErrorActionPreference = 'Stop'
 $engineRoot = Split-Path -Parent (Split-Path -Parent $PSScriptRoot)
 $solution = Join-Path $engineRoot 'Kurisu.slnx'
+$temporaryDrive = $null
 try {
-    Push-Location -LiteralPath $engineRoot
+    $generationRoot = $engineRoot
+    # This Premake build cannot open Lua scripts through non-ASCII paths.
+    # Use an ASCII alias only during generation, then restore real paths in XML.
+    if ($engineRoot -match '[^\x00-\x7F]') {
+        $temporaryDrive = @('Z:', 'Y:', 'X:', 'W:', 'V:', 'U:', 'T:', 'S:', 'R:') |
+            Where-Object { -not (Test-Path -LiteralPath ($_ + '\')) } |
+            Select-Object -First 1
+        if (-not $temporaryDrive) { throw 'No free drive letter for project generation.' }
+        & subst.exe $temporaryDrive $engineRoot
+        if ($LASTEXITCODE -ne 0) {
+            $temporaryDrive = $null
+            throw 'Could not create the temporary project path.'
+        }
+        $generationRoot = $temporaryDrive + '\'
+    }
+    Push-Location -LiteralPath $generationRoot
     try {
-        & (Join-Path $PSScriptRoot 'premake5.exe') "--file=$PSScriptRoot\premake5.lua" vs2026
+        & '.\Setup\Build\premake5.exe' '--file=Setup/Build/premake5.lua' vs2026
         if ($LASTEXITCODE -ne 0) { throw "Premake failed with exit code $LASTEXITCODE." }
+        if ($temporaryDrive) {
+            $generatedFiles = @(Get-Item -LiteralPath $solution)
+            $generatedFiles += Get-ChildItem -LiteralPath (Join-Path $engineRoot 'Build\Projects') -File |
+                Where-Object { $_.Name -match '\.vcxproj(\.filters|\.user)?$' }
+            $utf8 = New-Object System.Text.UTF8Encoding($false)
+            $xmlRoot = [System.Security.SecurityElement]::Escape($engineRoot.TrimEnd('\'))
+            foreach ($file in $generatedFiles) {
+                $text = [IO.File]::ReadAllText($file.FullName)
+                $text = $text.Replace($temporaryDrive + '\', $xmlRoot + '\')
+                $text = $text.Replace($temporaryDrive + '/', $xmlRoot.Replace('\', '/') + '/')
+                # Premake strips the slash from drive-root values (debugdir,
+                # include directories and filters), leaving a bare "Z:".
+                $text = $text.Replace($temporaryDrive, $xmlRoot)
+                if ($text.Contains($temporaryDrive)) {
+                    throw "Temporary drive reference remains in $($file.Name)."
+                }
+                [IO.File]::WriteAllText($file.FullName, $text, $utf8)
+            }
+        }
         if (-not (Test-Path -LiteralPath $solution -PathType Leaf)) { throw "Solution was not generated: $solution" }
     }
     finally { Pop-Location }
@@ -17,4 +52,7 @@ try {
 catch {
     [Console]::Error.WriteLine("Project generation failed: $($_.Exception.Message)")
     exit 1
+}
+finally {
+    if ($temporaryDrive) { & subst.exe $temporaryDrive /D }
 }

@@ -138,6 +138,26 @@ namespace
 		return true;
 	}
 
+	// 메시 파티클 패킷이면 같은 패스의 인스턴싱 변형으로 바꾼다. false면 이 배치를 그리지 않는다
+	bool ApplyParticleInstance(FMeshDrawBatch& Batch, const FRenderPacket& Packet)
+	{
+		if (!Packet.InstanceBuffer || !Batch.Pipeline.Shader) return true;
+
+		if (FShaderProgram* Instanced = FRenderResourceManager::FindShaderProgram(Batch.Pipeline.Shader->Name + "#PARTICLE_INSTANCE"))
+		{
+			Batch.Pipeline.Shader = Instanced;
+			return true;
+		}
+
+		// 스프라이트는 전용 셰이더가 인스턴스 입력을 직접 받으므로 그대로 그린다
+		const EPSOType Type = Packet.Material ? Packet.Material->PSOType : EPSOType::StaticMesh_Opaque;
+		if (Type == EPSOType::Particle_Additive || Type == EPSOType::Particle_AlphaBlend)
+			return true;
+
+		// 변형이 없는 셰이더로 그리면 모든 인스턴스가 원점에 겹치므로 건너뛴다
+		return false;
+	}
+
 	FMeshDrawBatch::FItem BuildItem(const FMatrix& World, const FSceneView& View,
 		EMeshPassType Pass, uint32 Slot, uint32 StartIndex, uint32 IndexCount,
 		const void* ObjectKey, bool bReceiveShadow, bool bReceivesDecals, const FAABB &Bounds,
@@ -255,6 +275,7 @@ bool FMeshPassProcessor::Build(const FSceneView& View, const FRenderQueue& Queue
 		if (!BuildBatch(Batch, VB, IB, Packet.Material, Pass, View,
 			LightingModel, Packet.MaterialParamData, Packet.MaterialParamDataSize)) return false;
 		if (!ApplyGpuSkin(Batch, Packet)) continue;
+		if (!ApplyParticleInstance(Batch, Packet)) continue;
 		Batch.InstanceBuffer = Packet.InstanceBuffer;
 
 		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Batch.IndexBuffer->GetIndexCount();

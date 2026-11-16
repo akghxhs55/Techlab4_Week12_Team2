@@ -44,11 +44,6 @@ public:
 	virtual void MouseMove(FViewport* Viewport, int32 X, int32 Y) override;
 	virtual bool InputKey(FViewport* Viewport, int32 Key, bool bDown) override;
 	virtual bool InputAxis(FViewport* Viewport, int32 ControllerId, EGameInputAxis AxisKey, float Delta, float DeltaTime) override;
-	bool ConsumeExitRequest() {
-		const bool bRequested = bExitRequested;
-		bExitRequested = false;
-		return bRequested;
-	}
 
 	// 게임 카메라 시점 계산
 	FSceneView CalcSceneView(const FRect& InViewRect);
@@ -128,7 +123,6 @@ private:
 	UGameInstance* GameInstance = nullptr;
 	UEngine* Engine = nullptr;
 	UCameraComponent* CameraComponent = nullptr;
-	bool bExitRequested = false;
 
 	// 렌더 타깃 버퍼
 	FRect Rect{};

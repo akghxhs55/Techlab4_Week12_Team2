@@ -30,6 +30,8 @@ struct FParticleEmitterInstance
 	int32   MaxActiveParticles = 0;   // 블록에 들어가는 최대 수
 	uint32  ParticleCounter = 0;   // 생성 순번
 	int32 SubUVDataOffset = 0;
+	// 인스턴스 전용 Payload 시작 위치. 모듈 Payload 뒤에 붙는다. 0이면 없음
+	int32 InstancePayloadOffset = 0;
 
 	float SpawnFraction = 0.0f;   // 초당 생성에서 남은 소수점
 	float EmitterTime = 0.0f;   // 이번 루프 안에서의 시간
@@ -57,6 +59,8 @@ struct FParticleEmitterInstance
 	FVector EmitterToSimulationVector(const FVector& EmitterVector) const;
 
 protected:
+	// 서브클래스가 파티클마다 추가로 필요한 바이트 수. Init 안에서 불린다
+	virtual int32 GetInstancePayloadSize() const { return 0; }
 	virtual void UpdateEmitterTime(float DeltaTime);
 	int32 ComputeBurstCount();
 	virtual void KillParticles();

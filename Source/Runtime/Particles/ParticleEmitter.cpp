@@ -6,9 +6,20 @@
 #include "ParticleEmitterInstance.h"
 #include "Module/ParticleModuleRequired.h"
 #include "Module/ParticleModuleSpawn.h"
+#include "Module/ParticleModuleTypeDataBase.h"
 
 FParticleEmitterInstance* UParticleEmitter::CreateInstance(UParticleSystemComponent* InComponent)
 {
+	// 인스턴스 종류(Payload 레이아웃)는 에미터 일생 동안 하나여야 하므로 LOD 0 기준
+	UParticleLODLevel* LODLevel = GetLODLevel(0);
+	UParticleModuleTypeDataBase* TypeData = LODLevel ? LODLevel->GetTypeDataModule() : nullptr;
+	if (TypeData)
+	{
+		// TypeData가 생성과 Init까지 끝낸다
+		if (FParticleEmitterInstance* TypedInstance = TypeData->CreateInstance(this, InComponent))
+			return TypedInstance;
+	}
+
 	FParticleEmitterInstance* Instance = new FParticleEmitterInstance();
 	Instance->Init(this, InComponent);
 	return Instance;
@@ -44,6 +55,10 @@ void UParticleEmitter::Build()
 	if (UParticleModule* SpawnModule = LODLevel->GetSpawnModule())
 	{
 		SpawnModule->BakeDistributions();
+	}
+	if (UParticleModuleTypeDataBase* TypeDataModule = LODLevel->GetTypeDataModule())
+	{
+		TypeDataModule->BakeDistributions();
 	}
 	for (UParticleModule* Module : LODLevel->GetModules())
 	{

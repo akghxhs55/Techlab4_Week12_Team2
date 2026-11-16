@@ -32,7 +32,7 @@ FEngineConfig UGameEngine::GetConfig() const
 	Desc.SyncInterval = Settings.bVSync ? 1 : 0;
 	// 3D는 게임 뷰포트의 오프스크린 타깃에 그리고 백버퍼로는 복사만 한다.
 	Desc.bCreateDepthBuffer = false;
-	// Esc는 FGameViewportClient가 받아 종료 요청으로 바꾼다. 나중에 게임 UI가 가로챌 수 있다.
+	// Escape is delivered to game logic; the runtime does not bind it to exit.
 	Desc.bExitOnEscape = false;
 	Desc.SplashImage = "Engine/Splash/KurisuSplash.png";
 	return Desc;
@@ -94,11 +94,6 @@ void UGameEngine::Tick(float DeltaTime)
 	}
 
 	DispatchInput(Viewport, DeltaTime);
-	if (Viewport.ConsumeExitRequest())
-	{
-		RequestEngineExit("game viewport");
-		return;
-	}
 
 	World->Tick(DeltaTime);
 	if (FAudioDevice* AudioDevice = GetMainAudioDevice())

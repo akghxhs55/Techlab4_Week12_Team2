@@ -1,0 +1,122 @@
+#pragma once
+
+#include "Core/Types.h"
+#include "Containers/Array.h"
+#include "Math/Vector.h"
+#include "Render/Buffer.h"
+#include "Render/RenderPacket.h"
+
+class UMaterial;
+struct FParticleEmitterInstance;
+struct FBaseParticle;
+enum class EParticleSortMode : uint8;
+
+// 프록시가 뷰마다 한 번 계산해서 모든 에미터에 넘기는 값
+struct FParticleSubmitContext
+{
+	const FViewContext* View = nullptr;
+	FVector CameraRight;
+	FVector CameraUp;
+	float BoundsDistanceSq = 0.0f;   // 프록시 바운드 중심까지 거리
+	int32 EmitterIndex = 0;
+	int32 EmitterCount = 0;
+	UMaterial* DefaultMaterial = nullptr;
+	FVertexBuffer* SpriteQuadVertexBuffer = nullptr;
+	FIndexBuffer* SpriteQuadIndexBuffer = nullptr;
+};
+
+enum class EDynamicEmitterType : uint8
+{
+	Sprite,
+	Mesh,
+};
+
+// 에미터 하나의 렌더 리소스와 제출
+class FDynamicEmitterDataBase
+{
+public:
+	virtual ~FDynamicEmitterDataBase() = default;
+
+	virtual EDynamicEmitterType GetType() const = 0;
+	virtual void Submit(FRenderQueue& Queue, FParticleEmitterInstance& Instance, const FParticleSubmitContext& Context) = 0;
+
+protected:
+	// 큐는 거리가 큰 패킷부터 그린다. 같은 PSC의 에미터는 배열 순서대로 그리도록 앞 인덱스를 더 멀게
+	static float GetPacketDistance(const FParticleSubmitContext& Context);
+};
+
+struct FParticleSpriteCorner
+{
+	FVector2 UV;
+};
+static_assert(sizeof(FParticleSpriteCorner) == 8, "ParticleSpriteShader 슬롯 0과 맞아야 한다");
+
+struct FParticleSpriteInstance
+{
+	FVector Position;
+	float Rotation;
+	FVector2 Size;
+	float SubImageIndex;
+	FLinearColor Color;
+};
+static_assert(sizeof(FParticleSpriteInstance) == 44, "ParticleSpriteShader INSTANCE_* 와 맞아야 한다");
+
+struct FParticleSpriteConstants
+{
+	FVector4 CameraRight;
+	FVector4 CameraUp;
+	FVector4 SubImageSize;
+};
+static_assert(sizeof(FParticleSpriteConstants) % 16 == 0, "cbuffer 16바이트 정렬");
+
+struct FParticleSortEntry
+{
+	float Key;
+	const FBaseParticle* Particle;
+	const uint8* ParticleBase;
+};
+
+class FDynamicSpriteEmitterData final : public FDynamicEmitterDataBase
+{
+public:
+	EDynamicEmitterType GetType() const override { return EDynamicEmitterType::Sprite; }
+	void Submit(FRenderQueue& Queue, FParticleEmitterInstance& Instance, const FParticleSubmitContext& Context) override;
+
+private:
+	bool EnsureInstanceBuffer(const FParticleEmitterInstance& Instance);
+	int32 BuildInstances(FParticleEmitterInstance& Instance, const FViewContext& View, EParticleSortMode SortMode);
+
+	TUniquePtr<FVertexBuffer> InstanceBuffer;
+	int32 Capacity = 0;
+	// 패킷이 이 주소를 가리키므로 배치가 복사할 때까지 살아 있어야 한다
+	FParticleSpriteConstants Constants;
+
+	TArray<FParticleSortEntry> SortScratch;
+	TArray<FParticleSpriteInstance> InstanceScratch;
+};
+
+// ParticleInstanceCommon.hlsli의 PARTICLE_INSTANCE_VS_INPUT과 필드 순서가 같아야 한다
+// Transform0~2 = 파티클 World 행렬(row-vector)의 열 0~2. w에 이동값이 들어간다
+struct FParticleMeshInstance
+{
+	FVector4 Transform0;
+	FVector4 Transform1;
+	FVector4 Transform2;
+	FLinearColor Color;
+};
+static_assert(sizeof(FParticleMeshInstance) == 64, "PARTICLE_INSTANCE_VS_INPUT과 맞아야 한다");
+
+class FDynamicMeshEmitterData final : public FDynamicEmitterDataBase
+{
+public:
+	EDynamicEmitterType GetType() const override { return EDynamicEmitterType::Mesh; }
+	void Submit(FRenderQueue& Queue, FParticleEmitterInstance& Instance, const FParticleSubmitContext& Context) override;
+
+private:
+	bool EnsureInstanceBuffer(const FParticleEmitterInstance& Instance);
+	int32 BuildInstances(FParticleEmitterInstance& Instance);
+
+	TUniquePtr<FVertexBuffer> InstanceBuffer;
+	int32 Capacity = 0;
+	TArray<FParticleMeshInstance> InstanceScratch;
+};
