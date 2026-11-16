@@ -243,7 +243,10 @@ project "KurisuEditor"
 	}
 
 
-	dependson { "KurisuHeaderTool" }
+	-- Release builds package KurisuGame.exe into the editor distribution, so the
+	-- game must finish first. Solution dependencies cannot be per-configuration,
+	-- so Debug editor builds also build the (small) game launcher.
+	dependson { "KurisuHeaderTool", "KurisuGame" }
 	prebuildcommands { HeaderTool .. ' Editor "' .. GeneratedDir .. '/Editor" "' .. ProjectRoot .. '/Source/Editor"' }
 
 	includedirs

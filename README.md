@@ -52,7 +52,7 @@ MSBuild.exe .\Kurisu.slnx -t:KurisuEditor -p:Configuration=Release -p:Platform=x
 
 ### 에디터 배포본
 
-`SlnGenerator.bat`으로 솔루션을 갱신하고 `KurisuEditor`를 **Release / x64**로 빌드하면 `KurisuGame`도 먼저 빌드한 뒤 `Build/Distributions/KurisuEditor/` 배포 폴더를 자동 생성합니다. 폴더 전체를 옮겨 `KurisuEditor.exe`로 실행하면 됩니다. Debug 에디터 빌드는 게임을 빌드하지 않습니다.
+`SlnGenerator.bat`으로 솔루션을 갱신하고 `KurisuEditor`를 **Release / x64**로 빌드하면 `KurisuGame`도 먼저 빌드한 뒤 `Build/Distributions/KurisuEditor/` 배포 폴더를 자동 생성합니다. 폴더 전체를 옮겨 `KurisuEditor.exe`로 실행하면 됩니다. 에디터는 모든 구성에서 `KurisuGame` 다음에 빌드되며, 배포 폴더는 Release에서만 생성됩니다.
 
 배포본에는 에디터 실행 파일, FBX DLL, 해당 도구 버전의 x64 C++ 런타임 DLL, `EngineResources` 및 게임 패키징 스크립트(`Setup/Packaging/Package.ps1`)가 포함됩니다. `EngineResources/Runtime/Windows-x86_64/KurisuGame.exe`는 기존 `KurisuGame`의 Release 빌드 결과이며, 사용자가 만든 콘텐츠와 함께 복사해 게임을 패키징합니다. 소스, 기본 프로젝트 콘텐츠, PDB, 정적 라이브러리, 중간 빌드 파일과 개인 설정은 포함하지 않습니다. 프로젝트는 새로 생성하거나 별도로 보관한 `.kproject`를 열면 됩니다.
 
