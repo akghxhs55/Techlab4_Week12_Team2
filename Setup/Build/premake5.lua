@@ -1,5 +1,18 @@
 local ProjectRoot = path.getabsolute("../..", _SCRIPT_DIR)
 
+-- Build events run in Build/Projects. Keep their paths relative: cmd.exe
+-- misreads the line after one that holds a non-ASCII (e.g. Korean) path,
+-- which breaks multi-line build events when the engine lives in such a folder.
+-- path.getrelative is not used because it returns absolute paths when the
+-- engine root is a drive root (GenerateProjects.ps1 maps non-ASCII roots to one).
+local function ProjectRelative(Path)
+	local Prefix = ProjectRoot .. "/"
+	if Path:sub(1, #Prefix):lower() ~= Prefix:lower() then
+		error("Build event path is outside the engine folder: " .. Path)
+	end
+	return path.translate("../../" .. Path:sub(#Prefix + 1), "\\")
+end
+
 -- ImGui는 다른 외부 라이브러리처럼 소스에 포함한다.
 if _ACTION and not os.isfile(ProjectRoot .. "/Source/ThirdParty/ImGui/imgui.h") then
 	error("Bundled ImGui sources are missing. Restore Source/ThirdParty/ImGui from this repository.")
@@ -187,7 +200,7 @@ project "KurisuEditor"
 		local SdkLibDir = path.join(FbxSdkRoot, "lib/x64", SdkConfig)
 		filter ("configurations:" .. Config)
 			libdirs { SdkLibDir }
-			postbuildcommands { '{COPYFILE} "' .. path.join(SdkLibDir, "libfbxsdk.dll") .. '" "%{cfg.targetdir}"' }
+			postbuildcommands { '{COPYFILE} "' .. ProjectRelative(path.join(SdkLibDir, "libfbxsdk.dll")) .. '" "%{cfg.targetdir}"' }
 	end
 	filter {}
 
@@ -264,7 +277,7 @@ project "KurisuEditor"
 -- Release editor builds also produce a source-free portable distribution.
 filter "configurations:Release"
 	postbuildcommands {
-		'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' .. ProjectRoot .. '/Setup/Packaging/PackageEditor.ps1" -Configuration Release -VCToolsInstallDir "$(VCToolsInstallDir)."'
+		'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' .. ProjectRelative(ProjectRoot .. "/Setup/Packaging/PackageEditor.ps1") .. '" -Configuration Release -VCToolsInstallDir "$(VCToolsInstallDir)."'
 	}
 filter {}
 
