@@ -57,3 +57,25 @@ void FStructProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value)
 {
     Struct->SerializeTaggedProperties(Slot, Value);
 }
+
+// ---- FArrayProperty ----
+void FArrayProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value) const
+{
+	if (!Inner)
+	{
+        return;
+	}
+
+    int32 NumElements = Num(Value);
+	FStructuredArchive::FArray Array = Slot.EnterArray(NumElements);
+
+    if (Slot.GetUnderlyingArchive().IsLoading())
+    {
+	    SetNumFn(Value, NumElements);
+    }
+
+    for (int32 Index = 0; Index < NumElements; ++Index)
+    {
+	    Inner->SerializeItem(Array.EnterElement(), GetElementPtr(Value, Index));
+    }
+}
