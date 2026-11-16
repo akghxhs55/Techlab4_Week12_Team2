@@ -43,6 +43,8 @@ public:
 private:
 	// 에셋이 없을 때 쓰는 테스트 템플릿
 	void CreateDefaultTemplate();
+	// 에미터마다 렌더 사본을 갱신해 프록시에 넘긴다 (UE SendRenderDynamicData_Concurrent)
+	void SendRenderDynamicData();
 	void DestroyOwnedTemplate();
 
 	UParticleSystem* Template = nullptr;

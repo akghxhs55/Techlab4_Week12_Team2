@@ -5,6 +5,7 @@
 #include "ParticleTypes.h"
 #include "Module/ParticleModuleTypeDataMesh.h"
 #include "Render/Mesh.h"
+#include "Engine/ParticleSystemRender.h"
 
 void FParticleMeshEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent)
 {
@@ -12,6 +13,17 @@ void FParticleMeshEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleS
 	FParticleEmitterInstance::Init(InTemplate, InComponent);
 
 	MeshTypeData = CurrentLODLevel ? Cast<UParticleModuleTypeDataMesh>(CurrentLODLevel->GetTypeDataModule()) : nullptr;
+}
+
+void FParticleMeshEmitterInstance::UpdateDynamicData(TUniquePtr<FDynamicEmitterDataBase>& InOutData) const
+{
+	if (!InOutData || InOutData->GetType() != EDynamicEmitterType::Mesh)
+		InOutData = MakeUnique<FDynamicMeshEmitterData>();
+
+	FDynamicMeshEmitterReplayData& Source = static_cast<FDynamicMeshEmitterData&>(*InOutData).Source;
+	FillReplayData(Source);
+	Source.Mesh = MeshTypeData ? MeshTypeData->GetMesh() : nullptr;
+	Source.MeshRotationPayloadOffset = InstancePayloadOffset;
 }
 
 FMeshRotationPayloadData& FParticleMeshEmitterInstance::GetMeshRotationPayload(FBaseParticle& Particle) const

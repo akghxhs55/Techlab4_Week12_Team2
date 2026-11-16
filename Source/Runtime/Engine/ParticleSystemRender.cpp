@@ -1,13 +1,9 @@
 #include "EnginePCH.h"
 #include "ParticleSystemRender.h"
-#include "Particles/ParticleEmitterInstance.h"
+#include "Particles/ParticleTypes.h"
 #include "Particles/ParticleHelper.h"
-#include "Particles/ParticleLODLevel.h"
 #include "Particles/Module/ParticleModuleRequired.h"
 #include "Particles/Module/ParticleModuleSubUV.h"
-#include "Particles/ParticleMeshEmitterInstance.h"
-#include "Particles/Module/ParticleModuleTypeDataMesh.h"
-#include "Components/ParticleSystemComponent.h"
 #include "Render/RenderCommand.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
@@ -15,40 +11,55 @@
 
 #include <algorithm>
 
+template <typename FuncType>
+void FDynamicEmitterReplayDataBase::ForEachParticle(FuncType&& Func) const
+{
+	const uint8* const Data = ParticleData.GetData();
+	for (int32 i = ActiveParticleCount - 1; i >= 0; --i)
+	{
+		const uint8* ParticleBase = Data + ParticleIndices[i] * ParticleStride;
+		const FBaseParticle& Particle = *reinterpret_cast<const FBaseParticle*>(ParticleBase);
+		if (Particle.Flags & STATE_Particle_Freeze)
+			continue;
+		Func(Particle, ParticleBase);
+	}
+}
+
 float FDynamicEmitterDataBase::GetPacketDistance(const FParticleSubmitContext& Context)
 {
 	const float OrderBias = 1.0f + static_cast<float>(Context.EmitterCount - Context.EmitterIndex) * 1e-4f;
 	return Context.BoundsDistanceSq * OrderBias;
 }
 
-bool FDynamicSpriteEmitterData::EnsureInstanceBuffer(const FParticleEmitterInstance& Instance)
+bool FDynamicEmitterDataBase::EnsureInstanceBuffer(TUniquePtr<FVertexBuffer>& Buffer, int32& Capacity,
+	const FDynamicEmitterReplayDataBase& Source, uint32 Stride)
 {
-	if (!InstanceBuffer || Capacity < Instance.ActiveParticles)
+	if (!Buffer || Capacity < Source.ActiveParticleCount)
 	{
-		Capacity = Instance.MaxActiveParticles;
-		InstanceBuffer = RenderCommand::CreateDynamicVertexBuffer(
-			sizeof(FParticleSpriteInstance) * Capacity, sizeof(FParticleSpriteInstance));
+		Capacity = std::max(Source.MaxActiveParticles, Source.ActiveParticleCount);
+		Buffer = RenderCommand::CreateDynamicVertexBuffer(Stride * Capacity, Stride);
 	}
-	return InstanceBuffer != nullptr;
+	return Buffer != nullptr;
 }
 
-int32 FDynamicSpriteEmitterData::BuildInstances(FParticleEmitterInstance& Instance, const FViewContext& View, EParticleSortMode SortMode)
+int32 FDynamicSpriteEmitterData::BuildInstances(const FViewContext& View)
 {
 	SortScratch.SetNum(0, false);
 	const FVector CameraPos = View.CameraPosition;
 	const FVector Forward = View.CameraForward.Normalized();
+	const EParticleSortMode SortMode = Source.SortMode;
 
-	ParticleHelper::ForEachParticle(Instance, [&](FBaseParticle& Particle, uint8* ParticleBase)
+	Source.ForEachParticle([&](const FBaseParticle& Particle, const uint8* ParticleBase)
 		{
 			float Key = 0.0f;
 			switch (SortMode)
 			{
 			case EParticleSortMode::ViewProjDepth:
-				Key = (Instance.SimulationToWorld(Particle.Location) - CameraPos).Dot(Forward);
+				Key = (Source.SimulationToWorld(Particle.Location) - CameraPos).Dot(Forward);
 				break;
 			case EParticleSortMode::DistanceToView:
 			{
-				const FVector D = Instance.SimulationToWorld(Particle.Location) - CameraPos;
+				const FVector D = Source.SimulationToWorld(Particle.Location) - CameraPos;
 				Key = D.Dot(D);
 				break;
 			}
@@ -82,39 +93,36 @@ int32 FDynamicSpriteEmitterData::BuildInstances(FParticleEmitterInstance& Instan
 
 	const int32 Count = SortScratch.Num();
 	InstanceScratch.SetNum(Count, false);
-	const int32 SubUVOffset = Instance.SubUVDataOffset;
+	const int32 SubUVOffset = Source.SubUVDataOffset;
 	// 쿼드는 카메라 축으로 펼쳐져 월드 행렬의 스케일을 받지 못하므로 Local/World 모두 직접 곱한다
-	const FVector Scale = Instance.GetComponentScale();
+	const FVector Scale = Source.Scale;
 
 	for (int32 i = 0; i < Count; ++i)
 	{
 		const FBaseParticle& Particle = *SortScratch[i].Particle;
 		FParticleSpriteInstance& Out = InstanceScratch[i];
-		Out.Position = Instance.SimulationToWorld(Particle.Location);
+		Out.Position = Source.SimulationToWorld(Particle.Location);
 		Out.Rotation = Particle.Rotation;
 		Out.Size = FVector2(std::abs(Particle.Size.X * Scale.X), std::abs(Particle.Size.Y * Scale.Y));
 		Out.SubImageIndex = SubUVOffset > 0
-			? ParticleHelper::GetPayload<FFullSubUVPayload>(const_cast<uint8*>(SortScratch[i].ParticleBase), SubUVOffset).ImageIndex
+			? ParticleHelper::GetPayload<FFullSubUVPayload>(SortScratch[i].ParticleBase, SubUVOffset).ImageIndex
 			: 0.0f;
 		Out.Color = Particle.Color;
 	}
 	return Count;
 }
 
-void FDynamicSpriteEmitterData::Submit(FRenderQueue& Queue, FParticleEmitterInstance& Instance, const FParticleSubmitContext& Context)
+void FDynamicSpriteEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitContext& Context)
 {
 	if (!Context.View || !Context.SpriteQuadVertexBuffer || !Context.SpriteQuadIndexBuffer)
 		return;
-	if (!EnsureInstanceBuffer(Instance))
-		return;
-
-	const UParticleModuleRequired* Required = Instance.CurrentLODLevel ? Instance.CurrentLODLevel->GetRequiredModule() : nullptr;
-	UMaterial* EmitterMaterial = (Required && Required->GetMaterial()) ? Required->GetMaterial() : Context.DefaultMaterial;
+	UMaterial* EmitterMaterial = Source.Material ? Source.Material : Context.DefaultMaterial;
 	if (!EmitterMaterial)
 		return;
-	const EParticleSortMode SortMode = Required ? Required->GetSortMode() : EParticleSortMode::None;
+	if (!EnsureInstanceBuffer(InstanceBuffer, Capacity, Source, sizeof(FParticleSpriteInstance)))
+		return;
 
-	const int32 Count = BuildInstances(Instance, *Context.View, SortMode);
+	const int32 Count = BuildInstances(*Context.View);
 	if (Count == 0)
 		return;
 
@@ -123,10 +131,10 @@ void FDynamicSpriteEmitterData::Submit(FRenderQueue& Queue, FParticleEmitterInst
 
 	Constants.CameraRight = FVector4(Context.CameraRight.X, Context.CameraRight.Y, Context.CameraRight.Z, 0.0f);
 	Constants.CameraUp = FVector4(Context.CameraUp.X, Context.CameraUp.Y, Context.CameraUp.Z, 0.0f);
-	if (Required && Required->UsesSubUV() && Instance.SubUVDataOffset > 0)
+	if (Source.SubUVDataOffset > 0)
 	{
-		const float H = static_cast<float>(Required->GetSubImagesHorizontal());
-		const float V = static_cast<float>(Required->GetSubImagesVertical());
+		const float H = static_cast<float>(Source.SubImagesHorizontal);
+		const float V = static_cast<float>(Source.SubImagesVertical);
 		Constants.SubImageSize = FVector4(H, V, 1.0f / H, 1.0f / V);
 	}
 	else
@@ -158,32 +166,21 @@ namespace
 	}
 }
 
-bool FDynamicMeshEmitterData::EnsureInstanceBuffer(const FParticleEmitterInstance& Instance)
+int32 FDynamicMeshEmitterData::BuildInstances()
 {
-	if (!InstanceBuffer || Capacity < Instance.ActiveParticles)
-	{
-		Capacity = Instance.MaxActiveParticles;
-		InstanceBuffer = RenderCommand::CreateDynamicVertexBuffer(
-			sizeof(FParticleMeshInstance) * Capacity, sizeof(FParticleMeshInstance));
-	}
-	return InstanceBuffer != nullptr;
-}
-
-int32 FDynamicMeshEmitterData::BuildInstances(FParticleEmitterInstance& Instance)
-{
-	FParticleMeshEmitterInstance& MeshInstance = static_cast<FParticleMeshEmitterInstance&>(Instance);
-	const bool bLocalSpace = Instance.IsLocalSpace() && Instance.Component;
-	const FMatrix ComponentToWorld = bLocalSpace ? Instance.Component->GetWorldMatrix() : FMatrix::Identity;
+	const bool bLocalSpace = Source.bUseLocalSpace;
+	const FMatrix& ComponentToWorld = Source.LocalToWorld;
 	// Local은 ComponentToWorld에 스케일이 들어 있다. World는 위치에는 곱하지 않고 크기에만 곱한다
-	const FVector WorldScale = Instance.GetComponentScale();
+	const FVector WorldScale = Source.Scale;
+	const int32 PayloadOffset = Source.MeshRotationPayloadOffset;
 	constexpr float RadToDeg = 180.0f / PI;
 
-	InstanceScratch.SetNum(Instance.ActiveParticles, false);
+	InstanceScratch.SetNum(Source.ActiveParticleCount, false);
 	FParticleMeshInstance* Out = InstanceScratch.GetData();
 
-	ParticleHelper::ForEachParticle(Instance, [&](FBaseParticle& Particle, uint8*)
+	Source.ForEachParticle([&](const FBaseParticle& Particle, const uint8* ParticleBase)
 		{
-			const FMeshRotationPayloadData& Payload = MeshInstance.GetMeshRotationPayload(static_cast<const FBaseParticle&>(Particle));
+			const FMeshRotationPayloadData& Payload = ParticleHelper::GetPayload<FMeshRotationPayloadData>(ParticleBase, PayloadOffset);
 
 			// 회전 속도로 누적된 회전 + 스프라이트 회전(라디안, 세 축 공통)은 오일러 각끼리 더한다
 			const FVector SpinEuler = Payload.Rotation + FVector(Particle.Rotation * RadToDeg);
@@ -217,20 +214,18 @@ int32 FDynamicMeshEmitterData::BuildInstances(FParticleEmitterInstance& Instance
 	return static_cast<int32>(Out - InstanceScratch.GetData());
 }
 
-void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, FParticleEmitterInstance& Instance, const FParticleSubmitContext& Context)
+void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitContext& Context)
 {
 	if (!Context.View)
 		return;
 
-	const FParticleMeshEmitterInstance& MeshInstance = static_cast<const FParticleMeshEmitterInstance&>(Instance);
-	const UParticleModuleTypeDataMesh* TypeData = MeshInstance.GetMeshTypeData();
-	UStaticMesh* Mesh = TypeData ? TypeData->GetMesh() : nullptr;
+	UStaticMesh* Mesh = Source.Mesh;
 	if (!Mesh || !Mesh->GetVertexBuffer() || !Mesh->GetIndexBuffer())
 		return;
-	if (!EnsureInstanceBuffer(Instance))
+	if (!EnsureInstanceBuffer(InstanceBuffer, Capacity, Source, sizeof(FParticleMeshInstance)))
 		return;
 
-	const int32 Count = BuildInstances(Instance);
+	const int32 Count = BuildInstances();
 	if (Count == 0)
 		return;
 

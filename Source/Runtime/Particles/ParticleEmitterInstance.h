@@ -7,6 +7,8 @@
 #include "Math/RandomStream.h"
 
 struct FBaseParticle;
+struct FDynamicEmitterReplayDataBase;
+class FDynamicEmitterDataBase;
 class UParticleEmitter;
 class UParticleLODLevel;
 class UParticleSystemComponent;
@@ -46,6 +48,8 @@ struct FParticleEmitterInstance
 	virtual void Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent);
 	virtual bool Resize(int32 NewMaxActiveParticles);
 	virtual void Tick(float DeltaTime);
+	// 자기 타입의 렌더 데이터를 만들거나 재사용해 이번 프레임 상태를 복사한다. 프록시는 그 결과만 그린다
+	virtual void UpdateDynamicData(TUniquePtr<FDynamicEmitterDataBase>& InOutData) const;
 
 	// 루프를 모두 끝내 더 이상 생성하지 않는 상태
 	bool HasCompletedLoops() const;
@@ -73,6 +77,8 @@ protected:
 	virtual void UpdateBoundingBox(float DeltaTime);
 	// 스케일 적용 전 파티클 중심에서 가장 먼 점까지의 거리
 	virtual float GetParticleRadius(const FBaseParticle& Particle) const;
+	// 모든 에미터 타입이 공유하는 렌더 사본 필드
+	void FillReplayData(FDynamicEmitterReplayDataBase& Out) const;
 
 	FBaseParticle* GetParticle(int32 SlotIndex) const;   // ParticleData + SlotIndex × ParticleStride
 	void FreeParticleMemory();                           // 블록 해제 + MaxActiveParticles = 0

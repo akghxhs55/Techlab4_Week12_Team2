@@ -124,6 +124,28 @@ void UParticleSystemComponent::ResetParticles()
 		delete Instance;
 	}
 	EmitterInstances.Empty();
+	SendRenderDynamicData();
+}
+
+void UParticleSystemComponent::SendRenderDynamicData()
+{
+	FParticleSystemSceneProxy* Proxy = static_cast<FParticleSystemSceneProxy*>(GetSceneProxy());
+	if (!Proxy)
+		return;
+
+	TArray<TUniquePtr<FDynamicEmitterDataBase>>& RenderData = Proxy->GetDynamicEmitterData();
+	if (RenderData.Num() != EmitterInstances.Num())
+	{
+		RenderData.Empty();
+		RenderData.SetNum(EmitterInstances.Num());
+	}
+	for (int32 Index = 0; Index < EmitterInstances.Num(); ++Index)
+	{
+		if (FParticleEmitterInstance* Instance = EmitterInstances[Index])
+			Instance->UpdateDynamicData(RenderData[Index]);
+		else
+			RenderData[Index].reset();
+	}
 }
 
 void UParticleSystemComponent::TickComponent(float DeltaTime)
@@ -149,6 +171,7 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	{
 		Proxy->GetScene()->MarkDirty(Proxy);
 	}
+	SendRenderDynamicData();
 }
 
 void UParticleSystemComponent::CreateDefaultTemplate()

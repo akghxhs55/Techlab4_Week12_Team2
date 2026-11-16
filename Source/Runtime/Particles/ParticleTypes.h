@@ -50,3 +50,13 @@ enum EParticleStates : uint32
 	STATE_Mask = 0xFE000000,
 	STATE_CounterMask = (~STATE_Mask)
 };
+
+// 메시 에미터가 파티클마다 붙이는 Payload. 단위는 모두 도(degree)
+struct FMeshRotationPayloadData
+{
+	FVector InitialOrientation;		// 생성될 때의 회전. X = Roll, Y = Pitch, Z = Yaw
+	FVector Rotation;				// 생성 후 누적된 회전
+	FVector RotationRate;			// 이번 프레임 회전 속도(도/초). 모듈이 바꿀 수 있는 현재 값
+	FVector RotationRateBase;		// 회전 속도의 기준값. 매 프레임 RotationRate로 복원
+};
+static_assert(sizeof(FMeshRotationPayloadData) == 48, "FMeshRotationPayloadData 크기 오류, 48이어야 합니다.");
