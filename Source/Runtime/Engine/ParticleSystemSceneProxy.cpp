@@ -2,6 +2,7 @@
 #include "ParticleSystemSceneProxy.h"
 #include "Components/ParticleSystemComponent.h"
 #include "Particles/ParticleEmitterInstance.h"
+#include "Particles/ParticleMeshEmitterInstance.h"
 #include "Render/RenderCommand.h"
 #include "Render/Material.h"
 #include "Asset/AssetManager.h"
@@ -38,7 +39,9 @@ bool FParticleSystemSceneProxy::EnsureSpriteQuad()
 
 EDynamicEmitterType FParticleSystemSceneProxy::GetEmitterType(const FParticleEmitterInstance& Instance)
 {
-	// 메시 인스턴스가 생기면 여기서 분기한다
+	// 인스턴스 클래스는 TypeData가 정하므로 클래스로 렌더 종류를 고른다
+	if (dynamic_cast<const FParticleMeshEmitterInstance*>(&Instance))
+		return EDynamicEmitterType::Mesh;
 	return EDynamicEmitterType::Sprite;
 }
 
@@ -48,6 +51,8 @@ TUniquePtr<FDynamicEmitterDataBase> FParticleSystemSceneProxy::CreateEmitterData
 	{
 	case EDynamicEmitterType::Sprite:
 		return MakeUnique<FDynamicSpriteEmitterData>();
+	case EDynamicEmitterType::Mesh:
+		return MakeUnique<FDynamicMeshEmitterData>();
 	}
 	return nullptr;
 }

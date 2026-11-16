@@ -12,6 +12,11 @@
 #include "Particles/Module/ParticleModuleColor.h"
 #include "Particles/Module/ParticleModuleSubUV.h"
 #include "Particles/Module/ParticleModuleLocation.h"
+#include "Particles/Module/ParticleModuleTypeDataMesh.h"
+#include "Particles/ParticleMeshEmitterInstance.h"
+#include "Asset/AssetManager.h"
+#include "Render/Mesh.h"
+#include <cmath>
 #include "Particles/ParticleHelper.h"
 #include "Render/LineBatcher.h"
 #include "UObject/UObjectIterator.h"
@@ -176,10 +181,41 @@ void UParticleSystemComponent::CreateDefaultTemplate()
 	Emitter->AddLODLevel(LOD);
 	System->AddEmitter(Emitter);
 
-	// 인스턴스 Init 전에 ParticleSize 계산이 끝나 있어야 한다
+	// 메시 에미터: TypeDataMesh가 있으면 에미터가 메시 인스턴스를 만든다
+	UParticleEmitter*  MeshEmitter = NewObject<UParticleEmitter>(System);
+	UParticleLODLevel* MeshLOD     = NewObject<UParticleLODLevel>(MeshEmitter);
+
+	UParticleModuleRequired*     MeshRequired = NewObject<UParticleModuleRequired>(MeshLOD);
+	UParticleModuleSpawn*        MeshSpawn    = NewObject<UParticleModuleSpawn>(MeshLOD);
+	UParticleModuleLifetime*     MeshLifetime = NewObject<UParticleModuleLifetime>(MeshLOD);
+	UParticleModuleLocation*     MeshLocation = NewObject<UParticleModuleLocation>(MeshLOD);
+	UParticleModuleVelocity*     MeshVelocity = NewObject<UParticleModuleVelocity>(MeshLOD);
+	UParticleModuleSize*         MeshSize     = NewObject<UParticleModuleSize>(MeshLOD);
+	UParticleModuleColor*        MeshColor    = NewObject<UParticleModuleColor>(MeshLOD);
+	UParticleModuleTypeDataMesh* MeshTypeData = NewObject<UParticleModuleTypeDataMesh>(MeshLOD);
+
+	MeshTypeData->SetMesh(UAssetManager::GetAssetByPath<UStaticMesh>("Cube"));
+	MeshSpawn->GetRate().Constant = 5.0f;
+	MeshLifetime->GetLifetime().Constant = 2.0f;
+	MeshSize->GetStartSize().Constant = FVector(3.0f, 3.0f, 3.0f);
+
+	MeshLOD->SetRequiredModule(MeshRequired);
+	MeshLOD->SetSpawnModule(MeshSpawn);
+	MeshLOD->SetTypeDataModule(MeshTypeData);
+	MeshLOD->AddModule(MeshLifetime);
+	MeshLOD->AddModule(MeshLocation);
+	MeshLOD->AddModule(MeshVelocity);
+	MeshLOD->AddModule(MeshSize);
+	MeshLOD->AddModule(MeshColor);
+	MeshEmitter->AddLODLevel(MeshLOD);
+	System->AddEmitter(MeshEmitter);
+
+	// 인스턴스 Init 전에 ParticleSize 계산이 끝나 있어야 한다 (생성 후 바꾼 분포도 여기서 다시 굽는다)
 	System->BuildEmitters();
 
-	OwnedObjects = { Required, Spawn, Lifetime, Location, Velocity, Size, Color, SubUV, LOD, Emitter, System };
+	OwnedObjects = { Required, Spawn, Lifetime, Location, Velocity, Size, Color, SubUV, LOD, Emitter,
+		MeshRequired, MeshSpawn, MeshLifetime, MeshLocation, MeshVelocity, MeshSize, MeshColor, MeshTypeData, MeshLOD, MeshEmitter,
+		System };
 	Template = System;
 	bOwnsTemplate = true;
 }
@@ -208,19 +244,42 @@ FBox UParticleSystemComponent::CalcLocalBounds() const
 	FBox SimBounds(FVector(FLT_MAX), FVector(-FLT_MAX));
 	bool bAny = false;
 	bool bLocalSpace = false;
-	for (const FParticleEmitterInstance* Instance : EmitterInstances)
+	// 위치만 담긴 박스라 스프라이트 크기만큼 기본 여유를 준다
+	float PadSize = 50.0f;
+	for (FParticleEmitterInstance* Instance : EmitterInstances)
 	{
 		if (!Instance || Instance->ActiveParticles == 0)
 			continue;
 		SimBounds.Expand(Instance->BoundingBox);
 		bLocalSpace = Instance->IsLocalSpace();
 		bAny = true;
+
+		// 메시 파티클은 메시 반경 × 최대 크기만큼 튀어나온다
+		const FParticleMeshEmitterInstance* MeshInstance = dynamic_cast<const FParticleMeshEmitterInstance*>(Instance);
+		const UParticleModuleTypeDataMesh* TypeData = MeshInstance ? MeshInstance->GetMeshTypeData() : nullptr;
+		const UStaticMesh* Mesh = TypeData ? TypeData->GetMesh() : nullptr;
+		if (Mesh)
+		{
+			const FBox& MeshBounds = Mesh->GetRenderBounds();
+			const FVector MaxCorner(
+				std::max(std::abs(MeshBounds.Min.X), std::abs(MeshBounds.Max.X)),
+				std::max(std::abs(MeshBounds.Min.Y), std::abs(MeshBounds.Max.Y)),
+				std::max(std::abs(MeshBounds.Min.Z), std::abs(MeshBounds.Max.Z)));
+			const float MeshRadius = MaxCorner.Length();
+
+			float MaxParticleSize = 0.0f;
+			ParticleHelper::ForEachParticle(*Instance, [&](FBaseParticle& Particle, uint8*)
+				{
+					MaxParticleSize = std::max(MaxParticleSize,
+						std::max(std::abs(Particle.Size.X), std::max(std::abs(Particle.Size.Y), std::abs(Particle.Size.Z))));
+				});
+			PadSize = std::max(PadSize, MeshRadius * MaxParticleSize);
+		}
 	}
 	if (!bAny)
 		return FBox(FVector(-1.0f), FVector(1.0f));
 
-	// 위치만 담긴 박스라 스프라이트 크기만큼 여유를 준다
-	const FVector Pad(50.0f);
+	const FVector Pad(PadSize);
 	SimBounds = FBox(SimBounds.Min - Pad, SimBounds.Max + Pad);
 
 	// 프록시가 LocalToWorld를 다시 곱하므로 World Space면 로컬로 되돌린다

@@ -188,6 +188,13 @@ FShaderProgram* FRenderResourceManager::GetShaderProgram(const FString& InPath)
 	return nullptr;
 }
 
+FShaderProgram* FRenderResourceManager::FindShaderProgram(const FString& InPath)
+{
+	if (TUniquePtr<FShaderProgram>* Found = Get().ShaderProgramMap.Find(InPath))
+		return Found->get();
+	return nullptr;
+}
+
 
 
 void FRenderResourceManager::LoadOrCompileShader(const FString& Path)

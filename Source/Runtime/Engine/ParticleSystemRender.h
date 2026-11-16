@@ -28,6 +28,7 @@ struct FParticleSubmitContext
 enum class EDynamicEmitterType : uint8
 {
 	Sprite,
+	Mesh,
 };
 
 // 에미터 하나의 렌더 리소스와 제출
@@ -92,4 +93,30 @@ private:
 
 	TArray<FParticleSortEntry> SortScratch;
 	TArray<FParticleSpriteInstance> InstanceScratch;
+};
+
+// ParticleInstanceCommon.hlsli의 PARTICLE_INSTANCE_VS_INPUT과 필드 순서가 같아야 한다
+// Transform0~2 = 파티클 World 행렬(row-vector)의 열 0~2. w에 이동값이 들어간다
+struct FParticleMeshInstance
+{
+	FVector4 Transform0;
+	FVector4 Transform1;
+	FVector4 Transform2;
+	FLinearColor Color;
+};
+static_assert(sizeof(FParticleMeshInstance) == 64, "PARTICLE_INSTANCE_VS_INPUT과 맞아야 한다");
+
+class FDynamicMeshEmitterData final : public FDynamicEmitterDataBase
+{
+public:
+	EDynamicEmitterType GetType() const override { return EDynamicEmitterType::Mesh; }
+	void Submit(FRenderQueue& Queue, FParticleEmitterInstance& Instance, const FParticleSubmitContext& Context) override;
+
+private:
+	bool EnsureInstanceBuffer(const FParticleEmitterInstance& Instance);
+	int32 BuildInstances(FParticleEmitterInstance& Instance);
+
+	TUniquePtr<FVertexBuffer> InstanceBuffer;
+	int32 Capacity = 0;
+	TArray<FParticleMeshInstance> InstanceScratch;
 };

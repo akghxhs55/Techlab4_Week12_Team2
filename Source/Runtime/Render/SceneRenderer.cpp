@@ -402,11 +402,13 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 					// 실제 메시 패스와 같은 VS를 사용해 깊이 계산을 일치시킨다.
 					FShaderProgram DepthProgram(nullptr, DepthPipeline->Shader->PixelShader);
 					FShaderProgram SkinnedDepthProgram(nullptr, DepthPipeline->Shader->PixelShader);
+					FShaderProgram InstancedDepthProgram(nullptr, DepthPipeline->Shader->PixelShader);
 					TArray<FMeshDrawBatch> DepthBatches = ForwardBatches;
 					for (FMeshDrawBatch& Batch : DepthBatches)
 					{
-						// GPU 스킨 배치는 VS가 달라서 프로그램을 나눈다
-						FShaderProgram& Program = Batch.BoneBuffer ? SkinnedDepthProgram : DepthProgram;
+						// 같은 객체를 공유하면 마지막 VS로 덮어써지므로 VS가 다른 종류(스킨, 파티클 인스턴스)는 프로그램을 나눈다
+						FShaderProgram& Program = Batch.InstanceBuffer ? InstancedDepthProgram
+							: (Batch.BoneBuffer ? SkinnedDepthProgram : DepthProgram);
 						Program.VertexShader = Batch.Pipeline.Shader->VertexShader;
 						Batch.Pipeline = *DepthPipeline;
 						Batch.Pipeline.Shader = &Program;

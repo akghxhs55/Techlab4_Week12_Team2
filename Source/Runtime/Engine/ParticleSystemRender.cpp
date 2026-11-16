@@ -5,8 +5,13 @@
 #include "Particles/ParticleLODLevel.h"
 #include "Particles/Module/ParticleModuleRequired.h"
 #include "Particles/Module/ParticleModuleSubUV.h"
+#include "Particles/ParticleMeshEmitterInstance.h"
+#include "Particles/Module/ParticleModuleTypeDataMesh.h"
+#include "Components/ParticleSystemComponent.h"
 #include "Render/RenderCommand.h"
 #include "Render/Material.h"
+#include "Render/Mesh.h"
+#include "Math/Transform.h"
 
 #include <algorithm>
 
@@ -140,4 +145,93 @@ void FDynamicSpriteEmitterData::Submit(FRenderQueue& Queue, FParticleEmitterInst
 	Packet.MaterialParamDataSize = sizeof(FParticleSpriteConstants);
 	Packet.CameraToParticleDistance = GetPacketDistance(Context);
 	Queue.Add(Packet);
+}
+
+bool FDynamicMeshEmitterData::EnsureInstanceBuffer(const FParticleEmitterInstance& Instance)
+{
+	if (!InstanceBuffer || Capacity < Instance.ActiveParticles)
+	{
+		Capacity = Instance.MaxActiveParticles;
+		InstanceBuffer = RenderCommand::CreateDynamicVertexBuffer(
+			sizeof(FParticleMeshInstance) * Capacity, sizeof(FParticleMeshInstance));
+	}
+	return InstanceBuffer != nullptr;
+}
+
+int32 FDynamicMeshEmitterData::BuildInstances(FParticleEmitterInstance& Instance)
+{
+	FParticleMeshEmitterInstance& MeshInstance = static_cast<FParticleMeshEmitterInstance&>(Instance);
+	const bool bLocalSpace = Instance.IsLocalSpace() && Instance.Component;
+	const FMatrix ComponentToWorld = bLocalSpace ? Instance.Component->GetWorldMatrix() : FMatrix::Identity;
+	constexpr float RadToDeg = 180.0f / PI;
+
+	InstanceScratch.SetNum(Instance.ActiveParticles, false);
+	FParticleMeshInstance* Out = InstanceScratch.GetData();
+
+	ParticleHelper::ForEachParticle(Instance, [&](FBaseParticle& Particle, uint8*)
+		{
+			// 오일러 각(도). Payload는 X = Roll, Y = Pitch, Z = Yaw. 스프라이트 회전(라디안)은 세 축에 공통으로 더한다
+			const FMeshRotationPayloadData& Payload = MeshInstance.GetMeshRotationPayload(static_cast<const FBaseParticle&>(Particle));
+			const FVector Euler = Payload.InitialOrientation + Payload.Rotation + FVector(Particle.Rotation * RadToDeg);
+			const FRotator Rotation(Euler.Y, Euler.Z, Euler.X);
+
+			// row-vector: Scale × Rotation × Translation (액터 Transform과 같은 규칙)
+			FMatrix M = FTransform(Rotation, Particle.Location, Particle.Size).GetLocalMatrix();
+			if (bLocalSpace)
+			{
+				M = M * ComponentToWorld;
+			}
+
+			// 셰이더가 열과 내적하므로 0~2열을 위에서 아래로 담는다 (행을 넣으면 전치가 된다)
+			Out->Transform0 = FVector4(M.M[0][0], M.M[1][0], M.M[2][0], M.M[3][0]);
+			Out->Transform1 = FVector4(M.M[0][1], M.M[1][1], M.M[2][1], M.M[3][1]);
+			Out->Transform2 = FVector4(M.M[0][2], M.M[1][2], M.M[2][2], M.M[3][2]);
+			Out->Color = Particle.Color;
+			++Out;
+		});
+
+	// Freeze된 파티클은 건너뛰므로 실제로 채운 수
+	return static_cast<int32>(Out - InstanceScratch.GetData());
+}
+
+void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, FParticleEmitterInstance& Instance, const FParticleSubmitContext& Context)
+{
+	if (!Context.View)
+		return;
+
+	const FParticleMeshEmitterInstance& MeshInstance = static_cast<const FParticleMeshEmitterInstance&>(Instance);
+	const UParticleModuleTypeDataMesh* TypeData = MeshInstance.GetMeshTypeData();
+	UStaticMesh* Mesh = TypeData ? TypeData->GetMesh() : nullptr;
+	if (!Mesh || !Mesh->GetVertexBuffer() || !Mesh->GetIndexBuffer())
+		return;
+	if (!EnsureInstanceBuffer(Instance))
+		return;
+
+	const int32 Count = BuildInstances(Instance);
+	if (Count == 0)
+		return;
+
+	RenderCommand::UpdateBufferData(InstanceBuffer.get(),
+		InstanceScratch.GetData(), sizeof(FParticleMeshInstance) * Count);
+
+	// 섹션마다 메시 머티리얼로 그린다. 머티리얼 PSO가 불투명이면 Forward 패스에서 #PARTICLE_INSTANCE 변형으로 교체된다
+	for (const FStaticMeshSection& Section : Mesh->GetMeshData().Sections)
+	{
+		UMaterial* SectionMaterial = Mesh->GetMaterial(Section.MaterialSlotIndex);
+		if (!SectionMaterial || Section.IndexCount == 0)
+			continue;
+
+		FRenderPacket Packet;
+		// 셰이더 변형은 World를 쓰지 않지만 오브젝트 슬롯 상수를 채우는 데 필요하다
+		Packet.Model = Queue.StoreWorldMatrix(FMatrix::Identity);
+		Packet.VertexBuffer = Mesh->GetVertexBuffer();
+		Packet.IndexBuffer = Mesh->GetIndexBuffer();
+		Packet.StartIndex = Section.StartIndex;
+		Packet.IndexCount = Section.IndexCount;
+		Packet.InstanceBuffer = InstanceBuffer.get();
+		Packet.InstanceCount = static_cast<uint32>(Count);
+		Packet.Material = SectionMaterial;
+		Packet.CameraToParticleDistance = GetPacketDistance(Context);
+		Queue.Add(Packet);
+	}
 }
