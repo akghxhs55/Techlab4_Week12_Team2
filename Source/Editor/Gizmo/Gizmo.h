@@ -49,10 +49,11 @@ public:
 	void SetSpace(EGizmoSpace InSpace) { if (Space != InSpace) EndDrag(); Space = InSpace; }
 	EGizmoSpace GetSpace() const { return Space; }
 
+	// 켜면 이동과 크기는 Step 단위로, 회전은 고정 각도 단위로 맞춘다.
 	void SetLocationSnap(bool bEnabled, float Step)
 	{
-		bLocationSnapEnabled = bEnabled;
-		LocationSnapSize = Step > 0.0f ? Step : 1.0f;
+		bLocationSnapEnabled = bEnabled && Step > 0.0f;
+		LocationSnapSize = bLocationSnapEnabled ? Step : 0.0f;
 	}
 	bool IsLocationSnapEnabled() const { return bLocationSnapEnabled; }
 	float GetLocationSnapSize() const { return LocationSnapSize; }

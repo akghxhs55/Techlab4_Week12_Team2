@@ -640,8 +640,8 @@ void FContentDrawerPanel::RenderContents()
 			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 0.0f);
 			if (bShowPathSearch)
 			{
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.16f, 0.43f, 0.85f, 1.0f));
-				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, ImVec4(0.22f, 0.50f, 0.92f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::Accent);
+				ImGui::PushStyleColor(ImGuiCol_ButtonHovered, EditorColor::AccentHover);
 			}
 			else
 			{
@@ -914,8 +914,8 @@ void FContentDrawerPanel::RenderContents()
 					// 폴더는 회색 푸터/격자 배경 없이 아이콘과 이름만 노출하고 선택·호버 시에만 강조한다.
 					if (bIsSelected)
 					{
-						DL->AddRectFilled(CardMin, CardMax, IM_COL32(20, 92, 198, 175), CardRounding);
-						DL->AddRect(CardMin, CardMax, IM_COL32(62, 148, 255, 255), CardRounding, 0, EditorStyle::Scale(1.6f));
+						DL->AddRectFilled(CardMin, CardMax, EditorColor::WithAlpha(EditorColor::Accent, 175), CardRounding);
+						DL->AddRect(CardMin, CardMax, EditorColor::AccentBright, CardRounding, 0, EditorStyle::Scale(1.6f));
 					}
 					else if (bHovered)
 					{
@@ -973,7 +973,7 @@ void FContentDrawerPanel::RenderContents()
 				DL->AddRectFilled(StripeMin, StripeMax, CardStyle.AccentColor);
 
 				const ImU32 FooterCol = bIsSelected
-					? IM_COL32(20, 92, 198, 255)
+					? EditorColor::Accent
 					: (bHovered ? IM_COL32(55, 58, 65, 255) : IM_COL32(42, 44, 48, 255));
 				DL->AddRectFilled(FooterMin, FooterMax, FooterCol, CardRounding, ImDrawFlags_RoundCornersBottom);
 
@@ -986,14 +986,14 @@ void FContentDrawerPanel::RenderContents()
 						CardW - TextPadX * 2.0f, NameCol, false, bOutNameTruncated);
 				}
 
-				const ImU32 TypeCol = bIsSelected ? IM_COL32(215, 228, 248, 255) : IM_COL32(142, 146, 155, 255);
+				const ImU32 TypeCol = bIsSelected ? EditorColor::TextPrimary : EditorColor::TextMuted;
 				DrawTruncatedSingleLine(DL, CardStyle.TypeLabel,
 					ImVec2(FooterMin.x + TextPadX, FooterMax.y - TextPadY - TypeFontSize),
 					CardW - TextPadX * 2.0f, ImGui::GetFont(), TypeFontSize, TypeCol, bOutTypeTruncated);
 				DL->PopClipRect();
 
 				const ImU32 BorderCol = bIsSelected
-					? IM_COL32(62, 148, 255, 255)
+					? EditorColor::AccentBright
 					: (bHovered ? IM_COL32(115, 120, 130, 255) : IM_COL32(26, 28, 32, 255));
 				DL->AddRect(CardMin, CardMax, BorderCol, CardRounding, 0, bIsSelected ? EditorStyle::Scale(1.8f) : 1.0f);
 			};
@@ -1241,8 +1241,8 @@ void FContentDrawerPanel::RenderContents()
 						ImGui::SetKeyboardFocusHere();
 						bFocusInlineRename = false;
 					}
-					ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.05f, 0.06f, 0.08f, 1.0f));
-					ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.35f, 0.62f, 0.98f, 0.95f));
+					ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorColor::BgDeepest);
+					ImGui::PushStyleColor(ImGuiCol_Border, EditorColor::AccentBright);
 					ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 					ImGui::PushStyleVar(ImGuiStyleVar_FrameRounding, EditorStyle::Scale(3.0f));
 					ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(4.0f), EditorStyle::Scale(2.0f)));
@@ -1627,8 +1627,8 @@ void FContentDrawerPanel::RenderFolderTree(const fs::path& Path, fs::path& Selec
 				ImGui::SetKeyboardFocusHere();
 				bFocusInlineRename = false;
 			}
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.08f, 0.09f, 0.11f, 1.0f));
-			ImGui::PushStyleColor(ImGuiCol_Border, ImVec4(0.35f, 0.62f, 0.98f, 0.95f));
+			ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorColor::BgDeepest);
+			ImGui::PushStyleColor(ImGuiCol_Border, EditorColor::AccentBright);
 			ImGui::PushStyleVar(ImGuiStyleVar_FrameBorderSize, 1.0f);
 			ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(EditorStyle::Scale(3.0f), 0.0f));
 			const bool bEnter = ImGui::InputText("##TreeInlineRename", RenameBuffer, sizeof(RenameBuffer),

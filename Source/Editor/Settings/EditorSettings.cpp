@@ -238,8 +238,8 @@ bool FEditorSettingsManager::LoadSettings()
 				else if (Key == "LocationSnapSize")
 				{
 					const float Value = std::stof(ValueStr);
-					if (std::isfinite(Value) && Value > 0.0f)
-						Settings.LocationSnapSize = FMath::Clamp(Value, 0.01f, 1000.0f);
+					if (std::isfinite(Value) && Value >= 0.0f)
+						Settings.LocationSnapSize = FMath::Clamp(Value, 0.0f, 1000.0f);
 				}
 				else if (Key == "Horizontal") Settings.MultipleViewportsHorizontal = std::stof(ValueStr);
 				else if (Key == "Vertical") Settings.MultipleViewportsVertical = std::stof(ValueStr);
@@ -271,6 +271,9 @@ bool FEditorSettingsManager::LoadSettings()
 	}
 
 	File.close();
+	Settings.bLocationSnap = Settings.bLocationSnap && Settings.LocationSnapSize > 0.0f;
+	if (!Settings.bLocationSnap)
+		Settings.LocationSnapSize = 0.0f;
 	if (!std::isfinite(Settings.SceneDepthMaxRange))
 		Settings.SceneDepthMaxRange = 50.0f;
 	Settings.SceneDepthMaxRange = FMath::Clamp(Settings.SceneDepthMaxRange, 0.1f, 10000.0f);

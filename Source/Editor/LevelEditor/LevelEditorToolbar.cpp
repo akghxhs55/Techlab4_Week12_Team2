@@ -108,7 +108,8 @@ void FLevelEditorToolbar::DrawPlacementGroup()
 		EditorStyle::PopSelectedButton(bSnapOn);
 		SnapAnchor = EditorStyle::LastItemAnchor();
 		if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("LevelSnapPopup"))
-			ImGui::SetTooltip(bSnapOn ? "Location snap: ON (G to toggle)" : "Location snap: OFF (G to toggle)");
+			ImGui::SetTooltip(bSnapOn ? "Snap: ON (G to toggle)\nLocation/Scale use the snap size, rotation snaps by 5 degrees."
+				: "Snap: OFF (G to toggle)");
 		ImGui::SameLine();
 	}
 
@@ -118,7 +119,7 @@ void FLevelEditorToolbar::DrawPlacementGroup()
 		ImGui::OpenPopup("LevelGridPopup");
 	GridAnchor = EditorStyle::LastItemAnchor();
 	if (ImGui::IsItemHovered() && !ImGui::IsPopupOpen("LevelGridPopup"))
-		ImGui::SetTooltip("Grid spacing");
+		ImGui::SetTooltip("Grid");
 
 	EndToolbarGroup();
 

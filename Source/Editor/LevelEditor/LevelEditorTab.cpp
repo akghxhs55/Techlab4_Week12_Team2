@@ -206,15 +206,17 @@ void FLevelEditorTab::DrawStatusBar(float Height, ImVec2& OutBarMin, ImVec2& Out
 				Width += IconSide + Gap;
 
 			if (bDrawerActive)
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.20f, 0.44f, 0.76f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::Accent);
 			else if (bDocked)
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.18f, 0.19f, 0.22f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::BgHeader);
 			else
-				ImGui::PushStyleColor(ImGuiCol_Button, ImVec4(0.13f, 0.13f, 0.15f, 1.0f));
+				ImGui::PushStyleColor(ImGuiCol_Button, EditorColor::BgElevated);
+			ImGui::PushStyleColor(ImGuiCol_ButtonHovered, bDrawerActive ? EditorColor::AccentHover : EditorColor::BgAccentHover);
+			ImGui::PushStyleColor(ImGuiCol_ButtonActive, EditorColor::AccentActive);
 
 			const ImVec2 Pos = ImGui::GetCursorScreenPos();
 			const bool bClicked = ImGui::Button(Id, ImVec2(Width, BtnHeight));
-			ImGui::PopStyleColor();
+			ImGui::PopStyleColor(3);
 
 			const float CenterY = Pos.y + BtnHeight * 0.5f;
 			float X = Pos.x + PadX;

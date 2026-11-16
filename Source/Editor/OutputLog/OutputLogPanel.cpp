@@ -700,9 +700,9 @@ void FOutputLogPanel::RenderAutocompletePopup(const ImVec2& InputMin, const ImVe
 				BadgeColor = IM_COL32(92, 166, 214, 255);
 
 			if (bSelected)
-				DrawList->AddRectFilled(ImVec2(RowMin.x + BadgeWidth, RowMin.y), RowMax, IM_COL32(56, 62, 74, 255));
+				DrawList->AddRectFilled(ImVec2(RowMin.x + BadgeWidth, RowMin.y), RowMax, EditorColor::Accent);
 			else if (bHovered)
-				DrawList->AddRectFilled(ImVec2(RowMin.x + BadgeWidth, RowMin.y), RowMax, IM_COL32(42, 47, 56, 255));
+				DrawList->AddRectFilled(ImVec2(RowMin.x + BadgeWidth, RowMin.y), RowMax, EditorColor::BgAccentHover);
 
 			DrawList->AddRectFilled(RowMin, ImVec2(RowMin.x + BadgeWidth, RowMax.y), BadgeColor);
 

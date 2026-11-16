@@ -908,8 +908,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 			CapturedViewportIndex == -1 && !ImGui::GetIO().KeyCtrl && !ImGui::GetIO().KeyAlt && !ImGui::GetIO().KeyShift &&
 			FInputSystem::IsKeyPressed(EKeyCode::G) && EditorSettings)
 		{
-			bool& bSnap = EditorSettings->GetMutableSettings().bLocationSnap;
-			bSnap = !bSnap;
+			ViewportsPanel->SetLocationSnapEnabled(!ViewportsPanel->IsLocationSnapEnabled());
 		}
 
 		// 활성 뷰포트 시점 동기화
