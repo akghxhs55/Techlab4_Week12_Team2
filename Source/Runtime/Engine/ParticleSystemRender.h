@@ -31,6 +31,7 @@ enum class EDynamicEmitterType : uint8
 	Sprite,
 	Mesh,
 	Beam,
+	Ribbon,
 };
 
 // 틱이 끝날 때 에미터가 채우는 렌더용 사본. 렌더 쪽은 이것만 보고 FParticleEmitterInstance는 모른다
@@ -71,6 +72,18 @@ struct FDynamicBeamEmitterReplayData : FDynamicEmitterReplayDataBase
 	int32 NoiseFrequency = 0;
 	bool  bNoiseSmooth = false;
 	int32 NoiseTessellation = 1;
+};
+
+struct FDynamicRibbonEmitterReplayData : FDynamicEmitterReplayDataBase
+{
+	int32 RibbonPayloadOffset = 0;   // 파티클 메모리에서 FRibbonPayloadData 위치
+	int32 Sheets = 1;
+	bool  bTiling = false;           // TilingDistance > 0
+
+	bool    bHeadValid = false;      // head를 현재 트레일에 이을지
+	uint32  HeadTrailId = 0;
+	FVector HeadPosition;            // 이번 프레임 소스 위치(월드)
+	float   HeadTiledU = 0.0f;
 };
 
 
@@ -142,17 +155,23 @@ static_assert(sizeof(FParticleTrailVertex) == 36, "ParticleTrailShader VS_INPUT�
 // 위아래 두 줄로 놓인 정점들을 삼각형 인덱스로 만든다
 void AppendTrailIndices(TArray<uint32>& OutIndices, uint32 BaseVertex, uint32 NumSegments);
 
+struct FTrailPoint
+{
+	FVector Position;
+	float HalfWidth = 1.0f;
+	FLinearColor Color;
+	float U = 0.0f;
+};
+
 struct FTrailStripParams
 {
 	FVector CameraPosition;
-	float HalfWidth = 1.0f;
+	FVector CameraUp;
 	int32 Sheets = 1;
-	float TextureTile = 1.0f;
-	FLinearColor Color;
 };
 
 // Points를 따라 시트 수만큼 띠를 만들어 정점과 인덱스를 덧붙인다. 빔, 리본 공용
-void AppendTrailStrip(const TArray<FVector>& Points, const FTrailStripParams& Params,
+void AppendTrailStrip(const TArray<FTrailPoint>& Points, const FTrailStripParams& Params,
 	TArray<FParticleTrailVertex>& OutVertices, TArray<uint32>& OutIndices);
 
 struct FParticleSpriteConstants
@@ -216,7 +235,7 @@ public:
 private:
 	bool EnsureBuffers(int32 NumVertices, int32 NumIndices);
 	// 정렬된 빔마다 시트 수만큼 띠를 만든다. 반환값은 인덱스 수
-	int32 BuildGeometry(const FViewContext& View);
+	int32 BuildGeometry(const FParticleSubmitContext& Context);
 	// 노이즈 점을 월드로 펼치고 bSmooth면 곡선으로 채워 PathScratch에 넣는다
 	void BuildNoisePath(const FVector& S, const FVector& T, const uint8* ParticleBase);
 
@@ -229,6 +248,38 @@ private:
 	TArray<FParticleSortEntry> SortScratch;
 	TArray<FVector> PathScratch;
 	TArray<FVector> NoiseScratch;
+	TArray<FTrailPoint> PointScratch;
+	TArray<FParticleTrailVertex> VertexScratch;
+	TArray<uint32> IndexScratch;
+};
+
+class FDynamicRibbonEmitterData final : public FDynamicEmitterDataBase
+{
+public:
+	EDynamicEmitterType GetType() const override { return EDynamicEmitterType::Ribbon; }
+	const FDynamicEmitterReplayDataBase& GetSource() const override { return Source; }
+	void Submit(FRenderQueue& Queue, const FParticleSubmitContext& Context) override;
+
+	FDynamicRibbonEmitterReplayData Source;
+
+private:
+	bool EnsureBuffers(int32 NumVertices, int32 NumIndices);
+	int32 BuildGeometry(const FParticleSubmitContext& Context);
+
+	TUniquePtr<FVertexBuffer> VertexBuffer;
+	TUniquePtr<FIndexBuffer>  IndexBuffer;
+	int32 VertexCapacity = 0;
+	int32 IndexCapacity = 0;
+	FTrailVertexFactory VertexFactory;
+
+	struct FRibbonSortEntry
+	{
+		uint32 TrailId;
+		uint32 Counter;
+		const uint8* ParticleBase;
+	};
+	TArray<FRibbonSortEntry> SortScratch;
+	TArray<FTrailPoint> PointScratch;
 	TArray<FParticleTrailVertex> VertexScratch;
 	TArray<uint32> IndexScratch;
 };

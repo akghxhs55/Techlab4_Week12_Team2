@@ -86,3 +86,11 @@ struct FBeamNoisePoint
 	FVector2 Target;    // 움직여 갈 목표
 };
 static_assert(sizeof(FBeamNoisePoint) == 16, "FBeamNoisePoint 크기 오류, 16이어야 합니다.");
+
+struct FRibbonPayloadData
+{
+	float TiledU;   // 생성 시점까지 누적 이동거리 / TilingDistance
+	uint32 TrailId; // 텔레포트, 재활성화로 끊길 때마다 바뀐다. 렌더는 같은 Id끼리만 잇는다
+	float Pad[2];
+};
+static_assert(sizeof(FRibbonPayloadData) == 16, "FRibbonPayloadData 크기 오류, 16이어야 합니다.");

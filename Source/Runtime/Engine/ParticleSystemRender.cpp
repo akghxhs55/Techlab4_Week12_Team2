@@ -36,14 +36,13 @@ void AppendTrailIndices(TArray<uint32>& OutIndices, uint32 BaseVertex, uint32 Nu
 	}
 }
 
-void AppendTrailStrip(const TArray<FVector>& Points, const FTrailStripParams& Params,
+void AppendTrailStrip(const TArray<FTrailPoint>& Points, const FTrailStripParams& Params,
 	TArray<FParticleTrailVertex>& OutVertices, TArray<uint32>& OutIndices)
 {
 	const int32 NumPoints = Points.Num();
 	if (NumPoints < 2 || Params.Sheets < 1)
 		return;
 
-	const float LastIndex = static_cast<float>(NumPoints - 1);
 	for (int32 Sheet = 0; Sheet < Params.Sheets; ++Sheet)
 	{
 		// 판은 180° 돌리면 같은 모양이라 PI를 나눈다
@@ -55,22 +54,20 @@ void AppendTrailStrip(const TArray<FVector>& Points, const FTrailStripParams& Pa
 		for (int32 i = 0; i < NumPoints; ++i)
 		{
 			// 휘어진 경로는 점마다 진행 방향이 달라서 앞뒤 점으로 접선을 구한다
-			FVector Tangent = Points[std::min(i + 1, NumPoints - 1)] - Points[std::max(i - 1, 0)];
+			const FTrailPoint& Point = Points[i];
+			FVector Tangent = Points[std::min(i + 1, NumPoints - 1)].Position - Points[std::max(i - 1, 0)].Position;
 			if (Tangent.Length() < 1e-4f)
 				Tangent = FVector(1.0f, 0.0f, 0.0f);
 			Tangent = Tangent.Normalized();
 
 			// 접선과 시선 둘 다에 수직이면 판이 카메라를 향한다
-			FVector Right0 = FVector::Cross(Tangent, Points[i] - Params.CameraPosition);
-			if (Right0.Length() < 1e-4f) Right0 = FVector::Cross(Tangent, FVector(0.0f, 0.0f, 1.0f));   // 경로를 정면으로 볼 때
-			if (Right0.Length() < 1e-4f) Right0 = FVector::Cross(Tangent, FVector(0.0f, 1.0f, 0.0f));   // 경로가 Z축과 평행할 때
-			Right0 = Right0.Normalized();
+			FVector Right0 = FVector::Cross(Tangent, Point.Position - Params.CameraPosition);
+			Right0 = Right0.Length() < 1e-4f ? Params.CameraUp : Right0.Normalized();
 			const FVector Up0 = FVector::Cross(Tangent, Right0);
 
-			const FVector Offset = (Right0 * CosA + Up0 * SinA) * Params.HalfWidth;
-			const float U = static_cast<float>(i) / LastIndex * Params.TextureTile;
-			OutVertices.Add({ Points[i] - Offset, FVector2(U, 1.0f), Params.Color });   // 짝수 = 아래
-			OutVertices.Add({ Points[i] + Offset, FVector2(U, 0.0f), Params.Color });   // 홀수 = 위
+			const FVector Offset = (Right0 * CosA + Up0 * SinA) * Point.HalfWidth;
+			OutVertices.Add({ Point.Position - Offset, FVector2(Point.U, 1.0f), Point.Color });   // 짝수 = 아래
+			OutVertices.Add({ Point.Position + Offset, FVector2(Point.U, 0.0f), Point.Color });   // 홀수 = 위
 		}
 		AppendTrailIndices(OutIndices, BaseVertex, static_cast<uint32>(NumPoints - 1));
 	}
@@ -391,8 +388,9 @@ void FDynamicBeamEmitterData::BuildNoisePath(const FVector& S, const FVector& T,
 	PathScratch.Add(NoiseScratch[F]);
 }
 
-int32 FDynamicBeamEmitterData::BuildGeometry(const FViewContext& View)
+int32 FDynamicBeamEmitterData::BuildGeometry(const FParticleSubmitContext& Context)
 {
+	const FViewContext& View = *Context.View;
 	VertexScratch.SetNum(0, false);
 	IndexScratch.SetNum(0, false);
 
@@ -403,8 +401,8 @@ int32 FDynamicBeamEmitterData::BuildGeometry(const FViewContext& View)
 
 	FTrailStripParams Params;
 	Params.CameraPosition = View.CameraPosition;
+	Params.CameraUp = Context.CameraUp;
 	Params.Sheets = Source.Sheets;
-	Params.TextureTile = Source.TextureTile;
 
 	for (const FParticleSortEntry& Entry : SortScratch)
 	{
@@ -430,9 +428,12 @@ int32 FDynamicBeamEmitterData::BuildGeometry(const FViewContext& View)
 			}
 		}
 
-		Params.HalfWidth = std::abs(Particle.Size.X * Source.Scale.X) * 0.5f;
-		Params.Color = Particle.Color;
-		AppendTrailStrip(PathScratch, Params, VertexScratch, IndexScratch);
+		const float HalfWidth = std::abs(Particle.Size.X * Source.Scale.X) * 0.5f;
+		const float LastIndex = static_cast<float>(std::max(PathScratch.Num() - 1, 1));
+		PointScratch.SetNum(0, false);
+		for (int32 i = 0; i < PathScratch.Num(); ++i)
+			PointScratch.Add({ PathScratch[i], HalfWidth, Particle.Color, static_cast<float>(i) / LastIndex * Source.TextureTile });
+		AppendTrailStrip(PointScratch, Params, VertexScratch, IndexScratch);
 	}
 	return IndexScratch.Num();
 }
@@ -445,7 +446,7 @@ void FDynamicBeamEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitC
 	if (!EmitterMaterial)
 		return;
 
-	const int32 IndexCount = BuildGeometry(*Context.View);
+	const int32 IndexCount = BuildGeometry(Context);
 	if (IndexCount == 0)
 		return;
 	if (!EnsureBuffers(VertexScratch.Num(), IndexCount))
@@ -464,6 +465,128 @@ void FDynamicBeamEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitC
 	Packet.VertexFactory = &VertexFactory;
 	Packet.StartIndex = 0;
 	// 0이면 버퍼 전체를 그리므로 이번 프레임 개수를 넣는다
+	Packet.IndexCount = static_cast<uint32>(IndexCount);
+	Packet.InstanceCount = 0;
+	Packet.Material = EmitterMaterial;
+	Packet.CameraToParticleDistance = GetPacketDistance(Context);
+	Queue.Add(Packet);
+}
+
+bool FDynamicRibbonEmitterData::EnsureBuffers(int32 NumVertices, int32 NumIndices)
+{
+	if (!VertexBuffer || VertexCapacity < NumVertices)
+	{
+		VertexCapacity = std::max(NumVertices, VertexCapacity * 2);
+		VertexBuffer = RenderCommand::CreateDynamicVertexBuffer(
+			sizeof(FParticleTrailVertex) * VertexCapacity, sizeof(FParticleTrailVertex));
+	}
+	if (!IndexBuffer || IndexCapacity < NumIndices)
+	{
+		IndexCapacity = std::max(NumIndices, IndexCapacity * 2);
+		IndexBuffer = RenderCommand::CreateDynamicIndexBuffer(IndexCapacity);
+	}
+	return VertexBuffer && IndexBuffer;
+}
+
+int32 FDynamicRibbonEmitterData::BuildGeometry(const FParticleSubmitContext& Context)
+{
+	VertexScratch.SetNum(0, false);
+	IndexScratch.SetNum(0, false);
+
+	SortScratch.SetNum(0, false);
+	Source.ForEachParticle([&](const FBaseParticle& Particle, const uint8* ParticleBase)
+		{
+			const FRibbonPayloadData& Payload = ParticleHelper::GetPayload<FRibbonPayloadData>(ParticleBase, Source.RibbonPayloadOffset);
+			SortScratch.Add({ Payload.TrailId, Particle.Flags & STATE_CounterMask, ParticleBase });
+		});
+
+	// 같은 트레일끼리 모으고, 트레일 안에서는 새 점부터
+	std::sort(SortScratch.GetData(), SortScratch.GetData() + SortScratch.Num(),
+		[](const FRibbonSortEntry& A, const FRibbonSortEntry& B)
+		{
+			if (A.TrailId != B.TrailId)
+				return A.TrailId < B.TrailId;
+			return A.Counter > B.Counter;
+		});
+
+	FTrailStripParams Params;
+	Params.CameraPosition = Context.View->CameraPosition;
+	Params.CameraUp = Context.CameraUp;
+	Params.Sheets = Source.Sheets;
+
+	// 겹친 점을 넘기면 접선이 0이 되어 띠가 뒤틀린다
+	constexpr float MinPointDistance = 1e-3f;
+
+	for (int32 Begin = 0; Begin < SortScratch.Num(); )
+	{
+		const uint32 Id = SortScratch[Begin].TrailId;
+		int32 End = Begin;
+		while (End < SortScratch.Num() && SortScratch[End].TrailId == Id)
+			++End;
+
+		PointScratch.SetNum(0, false);
+
+		const FBaseParticle& Newest = *reinterpret_cast<const FBaseParticle*>(SortScratch[Begin].ParticleBase);
+		const float NewestHalfWidth = std::abs(Newest.Size.X * Source.Scale.X) * 0.5f;
+		if (Source.bHeadValid && Id == Source.HeadTrailId)
+		{
+			const FVector NewestPos = Source.SimulationToWorld(Newest.Location);
+			if ((Source.HeadPosition - NewestPos).Length() > MinPointDistance)
+				PointScratch.Add({ Source.HeadPosition, NewestHalfWidth, Newest.Color, Source.HeadTiledU });
+		}
+
+		for (int32 i = Begin; i < End; ++i)
+		{
+			const FBaseParticle& Particle = *reinterpret_cast<const FBaseParticle*>(SortScratch[i].ParticleBase);
+			const FVector Pos = Source.SimulationToWorld(Particle.Location);
+			if (!PointScratch.IsEmpty() && (Pos - PointScratch.Last().Position).Length() < MinPointDistance)
+				continue;
+			const FRibbonPayloadData& Payload = ParticleHelper::GetPayload<FRibbonPayloadData>(SortScratch[i].ParticleBase, Source.RibbonPayloadOffset);
+			PointScratch.Add({ Pos, std::abs(Particle.Size.X * Source.Scale.X) * 0.5f, Particle.Color, Payload.TiledU });
+		}
+
+		Begin = End;
+		if (PointScratch.Num() < 2)
+			continue;
+
+		// Tile 모드와 같은 방향으로 head가 큰 U
+		if (!Source.bTiling)
+		{
+			const float LastIndex = static_cast<float>(PointScratch.Num() - 1);
+			for (int32 k = 0; k < PointScratch.Num(); ++k)
+				PointScratch[k].U = 1.0f - static_cast<float>(k) / LastIndex;
+		}
+
+		AppendTrailStrip(PointScratch, Params, VertexScratch, IndexScratch);
+	}
+	return IndexScratch.Num();
+}
+
+void FDynamicRibbonEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitContext& Context)
+{
+	if (!Context.View || Source.ActiveParticleCount == 0)
+		return;
+	UMaterial* EmitterMaterial = Source.Material ? Source.Material : Context.DefaultMaterial;
+	if (!EmitterMaterial)
+		return;
+
+	const int32 IndexCount = BuildGeometry(Context);
+	if (IndexCount == 0)
+		return;
+	if (!EnsureBuffers(VertexScratch.Num(), IndexCount))
+		return;
+
+	RenderCommand::UpdateBufferData(VertexBuffer.get(), VertexScratch.GetData(),
+		static_cast<uint32>(sizeof(FParticleTrailVertex) * VertexScratch.Num()));
+	RenderCommand::UpdateBufferData(IndexBuffer.get(), IndexScratch.GetData(),
+		static_cast<uint32>(sizeof(uint32) * IndexCount));
+
+	VertexFactory.Init(VertexBuffer.get(), IndexBuffer.get());
+
+	FRenderPacket Packet;
+	Packet.Model = Queue.StoreWorldMatrix(FMatrix::Identity);
+	Packet.VertexFactory = &VertexFactory;
+	Packet.StartIndex = 0;
 	Packet.IndexCount = static_cast<uint32>(IndexCount);
 	Packet.InstanceCount = 0;
 	Packet.Material = EmitterMaterial;
