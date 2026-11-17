@@ -33,6 +33,10 @@ workspace "Kurisu"
 
 	multiprocessorcompile "On"
 
+	-- 엔진 Debug lib가 수백 MB라 32비트 링커/Lib.exe가 읽다가 간헐적으로
+	-- LNK1236(COFF 섹션 손상)을 낸다. 64비트 호스트 툴체인을 쓴다
+	preferredtoolarchitecture "x86_64"
+
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
 
 -- 에디터 FBX 임포터는 저장소에 포함한 Windows x64 동적 링크 SDK를 사용한다.

@@ -137,6 +137,19 @@ static_assert(sizeof(FParticleTrailVertex) == 36, "ParticleTrailShader VS_INPUT�
 // 위아래 두 줄로 놓인 정점들을 삼각형 인덱스로 만든다
 void AppendTrailIndices(TArray<uint32>& OutIndices, uint32 BaseVertex, uint32 NumSegments);
 
+struct FTrailStripParams
+{
+	FVector CameraPosition;
+	float HalfWidth = 1.0f;
+	int32 Sheets = 1;
+	float TextureTile = 1.0f;
+	FLinearColor Color;
+};
+
+// Points를 따라 시트 수만큼 띠를 만들어 정점과 인덱스를 덧붙인다. 빔, 리본 공용
+void AppendTrailStrip(const TArray<FVector>& Points, const FTrailStripParams& Params,
+	TArray<FParticleTrailVertex>& OutVertices, TArray<uint32>& OutIndices);
+
 struct FParticleSpriteConstants
 {
 	FVector4 CameraRight;
@@ -207,6 +220,7 @@ private:
 	FTrailVertexFactory VertexFactory;
 
 	TArray<FParticleSortEntry> SortScratch;
+	TArray<FVector> PathScratch;
 	TArray<FParticleTrailVertex> VertexScratch;
 	TArray<uint32> IndexScratch;
 };

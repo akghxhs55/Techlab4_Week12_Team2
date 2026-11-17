@@ -35,6 +35,46 @@ void AppendTrailIndices(TArray<uint32>& OutIndices, uint32 BaseVertex, uint32 Nu
 	}
 }
 
+void AppendTrailStrip(const TArray<FVector>& Points, const FTrailStripParams& Params,
+	TArray<FParticleTrailVertex>& OutVertices, TArray<uint32>& OutIndices)
+{
+	const int32 NumPoints = Points.Num();
+	if (NumPoints < 2 || Params.Sheets < 1)
+		return;
+
+	const float LastIndex = static_cast<float>(NumPoints - 1);
+	for (int32 Sheet = 0; Sheet < Params.Sheets; ++Sheet)
+	{
+		// 판은 180° 돌리면 같은 모양이라 PI를 나눈다
+		const float Angle = PI / static_cast<float>(Params.Sheets) * static_cast<float>(Sheet);
+		const float CosA = std::cos(Angle);
+		const float SinA = std::sin(Angle);
+
+		const uint32 BaseVertex = static_cast<uint32>(OutVertices.Num());
+		for (int32 i = 0; i < NumPoints; ++i)
+		{
+			// 휘어진 경로는 점마다 진행 방향이 달라서 앞뒤 점으로 접선을 구한다
+			FVector Tangent = Points[std::min(i + 1, NumPoints - 1)] - Points[std::max(i - 1, 0)];
+			if (Tangent.Length() < 1e-4f)
+				Tangent = FVector(1.0f, 0.0f, 0.0f);
+			Tangent = Tangent.Normalized();
+
+			// 접선과 시선 둘 다에 수직이면 판이 카메라를 향한다
+			FVector Right0 = FVector::Cross(Tangent, Points[i] - Params.CameraPosition);
+			if (Right0.Length() < 1e-4f) Right0 = FVector::Cross(Tangent, FVector(0.0f, 0.0f, 1.0f));   // 경로를 정면으로 볼 때
+			if (Right0.Length() < 1e-4f) Right0 = FVector::Cross(Tangent, FVector(0.0f, 1.0f, 0.0f));   // 경로가 Z축과 평행할 때
+			Right0 = Right0.Normalized();
+			const FVector Up0 = FVector::Cross(Tangent, Right0);
+
+			const FVector Offset = (Right0 * CosA + Up0 * SinA) * Params.HalfWidth;
+			const float U = static_cast<float>(i) / LastIndex * Params.TextureTile;
+			OutVertices.Add({ Points[i] - Offset, FVector2(U, 1.0f), Params.Color });   // 짝수 = 아래
+			OutVertices.Add({ Points[i] + Offset, FVector2(U, 0.0f), Params.Color });   // 홀수 = 위
+		}
+		AppendTrailIndices(OutIndices, BaseVertex, static_cast<uint32>(NumPoints - 1));
+	}
+}
+
 float FDynamicEmitterDataBase::GetPacketDistance(const FParticleSubmitContext& Context)
 {
 	const float OrderBias = 1.0f + static_cast<float>(Context.EmitterCount - Context.EmitterIndex) * 1e-4f;
@@ -310,8 +350,12 @@ int32 FDynamicBeamEmitterData::BuildGeometry(const FViewContext& View)
 	// 반투명이라 먼 빔부터 쌓는다
 	SortParticles(Source, View, SortScratch);
 
-	const int32 Sheets = Source.Sheets;
 	const int32 Segments = Source.Segments;
+
+	FTrailStripParams Params;
+	Params.CameraPosition = View.CameraPosition;
+	Params.Sheets = Source.Sheets;
+	Params.TextureTile = Source.TextureTile;
 
 	for (const FParticleSortEntry& Entry : SortScratch)
 	{
@@ -320,38 +364,19 @@ int32 FDynamicBeamEmitterData::BuildGeometry(const FViewContext& View)
 
 		const FVector S = Payload.SourcePoint;
 		const FVector Axis = Payload.TargetPoint - S;
-		const float Length = Axis.Length();
-		if (Length < 1e-4f)
+		if (Axis.Length() < 1e-4f)
 			continue;
-		const FVector Dir = Axis * (1.0f / Length);
 
-		const float HalfWidth = std::abs(Particle.Size.X * Source.Scale.X) * 0.5f;
-
-		// 빔 축과 시선 둘 다에 수직이면 판이 카메라를 향한다
-		const FVector ViewDir = (S + Axis * 0.5f) - View.CameraPosition;
-		FVector Right0 = FVector::Cross(Dir, ViewDir);
-		if (Right0.Length() < 1e-4f) Right0 = FVector::Cross(Dir, FVector(0.0f, 0.0f, 1.0f));   // 빔을 정면으로 볼 때
-		if (Right0.Length() < 1e-4f) Right0 = FVector::Cross(Dir, FVector(0.0f, 1.0f, 0.0f));   // 빔이 Z축과 평행할 때
-		Right0 = Right0.Normalized();
-		const FVector Up0 = FVector::Cross(Dir, Right0);
-
-		for (int32 Sheet = 0; Sheet < Sheets; ++Sheet)
+		PathScratch.SetNum(0, false);
+		for (int32 i = 0; i <= Segments; ++i)
 		{
-			// 판은 180° 돌리면 같은 모양이라 PI를 나눈다
-			const float Angle = PI / static_cast<float>(Sheets) * static_cast<float>(Sheet);
-			const FVector Offset = (Right0 * std::cos(Angle) + Up0 * std::sin(Angle)) * HalfWidth;
-
-			const uint32 BaseVertex = static_cast<uint32>(VertexScratch.Num());
-			for (int32 i = 0; i <= Segments; ++i)
-			{
-				const float T = static_cast<float>(i) / static_cast<float>(Segments);
-				const FVector P = S + Axis * T;
-				const float U = T * Source.TextureTile;
-				VertexScratch.Add({ P - Offset, FVector2(U, 1.0f), Particle.Color });   // 짝수 = 아래
-				VertexScratch.Add({ P + Offset, FVector2(U, 0.0f), Particle.Color });   // 홀수 = 위
-			}
-			AppendTrailIndices(IndexScratch, BaseVertex, static_cast<uint32>(Segments));
+			const float T = static_cast<float>(i) / static_cast<float>(Segments);
+			PathScratch.Add(S + Axis * T);
 		}
+
+		Params.HalfWidth = std::abs(Particle.Size.X * Source.Scale.X) * 0.5f;
+		Params.Color = Particle.Color;
+		AppendTrailStrip(PathScratch, Params, VertexScratch, IndexScratch);
 	}
 	return IndexScratch.Num();
 }

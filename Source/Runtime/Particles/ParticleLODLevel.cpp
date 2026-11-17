@@ -5,6 +5,12 @@
 #include "Module/ParticleModuleRequired.h"
 #include "Module/ParticleModuleSpawn.h"
 #include "Module/ParticleModuleTypeDataBase.h"
+#include "Serialization/MemoryReader.h"
+#include "Serialization/MemoryWriter.h"
+#include "Serialization/StructuredArchive.h"
+#include "Serialization/StructuredArchiveSlots.h"
+#include "Serialization/Formatter/JsonArchiveInputFormatter.h"
+#include "Serialization/Formatter/JsonArchiveOutputFormatter.h"
 
 namespace
 {
@@ -66,6 +72,41 @@ void UParticleLODLevel::UpdateModuleLists()
 		if (Module->IsSpawnModule())  SpawnModules.Add(Module);
 		if (Module->IsUpdateModule()) UpdateModules.Add(Module); 
 	}
+}
+
+UParticleLODLevel* UParticleLODLevel::Duplicate(UObject* Outer)
+{
+	// 에셋 저장과 같은 경로를 쓰므로 모듈 종류가 늘어나도 복사 코드를 고칠 필요가 없다
+	TArray<uint8> Bytes;
+	FMemoryWriter Writer(Bytes);
+	{
+		FJsonArchiveOutputFormatter Formatter(Writer);
+		FStructuredArchive Archive(Formatter);
+		Serialize(Archive.Open().EnterRecord());
+	}
+	if (Writer.IsError())
+	{
+		KRS_LOG(Warning, "Particle LOD {} cannot be serialized for copy", Level);
+		return nullptr;
+	}
+
+	UParticleLODLevel* Copy = NewObject<UParticleLODLevel>(Outer);
+	FMemoryReader Reader(Bytes, true);
+	FJsonArchiveInputFormatter Formatter(Reader);
+	if (!Reader.IsError())
+	{
+		FStructuredArchive Archive(Formatter);
+		Copy->Serialize(Archive.Open().EnterRecord());
+	}
+	if (Reader.IsError())
+	{
+		KRS_LOG(Warning, "Particle LOD {} copy cannot be loaded", Level);
+		delete Copy;
+		return nullptr;
+	}
+
+	Copy->SetLevel(Level);
+	return Copy;
 }
 
 void UParticleLODLevel::AddModule(UParticleModule* InModule)

@@ -17,6 +17,8 @@
 #include <malloc.h>
 #include <cstring>
 
+bool FParticleEmitterInstance::bLogBursts = false;
+
 FParticleEmitterInstance::~FParticleEmitterInstance()
 {
 	FreeParticleMemory();
@@ -52,6 +54,7 @@ void FParticleEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSyste
 
 	SpriteTemplate = InTemplate;
 	Component = InComponent;
+	CurrentLODIndex = 0;
 	CurrentLODLevel = InTemplate->GetLODLevel(0);
 	ParticleSize = InTemplate->GetParticleSize();
 	assert(ParticleSize >= sizeof(FBaseParticle));
@@ -263,16 +266,54 @@ int32 FParticleEmitterInstance::ComputeBurstCount()
 	{
 		if (!BurstFired[i] && EmitterTime >= Bursts[i].Time)
 		{
-			Total += SpawnModule->GetBurstCount(i, RandomStream);
+			const int32 Count = SpawnModule->GetBurstCount(i, RandomStream);
+			Total += Count;
 			BurstFired[i] = 1;
+			if (bLogBursts)
+			{
+				KRS_LOG(Info, "Particle burst {} fired {} (LOD {}, loop {}, time {:.2f})", i, Count, CurrentLODIndex, LoopCount, EmitterTime);
+			}
 		}
 	}
 	return Total;
 }
 
+void FParticleEmitterInstance::SetCurrentLODIndex(int32 InLODIndex)
+{
+	if (SpriteTemplate == nullptr)
+		return;
+
+	const int32 NumLODLevels = SpriteTemplate->GetNumLODLevels();
+	if (NumLODLevels == 0)
+		return;
+
+	const int32 NewIndex = (std::clamp)(InLODIndex, 0, NumLODLevels - 1);
+	UParticleLODLevel* NewLODLevel = SpriteTemplate->GetLODLevel(NewIndex);
+	if (NewLODLevel == nullptr || NewLODLevel == CurrentLODLevel)
+		return;
+
+	CurrentLODIndex = NewIndex;
+	CurrentLODLevel = NewLODLevel;
+
+	// Burst 발사 기록은 항목 번호로 남는다. 항목 수가 다른 레벨로 오면 기록이 통째로 초기화되어
+	// 이미 터진 Burst가 다시 터지므로, 이번 루프에서 시간이 지난 항목은 터진 것으로 둔다
+	const UParticleModuleSpawn* SpawnModule = CurrentLODLevel->GetSpawnModule();
+	if (SpawnModule && SpawnModule->GetBurstList().Num() != BurstFired.Num())
+	{
+		const TArray<FParticleBurst>& Bursts = SpawnModule->GetBurstList();
+		BurstFired.Init(0, Bursts.Num());
+		for (int32 i = 0; i < Bursts.Num(); ++i)
+		{
+			BurstFired[i] = (EmitterTime >= Bursts[i].Time) ? 1 : 0;
+		}
+	}
+}
+
 void FParticleEmitterInstance::Spawn(float DeltaTime)
 {
-	if (!bSpawningEnabled || EmitterTime < 0.0f || HasCompletedLoops())
+	// 꺼진 LOD 레벨은 생성만 멈춘다. bSpawningEnabled(Deactivate)와는 따로 둬야
+	// 꺼진 레벨에서 돌아왔을 때 Deactivate한 이펙트가 다시 살아나지 않는다
+	if (!bSpawningEnabled || !CurrentLODLevel->IsEnabled() || EmitterTime < 0.0f || HasCompletedLoops())
 		return;
 
 	UParticleModuleSpawn* SpawnModule = CurrentLODLevel->GetSpawnModule();
@@ -289,10 +330,14 @@ void FParticleEmitterInstance::Spawn(float DeltaTime)
 
 	int32 BurstNumber = ComputeBurstCount();
 
-	const int32 Needed = ActiveParticles + Number + BurstNumber;
+	// 현재 LOD의 상한. 메모리 블록은 이전 LOD에서 더 커져 있을 수 있으므로 생성 수만 이 값으로 자른다
+	const UParticleModuleRequired* Required = CurrentLODLevel->GetRequiredModule();
+	const int32 LODLimit = (Required && Required->GetMaxActiveParticles() > 0) ? Required->GetMaxActiveParticles() : 65535;
+
+	const int32 Needed = (std::min)(ActiveParticles + Number + BurstNumber, LODLimit);
 	if (Needed > MaxActiveParticles)
 	{
-		int32 NewMax = static_cast<int32>(Needed * 1.5f);
+		int32 NewMax = (std::min)(static_cast<int32>(Needed * 1.5f), LODLimit);
 		if (NewMax > 65535)
 		{
 			NewMax = 65535;
@@ -300,15 +345,18 @@ void FParticleEmitterInstance::Spawn(float DeltaTime)
 		Resize(NewMax);
 	}
 
+	// 상한보다 많이 살아 있으면(상한이 낮은 LOD로 바뀐 직후) 줄어들 때까지 생성하지 않는다
+	const int32 SpawnLimit = (std::min)(MaxActiveParticles, LODLimit);
+
 	// 칸이 모자라면 Rate 먼저, 남은 칸에 Burst
-	const int32 FreeSlots = MaxActiveParticles - ActiveParticles;
+	const int32 FreeSlots = (std::max)(SpawnLimit - ActiveParticles, 0);
 	Number = Number < FreeSlots ? Number : FreeSlots;
 	if (Number > 0)
 	{
 		SpawnParticles(Number, StartTime, Increment);
 	}
 
-	const int32 FreeSlotsAfter = MaxActiveParticles - ActiveParticles;
+	const int32 FreeSlotsAfter = (std::max)(SpawnLimit - ActiveParticles, 0);
 	BurstNumber = BurstNumber < FreeSlotsAfter ? BurstNumber : FreeSlotsAfter;
 	if (BurstNumber > 0)
 	{

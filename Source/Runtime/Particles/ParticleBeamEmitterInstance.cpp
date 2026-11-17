@@ -90,7 +90,8 @@ void FParticleBeamEmitterInstance::ResolveBeamPoints(FBeamPayloadData& Payload) 
 		break;
 	}
 	case EBeamMethod::Target:
-		Payload.TargetPoint = BeamTypeData->GetTargetPoint();
+		// 에미터 기준 위치. 액터를 옮기거나 돌려도 Source와의 관계가 유지된다
+		Payload.TargetPoint = WorldMatrix.TransformPosition(BeamTypeData->GetTargetPoint());
 		break;
 	default:
 		break;

@@ -180,6 +180,9 @@ void FSceneRenderer::InitViews(FRenderer* Renderer, const FSceneRenderOptions& O
 	CachedViewContext.bShowSkeletalMesh = Options.bShowSkeletalMesh;
 	CachedViewContext.bShowParticles = Options.bShowParticles;
 
+	// 게임 쪽(파티클 LOD 등)이 다음 Tick에서 카메라 거리를 알 수 있게 남긴다
+	World->AddRenderedViewLocation(View.ViewLocation);
+
 	// 월드 프리미티브 수집 및 절두체 컬링
 	GatherRenderPackets(World->GetScene(), RenderData, CachedViewContext, &View.Frustum, Renderer);
 	RenderData.AmbientLight = World->GetScene().GetAmbientLight(View.bGameView);

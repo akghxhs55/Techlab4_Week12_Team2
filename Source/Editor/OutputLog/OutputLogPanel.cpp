@@ -9,6 +9,11 @@
 #include "Editor/Viewports/ViewportToolbarWidgets.h"
 
 #include "Components/SkinnedMeshComponent.h"
+#include "Components/ParticleSystemComponent.h"
+#include "Particles/ParticleEmitterInstance.h"
+#include "UObject/UObjectIterator.h"
+#include "Engine/World.h"
+#include <format>
 
 #include <algorithm>
 #include <cctype>
@@ -830,6 +835,82 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
+	Add("p.LogBursts", "p.LogBursts [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, FParticleEmitterInstance::bLogBursts, bOn)) return false;
+			FParticleEmitterInstance::bLogBursts = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.LogBursts = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	Add("p.ShowLOD", "p.ShowLOD [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, UParticleSystemComponent::bShowAllLODDistances, bOn)) return false;
+			UParticleSystemComponent::bShowAllLODDistances = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.ShowLOD = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	Add("p.LODInfo", "p.LODInfo", [](const TArray<FString>&, const FString&)
+		{
+			int32 Count = 0;
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				const UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				const UParticleSystem* Template = PSC->GetTemplate();
+				const UWorld* World = PSC->GetWorld();
+
+				int32 ActiveParticles = 0;
+				bool bSpawning = false;
+				for (const FParticleEmitterInstance* Instance : PSC->GetEmitterInstances())
+				{
+					if (!Instance) continue;
+					ActiveParticles += Instance->ActiveParticles;
+					bSpawning |= Instance->bSpawningEnabled;
+				}
+
+				FString Distances;
+				if (Template)
+				{
+					for (float D : Template->GetLODDistances())
+						Distances += std::format("{}{:.0f}", Distances.empty() ? "" : ", ", D);
+				}
+
+				FLog::Log(ELogVerbosity::Info, "[{}] {} | LOD {}/{} | camera {:.0f} | LODDistances [{}] | particles {} | {}",
+					(World && World->IsGameWorld()) ? "Game" : "Editor",
+					Template ? Template->GetAssetPath() : FString("None"),
+					PSC->GetLODLevel(), Template ? Template->GetNumLODs() : 0,
+					PSC->GetDistanceToNearestView(), Distances, ActiveParticles,
+					bSpawning ? "Active" : "Deactivated");
+				++Count;
+			}
+			FLog::Log(ELogVerbosity::Info, "p.LODInfo: {} components", Count);
+			return true;
+		});
+
+	// 등록된 모든 파티클 컴포넌트 (에디터·PIE 월드 모두)
+	Add("p.Particles", "p.Particles <Activate|Deactivate>", [](const TArray<FString>& Args, const FString&)
+		{
+			if (Args.Num() != 2) return false;
+			const bool bActivate = EqualsIgnoreCase(Args[1], "ACTIVATE");
+			if (!bActivate && !EqualsIgnoreCase(Args[1], "DEACTIVATE")) return false;
+
+			int32 Count = 0;
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				if (bActivate) PSC->Activate();
+				else PSC->Deactivate();
+				++Count;
+			}
+			FLog::Log(ELogVerbosity::Info, "p.Particles {}: {} components", bActivate ? "Activate" : "Deactivate", Count);
+			return true;
+		});
+
 	// 자동완성 미리보기 항목 등록 (명령 + 자주 쓰는 서브명령 조합)
 	RegisterSuggestion("Cmd", "HELP", "HELP", "Show command list");
 	RegisterSuggestion("Cmd", "CLEAR", "CLEAR", "Clear output log");
@@ -850,6 +931,11 @@ void FOutputLogPanel::RegisterCommands()
 	RegisterSuggestion("CVar", "r.shadow.CacheWholeSceneShadows", "r.shadow.CacheWholeSceneShadows", "[0|1]", true);
 	RegisterSuggestion("CVar", "r.GPUSkinning", "r.GPUSkinning", "[0|1]", true);
 	RegisterSuggestion("CVar", "r.Skinning.ForceUpdate", "r.Skinning.ForceUpdate", "[0|1]", true);
+	RegisterSuggestion("CVar", "p.LogBursts", "p.LogBursts", "[0|1] Log each particle burst", true);
+	RegisterSuggestion("CVar", "p.ShowLOD", "p.ShowLOD", "[0|1] Draw LOD distance spheres for all particles", true);
+	RegisterSuggestion("Cmd", "p.LODInfo", "p.LODInfo", "Print LOD, camera distance, particle count");
+	RegisterSuggestion("Cmd", "p.Particles Activate", "p.Particles Activate", "Activate all particle components");
+	RegisterSuggestion("Cmd", "p.Particles Deactivate", "p.Particles Deactivate", "Stop spawning on all particle components");
 }
 
 void FOutputLogPanel::AddToHistory(const FString& CommandLine)

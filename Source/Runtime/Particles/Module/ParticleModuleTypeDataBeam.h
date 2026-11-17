@@ -45,5 +45,5 @@ private:
 	float Distance = 100.f;  // Distance 모드: 에미터의 X축 방향으로 이 거리만큼
 
 	UPROPERTY(EditAnywhere)
-	FVector TargetPoint;     // Target 모드: 1차에서는 고정된 월드 좌표
+	FVector TargetPoint;     // Target 모드: 에미터 기준 위치
 };

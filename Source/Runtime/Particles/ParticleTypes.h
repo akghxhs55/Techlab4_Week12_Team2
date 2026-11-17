@@ -1,6 +1,7 @@
 #pragma once
 #include "Core/Types.h"
 #include "Math/Vector.h"
+#include "Math/Vector2.h"
 #include "Math/Color.h"
 
 struct FBaseParticle
@@ -69,3 +70,19 @@ struct FBeamPayloadData
 	float   Pad1;
 };
 static_assert(sizeof(FBeamPayloadData) == 32, "FBeamPayloadData 크기 오류, 32여야 합니다.");
+
+// BeamNoise 모듈 Payload의 고정 부분. 바로 뒤에 FBeamNoisePoint가 (Frequency + 1)개 붙는다
+struct FBeamNoiseHeader
+{
+	float LockTimer;   // 0 이하가 되면 새 목표를 뽑는다
+	float Pad[3];
+};
+static_assert(sizeof(FBeamNoiseHeader) == 16, "FBeamNoiseHeader 크기 오류, 16이어야 합니다.");
+
+// 노이즈 점 하나. 빔 축에 수직인 평면의 (Right, Up) 오프셋
+struct FBeamNoisePoint
+{
+	FVector2 Current;   // 지금 위치. 렌더가 읽는다
+	FVector2 Target;    // 움직여 갈 목표
+};
+static_assert(sizeof(FBeamNoisePoint) == 16, "FBeamNoisePoint 크기 오류, 16이어야 합니다.");

@@ -9,6 +9,7 @@
 #include "Render/LineBatcher.h"
 #include "UObject/UObjectIterator.h"
 #include "Engine/Scene.h"
+#include "Engine/World.h"
 #include "Engine/ParticleSystemSceneProxy.h"
 
 UParticleSystemComponent::UParticleSystemComponent()
@@ -74,6 +75,9 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 		}
 	}
 	bWasCompleted = false;
+
+	// 새 인스턴스는 LOD 0으로 시작하므로 지금 LOD를 다시 적용한다 (DirectSet 값, 미리보기 유지)
+	ApplyLODLevel(IsPreviewLODActive() ? PreviewLODOverride : LODLevel);
 }
 
 void UParticleSystemComponent::SetTemplate(UParticleSystem* NewTemplate)
@@ -112,6 +116,23 @@ void UParticleSystemComponent::ActivateSystem(bool bReset)
 		Instance->bSpawningEnabled = true;
 	}
 	bWasCompleted = false;
+
+	// 첫 Tick 전에 거리로 정해 둔다. 멀리서 터진 폭발이 LOD 0 Burst로 시작하지 않게 한다
+	LODCheckTimer = 0.0f;
+	bPendingActivateLOD = false;
+	if (Template && !IsPreviewLODActive() && Template->GetLODMethod() != EParticleSystemLODMethod::DirectSet)
+	{
+		const int32 DesiredLOD = ComputeDesiredLOD();
+		if (DesiredLOD >= 0)
+		{
+			ApplyLODLevel(DesiredLOD);
+		}
+		else
+		{
+			// 아직 그려진 뷰가 없으면(시작 직후) 뷰가 생기는 첫 Tick에서 정한다
+			bPendingActivateLOD = true;
+		}
+	}
 }
 
 void UParticleSystemComponent::DeactivateSystem()
@@ -160,6 +181,9 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	if (EmitterInstances.IsEmpty())
 		return;
 
+	// 인스턴스가 이번 Tick을 새 LOD의 모듈로 돌도록 먼저 고른다
+	UpdateLODLevel(DeltaTime);
+
 	bool bAllComplete = true;
 	for (FParticleEmitterInstance* Instance : EmitterInstances)
 	{
@@ -177,6 +201,147 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 		Proxy->GetScene()->MarkDirty(Proxy);
 	}
 	SendRenderDynamicData();
+}
+
+void UParticleSystemComponent::SetLODLevel(int32 InLODLevel)
+{
+	ApplyLODLevel(InLODLevel);
+}
+
+void UParticleSystemComponent::SetPreviewLODOverride(int32 InLODLevel)
+{
+	PreviewLODOverride = InLODLevel < 0 ? -1 : InLODLevel;
+	if (IsPreviewLODActive())
+	{
+		ApplyLODLevel(PreviewLODOverride);
+	}
+	else
+	{
+		// 미리보기를 끄면 다음 Tick에서 바로 거리로 다시 고르게 한다
+		LODCheckTimer = Template ? Template->GetLODDistanceCheckTime() : 0.0f;
+	}
+}
+
+bool UParticleSystemComponent::IsPreviewLODActive() const
+{
+	if (PreviewLODOverride < 0)
+		return false;
+	const UWorld* World = GetWorld();
+	return !(World && World->IsGameWorld());
+}
+
+namespace
+{
+	// 여러 뷰 중 가장 가까운 카메라까지의 제곱거리 (가장 자세히 보이는 곳에 맞춘다). 뷰가 없으면 -1
+	float NearestViewDistanceSq(const UParticleSystemComponent& Component)
+	{
+		const UWorld* World = Component.GetWorld();
+		if (!World)
+			return -1.0f;
+
+		const TArray<FVector>& ViewLocations = World->GetViewLocationsRenderedLastFrame();
+		if (ViewLocations.IsEmpty())
+			return -1.0f;
+
+		const FVector Location = Component.GetWorldLocation();
+		float MinDistanceSq = FLT_MAX;
+		for (const FVector& ViewLocation : ViewLocations)
+		{
+			const FVector Delta = ViewLocation - Location;
+			const float DistanceSq = Delta.Dot(Delta);
+			if (DistanceSq < MinDistanceSq)
+			{
+				MinDistanceSq = DistanceSq;
+			}
+		}
+		return MinDistanceSq;
+	}
+}
+
+bool UParticleSystemComponent::bShowAllLODDistances = false;
+
+float UParticleSystemComponent::GetDistanceToNearestView() const
+{
+	const float DistanceSq = NearestViewDistanceSq(*this);
+	return DistanceSq < 0.0f ? -1.0f : std::sqrt(DistanceSq);
+}
+
+int32 UParticleSystemComponent::ComputeDesiredLOD() const
+{
+	if (!Template)
+		return -1;
+
+	const float MinDistanceSq = NearestViewDistanceSq(*this);
+	if (MinDistanceSq < 0.0f)
+		return -1;
+
+	// 제곱끼리 비교해 sqrt를 피한다
+	const TArray<float>& Distances = Template->GetLODDistances();
+	for (int32 i = Distances.Num() - 1; i > 0; --i)
+	{
+		if (MinDistanceSq >= Distances[i] * Distances[i])
+			return i;
+	}
+	return 0;
+}
+
+void UParticleSystemComponent::UpdateLODLevel(float DeltaTime)
+{
+	if (!Template || IsPreviewLODActive())
+		return;
+
+	if (bPendingActivateLOD)
+	{
+		const int32 DesiredLOD = ComputeDesiredLOD();
+		if (DesiredLOD >= 0)
+		{
+			ApplyLODLevel(DesiredLOD);
+			bPendingActivateLOD = false;
+			LODCheckTimer = 0.0f;
+		}
+		return;
+	}
+
+	// DirectSet은 코드가 정한 값, ActivateAutomatic은 활성화 때 정한 값을 유지한다
+	if (Template->GetLODMethod() != EParticleSystemLODMethod::Automatic)
+		return;
+
+	LODCheckTimer += DeltaTime;
+	if (LODCheckTimer < Template->GetLODDistanceCheckTime())
+		return;
+	LODCheckTimer = 0.0f;
+
+	const int32 DesiredLOD = ComputeDesiredLOD();
+	if (DesiredLOD >= 0 && DesiredLOD != LODLevel)
+	{
+		ApplyLODLevel(DesiredLOD);
+	}
+}
+
+void UParticleSystemComponent::ApplyLODLevel(int32 InLODLevel)
+{
+	const int32 NumLODs = Template ? Template->GetNumLODs() : 1;
+	const int32 OldLODLevel = LODLevel;
+	LODLevel = (std::clamp)(InLODLevel, 0, (std::max)(NumLODs - 1, 0));
+
+	if (LODLevel != OldLODLevel)
+	{
+		int32 ActiveParticles = 0;
+		for (const FParticleEmitterInstance* Instance : EmitterInstances)
+		{
+			ActiveParticles += Instance ? Instance->ActiveParticles : 0;
+		}
+		KRS_LOG(Info, "Particle LOD {} -> {} ({}, active particles {})", OldLODLevel, LODLevel,
+			Template ? Template->GetAssetPath() : FString("None"), ActiveParticles);
+	}
+
+	for (FParticleEmitterInstance* Instance : EmitterInstances)
+	{
+		if (Instance)
+		{
+			Instance->SetCurrentLODIndex(LODLevel);
+		}
+	}
 }
 
 FPrimitiveSceneProxy* UParticleSystemComponent::CreateSceneProxy()
@@ -240,5 +405,78 @@ void DrawParticleSystems(UWorld* World, FLineBatcher* LineBatcher, const AActor*
 					LineBatcher->AddLine(P - FVector(0, 0, HalfLength), P + FVector(0, 0, HalfLength), Color);
 				});
 		}
+	}
+}
+
+namespace
+{
+	// 위도 원과 경도 원으로 지구본처럼 그린다. 큰 구도 둥글게 보이도록 선을 촘촘히 둔다
+	void AddWireGlobe(FLineBatcher& LineBatcher, const FVector& Center, float Radius, const FVector4& Color)
+	{
+		constexpr int32 LatitudeRings = 12;     // 극점 제외 위도 원 11개
+		constexpr int32 MeridianCircles = 8;    // 경도 원 8개 = 경선 16개
+		constexpr int32 Segments = 64;
+
+		auto CirclePoint = [](float Angle) { return FVector(std::cos(Angle), std::sin(Angle), 0.0f); };
+
+		for (int32 Ring = 1; Ring < LatitudeRings; ++Ring)
+		{
+			const float Latitude = PI * static_cast<float>(Ring) / LatitudeRings - PI * 0.5f;
+			const float RingRadius = Radius * std::cos(Latitude);
+			const FVector RingCenter = Center + FVector(0.0f, 0.0f, Radius * std::sin(Latitude));
+			for (int32 i = 0; i < Segments; ++i)
+			{
+				const FVector A = CirclePoint(2.0f * PI * i / Segments) * RingRadius;
+				const FVector B = CirclePoint(2.0f * PI * (i + 1) / Segments) * RingRadius;
+				LineBatcher.AddLine(RingCenter + A, RingCenter + B, Color);
+			}
+		}
+
+		for (int32 Meridian = 0; Meridian < MeridianCircles; ++Meridian)
+		{
+			const float Longitude = PI * static_cast<float>(Meridian) / MeridianCircles;
+			const FVector Horizontal(std::cos(Longitude), std::sin(Longitude), 0.0f);
+			for (int32 i = 0; i < Segments; ++i)
+			{
+				const float AngleA = 2.0f * PI * i / Segments;
+				const float AngleB = 2.0f * PI * (i + 1) / Segments;
+				const FVector A = Horizontal * (Radius * std::cos(AngleA)) + FVector(0.0f, 0.0f, Radius * std::sin(AngleA));
+				const FVector B = Horizontal * (Radius * std::cos(AngleB)) + FVector(0.0f, 0.0f, Radius * std::sin(AngleB));
+				LineBatcher.AddLine(Center + A, Center + B, Color);
+			}
+		}
+	}
+}
+
+void DrawParticleLODDistances(UWorld* World, FLineBatcher* LineBatcher, const AActor* Selected)
+{
+	const bool bAll = UParticleSystemComponent::bShowAllLODDistances;
+	if (!World || !LineBatcher || (!Selected && !bAll))
+		return;
+
+	const FVector4 Color(0.2f, 1.0f, 0.3f, 1.0f);
+
+	for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+	{
+		UParticleSystemComponent* PSC = *It;
+		if (!PSC || !PSC->IsRegistered() || PSC->GetWorld() != World)
+			continue;
+		if (!bAll && PSC->GetOwner() != Selected)
+			continue;
+
+		const UParticleSystem* Template = PSC->GetTemplate();
+		if (!Template)
+			continue;
+
+		const FVector Center = PSC->GetWorldLocation();
+		const TArray<float>& Distances = Template->GetLODDistances();
+		if (Distances.Num() < 2)
+			continue;
+
+		// 경계 i는 LOD i-1과 LOD i 사이. 여러 개를 겹쳐 그리면 어지러우므로
+		// 지금 LOD에서 다음 LOD로 넘어가는 바깥쪽 경계 하나만 그린다 (마지막 LOD면 안쪽 경계)
+		const int32 CurrentLOD = PSC->GetLODLevel();
+		const int32 Boundary = (std::min)(CurrentLOD + 1, Distances.Num() - 1);
+		AddWireGlobe(*LineBatcher, Center, Distances[Boundary], Color);
 	}
 }

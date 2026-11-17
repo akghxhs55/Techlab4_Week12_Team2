@@ -86,6 +86,20 @@
                                     "bEnabled": true
                                 }
                             }
+                        },
+                        {
+                            "Class": "UParticleModuleBeamNoise",
+                            "Data": {
+                                "Properties": {
+                                    "Frequency": 8,
+                                    "NoiseRange": 20.0,
+                                    "NoiseLockTime": 0.08,
+                                    "NoiseSpeed": 0.0,
+                                    "bSmooth": true,
+                                    "NoiseTessellation": 4,
+                                    "bEnabled": true
+                                }
+                            }
                         }
                     ],
                     "Properties": {

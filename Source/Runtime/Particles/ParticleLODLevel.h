@@ -19,6 +19,9 @@ public:
 	// Modules를 보고 SpawnModules, UpdateModules를 다시 만든다.
 	void UpdateModuleLists();
 
+	// 직렬화로 모듈까지 깊은 복사한다. 실패하면 nullptr. 호출자가 소유한다
+	UParticleLODLevel* Duplicate(UObject* Outer);
+
 	void SetLevel(int32 InLevel) { Level = InLevel; }
 	int32 GetLevel() const { return Level; }
 	bool  IsEnabled() const { return bEnabled; }
