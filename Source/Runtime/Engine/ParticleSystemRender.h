@@ -70,6 +70,14 @@ struct FDynamicMeshEmitterReplayData : FDynamicEmitterReplayDataBase
 {
 	UStaticMesh* Mesh = nullptr;
 	int32 MeshRotationPayloadOffset = 0;
+	bool bOverrideMaterial = false;
+};
+
+struct FParticleSortEntry
+{
+	float Key;
+	const FBaseParticle* Particle;
+	const uint8* ParticleBase;
 };
 
 // 에미터 하나의 렌더 리소스와 제출. 프록시가 소유하고 에미터 인스턴스가 Source를 갱신한다
@@ -87,6 +95,9 @@ protected:
 	static float GetPacketDistance(const FParticleSubmitContext& Context);
 	static bool EnsureInstanceBuffer(TUniquePtr<FVertexBuffer>& Buffer, int32& Capacity,
 		const FDynamicEmitterReplayDataBase& Source, uint32 Stride);
+	// Source.SortMode에 따라 살아 있는 파티클을 그릴 순서로 Out에 담는다
+	static void SortParticles(const FDynamicEmitterReplayDataBase& Source, const FViewContext& View,
+		TArray<FParticleSortEntry>& Out);
 };
 
 struct FParticleSpriteCorner
@@ -112,13 +123,6 @@ struct FParticleSpriteConstants
 	FVector4 SubImageSize;
 };
 static_assert(sizeof(FParticleSpriteConstants) % 16 == 0, "cbuffer 16바이트 정렬");
-
-struct FParticleSortEntry
-{
-	float Key;
-	const FBaseParticle* Particle;
-	const uint8* ParticleBase;
-};
 
 class FDynamicSpriteEmitterData final : public FDynamicEmitterDataBase
 {
@@ -152,10 +156,19 @@ public:
 	FDynamicMeshEmitterReplayData Source;
 
 private:
-	int32 BuildInstances();
+	int32 BuildInstances(const FViewContext& View);
 
 	TUniquePtr<FVertexBuffer> InstanceBuffer;
 	int32 Capacity = 0;
 	FMeshParticleVertexFactory VertexFactory;
+	TArray<FParticleSortEntry> SortScratch;
 	TArray<FParticleMeshInstance> InstanceScratch;
 };
+
+struct FParticleTrailVertex
+{
+	FVector      Position;   // 월드 좌표
+	FVector2     UV;
+	FLinearColor Color;
+};
+static_assert(sizeof(FParticleTrailVertex) == 36, "ParticleTrailShader VS_INPUT과 맞아야 한다");

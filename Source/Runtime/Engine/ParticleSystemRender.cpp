@@ -42,7 +42,8 @@ bool FDynamicEmitterDataBase::EnsureInstanceBuffer(TUniquePtr<FVertexBuffer>& Bu
 	return Buffer != nullptr;
 }
 
-int32 FDynamicSpriteEmitterData::BuildInstances(const FViewContext& View)
+void FDynamicEmitterDataBase::SortParticles(const FDynamicEmitterReplayDataBase& Source, const FViewContext& View,
+	TArray<FParticleSortEntry>& SortScratch)
 {
 	SortScratch.SetNum(0, false);
 	const FVector CameraPos = View.CameraPosition;
@@ -90,6 +91,11 @@ int32 FDynamicSpriteEmitterData::BuildInstances(const FViewContext& View)
 	default:
 		break;
 	}
+}
+
+int32 FDynamicSpriteEmitterData::BuildInstances(const FViewContext& View)
+{
+	SortParticles(Source, View, SortScratch);
 
 	const int32 Count = SortScratch.Num();
 	InstanceScratch.SetNum(Count, false);
@@ -166,8 +172,11 @@ namespace
 	}
 }
 
-int32 FDynamicMeshEmitterData::BuildInstances()
+int32 FDynamicMeshEmitterData::BuildInstances(const FViewContext& View)
 {
+	// 한 번의 인스턴스 드로우 안에서도 인스턴스 순서대로 합성되므로 버퍼 순서가 곧 그리는 순서다
+	SortParticles(Source, View, SortScratch);
+
 	const bool bLocalSpace = Source.bUseLocalSpace;
 	const FMatrix& ComponentToWorld = Source.LocalToWorld;
 	// Local은 ComponentToWorld에 스케일이 들어 있다. World는 위치에는 곱하지 않고 크기에만 곱한다
@@ -175,43 +184,53 @@ int32 FDynamicMeshEmitterData::BuildInstances()
 	const int32 PayloadOffset = Source.MeshRotationPayloadOffset;
 	constexpr float RadToDeg = 180.0f / PI;
 
-	InstanceScratch.SetNum(Source.ActiveParticleCount, false);
-	FParticleMeshInstance* Out = InstanceScratch.GetData();
+	const int32 Count = SortScratch.Num();
+	InstanceScratch.SetNum(Count, false);
 
-	Source.ForEachParticle([&](const FBaseParticle& Particle, const uint8* ParticleBase)
+	for (int32 i = 0; i < Count; ++i)
+	{
+		const FBaseParticle& Particle = *SortScratch[i].Particle;
+		const FMeshRotationPayloadData& Payload = ParticleHelper::GetPayload<FMeshRotationPayloadData>(SortScratch[i].ParticleBase, PayloadOffset);
+		FParticleMeshInstance* Out = &InstanceScratch[i];
+
+		// 회전 속도로 누적된 회전 + 스프라이트 회전(라디안, 세 축 공통)은 오일러 각끼리 더한다
+		const FVector SpinEuler = Payload.Rotation + FVector(Particle.Rotation * RadToDeg);
+
+		// row-vector: Scale × Rotation × Translation (액터 Transform과 같은 규칙)
+		const FVector Size = bLocalSpace ? Particle.Size
+			: FVector(Particle.Size.X * WorldScale.X, Particle.Size.Y * WorldScale.Y, Particle.Size.Z * WorldScale.Z);
+		FMatrix M = FTransform(EulerToRotator(SpinEuler), Particle.Location, Size).GetLocalMatrix();
+
+		// 초기 방향은 각도에 더하지 않고 별도 회전으로 맨 앞에 곱한다: (Orient × Scale) × Rot × Trans
+		// 오일러 각 덧셈은 한 축으로만 돌 때만 회전 합성과 같다
+		if (Payload.InitialOrientation.X != 0.0f || Payload.InitialOrientation.Y != 0.0f || Payload.InitialOrientation.Z != 0.0f)
 		{
-			const FMeshRotationPayloadData& Payload = ParticleHelper::GetPayload<FMeshRotationPayloadData>(ParticleBase, PayloadOffset);
+			const FMatrix Orient = EulerToRotator(Payload.InitialOrientation).Quaternion().ToFMatrix();
+			M = Orient * M;
+		}
+		if (bLocalSpace)
+		{
+			M = M * ComponentToWorld;
+		}
 
-			// 회전 속도로 누적된 회전 + 스프라이트 회전(라디안, 세 축 공통)은 오일러 각끼리 더한다
-			const FVector SpinEuler = Payload.Rotation + FVector(Particle.Rotation * RadToDeg);
+		// 셰이더가 열과 내적하므로 0~2열을 위에서 아래로 담는다 (행을 넣으면 전치가 된다)
+		Out->Transform0 = FVector4(M.M[0][0], M.M[1][0], M.M[2][0], M.M[3][0]);
+		Out->Transform1 = FVector4(M.M[0][1], M.M[1][1], M.M[2][1], M.M[3][1]);
+		Out->Transform2 = FVector4(M.M[0][2], M.M[1][2], M.M[2][2], M.M[3][2]);
+		Out->Color = Particle.Color;
+	}
+	return Count;
+}
 
-			// row-vector: Scale × Rotation × Translation (액터 Transform과 같은 규칙)
-			const FVector Size = bLocalSpace ? Particle.Size
-				: FVector(Particle.Size.X * WorldScale.X, Particle.Size.Y * WorldScale.Y, Particle.Size.Z * WorldScale.Z);
-			FMatrix M = FTransform(EulerToRotator(SpinEuler), Particle.Location, Size).GetLocalMatrix();
-
-			// 초기 방향은 각도에 더하지 않고 별도 회전으로 맨 앞에 곱한다: (Orient × Scale) × Rot × Trans
-			// 오일러 각 덧셈은 한 축으로만 돌 때만 회전 합성과 같다
-			if (Payload.InitialOrientation.X != 0.0f || Payload.InitialOrientation.Y != 0.0f || Payload.InitialOrientation.Z != 0.0f)
-			{
-				const FMatrix Orient = EulerToRotator(Payload.InitialOrientation).Quaternion().ToFMatrix();
-				M = Orient * M;
-			}
-			if (bLocalSpace)
-			{
-				M = M * ComponentToWorld;
-			}
-
-			// 셰이더가 열과 내적하므로 0~2열을 위에서 아래로 담는다 (행을 넣으면 전치가 된다)
-			Out->Transform0 = FVector4(M.M[0][0], M.M[1][0], M.M[2][0], M.M[3][0]);
-			Out->Transform1 = FVector4(M.M[0][1], M.M[1][1], M.M[2][1], M.M[3][1]);
-			Out->Transform2 = FVector4(M.M[0][2], M.M[1][2], M.M[2][2], M.M[3][2]);
-			Out->Color = Particle.Color;
-			++Out;
-		});
-
-	// Freeze된 파티클은 건너뛰므로 실제로 채운 수
-	return static_cast<int32>(Out - InstanceScratch.GetData());
+namespace
+{
+	// 메시 파티클 정점 변형이 있는 머티리얼만 오버라이드로 쓸 수 있다
+	bool IsMeshParticleMaterial(const UMaterial* Material)
+	{
+		return Material && (Material->PSOType == EPSOType::StaticMesh_Opaque
+			|| Material->PSOType == EPSOType::StaticMesh_Translucent
+			|| Material->PSOType == EPSOType::StaticMesh_Additive);
+	}
 }
 
 void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitContext& Context)
@@ -225,7 +244,7 @@ void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitC
 	if (!EnsureInstanceBuffer(InstanceBuffer, Capacity, Source, sizeof(FParticleMeshInstance)))
 		return;
 
-	const int32 Count = BuildInstances();
+	const int32 Count = BuildInstances(*Context.View);
 	if (Count == 0)
 		return;
 
@@ -234,10 +253,13 @@ void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitC
 
 	VertexFactory.Init(Mesh->GetVertexBuffer(), Mesh->GetIndexBuffer(), InstanceBuffer.get());
 
+	// 스프라이트용 머티리얼처럼 메시 정점을 못 받는 머티리얼이면 섹션 머티리얼로 되돌린다
+	UMaterial* OverrideMaterial = Source.bOverrideMaterial && IsMeshParticleMaterial(Source.Material) ? Source.Material : nullptr;
+
 	// 섹션마다 메시 머티리얼로 그린다. 패스 셰이더는 MeshParticle 정점 타입 변형으로 교체된다
 	for (const FStaticMeshSection& Section : Mesh->GetMeshData().Sections)
 	{
-		UMaterial* SectionMaterial = Mesh->GetMaterial(Section.MaterialSlotIndex);
+		UMaterial* SectionMaterial = OverrideMaterial ? OverrideMaterial : Mesh->GetMaterial(Section.MaterialSlotIndex);
 		if (!SectionMaterial || Section.IndexCount == 0)
 			continue;
 

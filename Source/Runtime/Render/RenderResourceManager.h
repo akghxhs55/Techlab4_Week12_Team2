@@ -34,6 +34,7 @@ enum class EPSOType : uint8
 	// 기존 씬의 PSOType 번호가 밀리지 않도록 끝에 추가
 	Particle_AlphaBlend,
 	Particle_Additive,
+	StaticMesh_Additive,     // 메시 파티클 가산 블렌드
 	Count
 };
 

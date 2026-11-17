@@ -178,6 +178,7 @@ void FSceneRenderer::InitViews(FRenderer* Renderer, const FSceneRenderOptions& O
 	}
 
 	CachedViewContext.bShowSkeletalMesh = Options.bShowSkeletalMesh;
+	CachedViewContext.bShowParticles = Options.bShowParticles;
 
 	// 월드 프리미티브 수집 및 절두체 컬링
 	GatherRenderPackets(World->GetScene(), RenderData, CachedViewContext, &View.Frustum, Renderer);

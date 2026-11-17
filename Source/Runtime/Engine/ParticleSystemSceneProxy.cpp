@@ -37,6 +37,9 @@ bool FParticleSystemSceneProxy::EnsureSpriteQuad()
 
 void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, const FViewContext& View)
 {
+	if (!View.bShowParticles)
+		return;
+
 	// 프록시가 머티리얼 등록보다 먼저 만들어졌을 수 있다
 	if (!DefaultMaterial)
 	{

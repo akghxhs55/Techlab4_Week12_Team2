@@ -48,6 +48,7 @@ struct FViewContext
 	bool bOrthographic = false;
 	bool bGameView = false;
 	bool bShowSkeletalMesh = true;
+	bool bShowParticles = true;
 	float CameraDepth = 0.0f;
 	FMatrix ViewProjection = FMatrix::Identity;
 	void Prepare()

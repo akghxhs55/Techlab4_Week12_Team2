@@ -383,6 +383,36 @@
                                     "bEnabled": true
                                 }
                             }
+                        },
+                        {
+                            "Class": "UParticleModuleMeshRotationRate",
+                            "Data": {
+                                "Properties": {
+                                    "StartRotationRate": {
+                                        "Constant": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 180.0,
+                                            "Y": 180.0,
+                                            "Z": 180.0
+                                        },
+                                        "MinValue": {
+                                            "X": -180.0,
+                                            "Y": -180.0,
+                                            "Z": -180.0
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
                         }
                     ],
                     "Properties": {
@@ -394,9 +424,9 @@
                             "EmitterDuration": 1.0,
                             "EmitterLoops": 0,
                             "InterpolationMethod": "None",
-                            "Material": null,
+                            "Material": "ParticleMeshTranslucent",
                             "RandomImageTime": 0.0,
-                            "SortMode": "None",
+                            "SortMode": "DistanceToView",
                             "SubImages_Horizontal": 1,
                             "SubImages_Vertical": 1,
                             "bDelayFirstLoopOnly": false,
@@ -452,6 +482,7 @@
                                     "bLockAxes": false
                                 },
                                 "bCastShadows": false,
+                                "bOverrideMaterial": true,
                                 "bEnabled": true
                             }
                         }

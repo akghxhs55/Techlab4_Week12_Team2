@@ -23,6 +23,7 @@ void FParticleMeshEmitterInstance::UpdateDynamicData(TUniquePtr<FDynamicEmitterD
 	FDynamicMeshEmitterReplayData& Source = static_cast<FDynamicMeshEmitterData&>(*InOutData).Source;
 	FillReplayData(Source);
 	Source.Mesh = MeshTypeData ? MeshTypeData->GetMesh() : nullptr;
+	Source.bOverrideMaterial = MeshTypeData && MeshTypeData->IsOverrideMaterial();
 	Source.MeshRotationPayloadOffset = InstancePayloadOffset;
 }
 

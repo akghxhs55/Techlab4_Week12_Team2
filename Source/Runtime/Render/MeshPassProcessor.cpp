@@ -87,6 +87,7 @@ namespace
 			Batch.bForceWireframe = View.bIsWireframe;
 			if (Material->PSOType == EPSOType::StaticMesh_Opaque ||
 				Material->PSOType == EPSOType::StaticMesh_Translucent ||
+				Material->PSOType == EPSOType::StaticMesh_Additive ||
 				Material->PSOType == EPSOType::StaticMesh_Wireframe)
 			{
 				FStaticMeshMaterialParams Params{};

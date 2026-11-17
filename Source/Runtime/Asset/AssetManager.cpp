@@ -461,6 +461,23 @@ void UAssetManager::CreateParticleMaterial()
 		};
 	MakeSpriteMaterial(EPSOType::Particle_Additive, EBlendState::Additive, "ParticleSpriteAdditive");
 	MakeSpriteMaterial(EPSOType::Particle_AlphaBlend, EBlendState::AlphaBlend, "ParticleSpriteAlphaBlend");
+
+	// 메시 에미터의 머티리얼 오버라이드용. 스프라이트 셰이더는 메시 파티클 정점을 받지 못한다
+	auto MakeMeshMaterial = [this](EPSOType PSOType, EBlendState Blend, const char* Name)
+		{
+			UMaterial* Mat = NewObject<UMaterial>();
+			Mat->PSOType = PSOType;
+			Mat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/StaticMeshTranslucentShader.hlsl");
+			Mat->Textures.Add(GetAssetByPath<UTexture2D>("WhiteTexture"));
+			Mat->BlendState = Blend;
+			Mat->DepthStencilState = EDepthStencilState::ReadOnly;
+			Mat->SamplerState = ESamplerState::LinearClamp;
+			Mat->ParamLayout = EMaterialParamLayout::StaticMesh;
+			Mat->ParamBuffer = RenderCommand::CreateConstantBuffer(sizeof(FStaticMeshMaterialParams));
+			RegisterAsset(Name, Mat);
+		};
+	MakeMeshMaterial(EPSOType::StaticMesh_Translucent, EBlendState::AlphaBlend, "ParticleMeshTranslucent");
+	MakeMeshMaterial(EPSOType::StaticMesh_Additive, EBlendState::Additive, "ParticleMeshAdditive");
 }
 
 void UAssetManager::CreateEditorArrowMaterial() {

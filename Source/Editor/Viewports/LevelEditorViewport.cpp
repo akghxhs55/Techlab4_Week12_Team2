@@ -64,6 +64,7 @@ void FLevelEditorViewportClient::Draw(FRenderer* Renderer)
 		EngineShowFlags.bShowVignette = S.bShowVignette;
 		EngineShowFlags.bShowCameraOverlay = S.bShowCameraOverlay;
 		EngineShowFlags.bShowSkeletalMesh = S.bShowSkeletalMesh;
+		EngineShowFlags.bShowParticles = S.bShowParticles;
 		EngineShowFlags.bDrawPrimitives = S.bDrawPrimitives;
 		EngineShowFlags.bDrawDecals = S.bDrawDecals;
 		EngineShowFlags.bDecalCulling = S.bDecalCulling;
@@ -173,7 +174,8 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 				// 이 뷰포트가 보고 있는 월드의 것을 그린다. PIE와 SIE 중에는 PIE 월드다.
 				DrawCollisionShapes(GetWorld(), LineBatcher, SelectedActor);
 				DrawSpringArms(GetWorld(), LineBatcher, SelectedActor);
-				DrawParticleSystems(GetWorld(), LineBatcher);
+				if (EngineShowFlags.bShowParticles)
+					DrawParticleSystems(GetWorld(), LineBatcher);
 
 				LineBatcher->OnRender(SceneView.ViewProjectionMatrix);
 			};

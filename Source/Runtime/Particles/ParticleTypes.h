@@ -60,3 +60,12 @@ struct FMeshRotationPayloadData
 	FVector RotationRateBase;		// 회전 속도의 기준값. 매 프레임 RotationRate로 복원
 };
 static_assert(sizeof(FMeshRotationPayloadData) == 48, "FMeshRotationPayloadData 크기 오류, 48이어야 합니다.");
+
+struct FBeamPayloadData
+{
+	FVector SourcePoint;   // 월드 좌표
+	float   Pad0;
+	FVector TargetPoint;   // 월드 좌표
+	float   Pad1;
+};
+static_assert(sizeof(FBeamPayloadData) == 32, "FBeamPayloadData 크기 오류, 32여야 합니다.");
