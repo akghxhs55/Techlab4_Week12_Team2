@@ -359,7 +359,7 @@ void FParticleSystemEditor::AddModule(UParticleEmitter* Emitter, UClass* ModuleC
 	SelectModule(Emitter, Modules.IsEmpty() ? nullptr : Modules[Modules.Num() - 1]);
 }
 
-void FParticleSystemEditor::RemoveModule(UParticleEmitter* Emitter, UParticleModule* Module)
+void FParticleSystemEditor::RemoveModule(const UParticleEmitter* Emitter, const UParticleModule* Module)
 {
 	const UParticleLODLevel* CurrentLODLevel = GetCurrentLODLevel(Emitter);
 	const int32 ModuleIndex = CurrentLODLevel ? CurrentLODLevel->FindModuleIndex(Module) : -1;
@@ -394,7 +394,7 @@ void FParticleSystemEditor::RemoveModule(UParticleEmitter* Emitter, UParticleMod
 	}
 }
 
-void FParticleSystemEditor::MoveModule(UParticleEmitter* Emitter, int32 From, int32 To)
+void FParticleSystemEditor::MoveModule(const UParticleEmitter* Emitter, int32 From, int32 To)
 {
 	if (!Emitter)
 	{
@@ -416,7 +416,7 @@ void FParticleSystemEditor::MoveModule(UParticleEmitter* Emitter, int32 From, in
 	}
 }
 
-void FParticleSystemEditor::SetTypeData(UParticleEmitter* Emitter, UClass* TypeDataClass)
+void FParticleSystemEditor::SetTypeData(const UParticleEmitter* Emitter, UClass* TypeDataClass)
 {
 	if (!Emitter || !GetCurrentLODLevel(Emitter))
 	{

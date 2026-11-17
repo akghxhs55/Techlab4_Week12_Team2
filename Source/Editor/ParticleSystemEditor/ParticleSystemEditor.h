@@ -44,9 +44,9 @@ public:
 	bool IsModuleSelected() const { return SelectedModule != nullptr; }
 	UParticleModule* GetSelectedModule() const { return SelectedModule; }
 	void AddModule(UParticleEmitter* Emitter, UClass* ModuleClass);
-	void RemoveModule(UParticleEmitter* Emitter, UParticleModule* Module);
-	void MoveModule(UParticleEmitter* Emitter, int32 From, int32 To);
-	void SetTypeData(UParticleEmitter* Emitter, UClass* TypeDataClass);
+	void RemoveModule(const UParticleEmitter* Emitter, const UParticleModule* Module);
+	void MoveModule(const UParticleEmitter* Emitter, int32 From, int32 To);
+	void SetTypeData(const UParticleEmitter* Emitter, UClass* TypeDataClass);
 
 	void NotifyPropertyEdited();
 	void NotifyStructureChanged();
