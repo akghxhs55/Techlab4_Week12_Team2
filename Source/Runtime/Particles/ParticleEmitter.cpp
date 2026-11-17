@@ -33,6 +33,43 @@ void UParticleEmitter::AddLODLevel(UParticleLODLevel* InLODLevel)
 	}
 }
 
+UParticleLODLevel* UParticleEmitter::DuplicateLODLevel(int32 SourceIndex, int32 InsertIndex)
+{
+	UParticleLODLevel* Source = GetLODLevel(SourceIndex);
+	if (!Source || InsertIndex < 0 || InsertIndex > LODLevels.Num())
+		return nullptr;
+
+	UParticleLODLevel* Copy = Source->Duplicate(this);
+	if (!Copy)
+		return nullptr;
+
+	LODLevels.Insert(Copy, static_cast<uint32>(InsertIndex));
+	RenumberLODLevels();
+	return Copy;
+}
+
+bool UParticleEmitter::RemoveLODLevel(int32 Index)
+{
+	if (!LODLevels.IsValidIndex(Index) || LODLevels.Num() <= 1)
+		return false;
+
+	delete LODLevels[Index];
+	LODLevels.RemoveAt(static_cast<uint32>(Index));
+	RenumberLODLevels();
+	return true;
+}
+
+void UParticleEmitter::RenumberLODLevels()
+{
+	for (int32 i = 0; i < LODLevels.Num(); ++i)
+	{
+		if (LODLevels[i])
+		{
+			LODLevels[i]->SetLevel(i);
+		}
+	}
+}
+
 UParticleEmitter::~UParticleEmitter()
 {
 	for (UParticleLODLevel* LODLevel : LODLevels)
