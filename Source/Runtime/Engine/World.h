@@ -126,6 +126,11 @@ public:
 	float GetEffectiveTimeDilation() const;
 	void StartHitStop(float Duration, float Dilation);
 
+	// 렌더러가 이 월드를 그릴 때 뷰마다 카메라 위치를 남긴다.
+	// Tick은 렌더보다 먼저 돌므로, Tick 안에서 읽으면 직전 프레임에 그린 카메라들이다
+	void AddRenderedViewLocation(const FVector& ViewLocation);
+	const TArray<FVector>& GetViewLocationsRenderedLastFrame() const { return ViewLocationsRenderedLastFrame; }
+
 private:
 
 	void GameWorldTick(float DeltaTime);
@@ -159,6 +164,13 @@ private:
 	float HitStopDilation = 1.0f;
 	float TimeSeconds = 0.0f;			// 게임 시간 (dilated 누적)
 	float RealTimeSeconds = 0.0f;		// 실제 시간 누적
+
+	// Tick이 돌 때마다 증가. 기록이 어느 Tick 뒤에 그려진 것인지 구분한다
+	uint32 TickCount = 0;
+	uint32 ViewLocationsTickCount = 0;
+	TArray<FVector> ViewLocationsRenderedLastFrame;
+	// Tick 없이 렌더만 계속되는 월드(PIE 중 에디터 월드 등)에서 목록이 끝없이 늘지 않게 막는다
+	static constexpr int32 MaxRenderedViewLocations = 16;
 
 	static constexpr float MinTimeDilation = 0.0001f;
 	static constexpr float MaxTimeDilation = 20.0f;

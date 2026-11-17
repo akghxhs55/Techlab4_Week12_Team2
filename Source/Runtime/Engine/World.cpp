@@ -155,6 +155,7 @@ void UWorld::Tick(float RealDeltaTime)
 
 	const float DeltaTime = RealDeltaTime * GetEffectiveTimeDilation();
 	RealTimeSeconds += RealDeltaTime;
+	++TickCount;
 
 	// World 시간 흐름
 	if (!bIsPaused)
@@ -187,6 +188,20 @@ void UWorld::Tick(float RealDeltaTime)
 	{
 		SCOPE_CYCLE_COUNTER(STAT_UpdateAllTransforms);
 		Scene.UpdateAllTransforms();
+	}
+}
+
+void UWorld::AddRenderedViewLocation(const FVector& ViewLocation)
+{
+	// 새 Tick 뒤 첫 기록이면 직전 프레임 목록을 버리고 이번 프레임 것으로 다시 모은다
+	if (ViewLocationsTickCount != TickCount)
+	{
+		ViewLocationsRenderedLastFrame.Empty();
+		ViewLocationsTickCount = TickCount;
+	}
+	if (ViewLocationsRenderedLastFrame.Num() < MaxRenderedViewLocations)
+	{
+		ViewLocationsRenderedLastFrame.Add(ViewLocation);
 	}
 }
 
