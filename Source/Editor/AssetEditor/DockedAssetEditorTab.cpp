@@ -47,6 +47,11 @@ void FDockedAssetEditorTab::OnRender(bool bActive)
         return;
     }
 
+    if (bActive)
+    {
+        DrawToolbar();
+    }
+
     if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable)
     {
         const ImVec2 Size = ImGui::GetContentRegionAvail();

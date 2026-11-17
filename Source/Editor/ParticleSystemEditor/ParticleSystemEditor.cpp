@@ -138,6 +138,140 @@ UObject* FParticleSystemEditor::GetSelectedObject() const
 	return SelectedEmitter;
 }
 
+namespace
+{
+	constexpr int32 SlotNone = -100;
+	constexpr int32 SlotTypeData = -3;
+	constexpr int32 SlotRequired = -2;
+	constexpr int32 SlotSpawn = -1;
+
+	int32 FindModuleSlot(const UParticleLODLevel* LODLevel, const UParticleModule* Module)
+	{
+		if (!LODLevel || !Module)
+		{
+			return SlotNone;
+		}
+		if (Module == LODLevel->GetTypeDataModule())
+		{
+			return SlotTypeData;
+		}
+		if (Module == LODLevel->GetRequiredModule())
+		{
+			return SlotRequired;
+		}
+		if (Module == LODLevel->GetSpawnModule())
+		{
+			return SlotSpawn;
+		}
+		const int32 Index = LODLevel->FindModuleIndex(Module);
+		return Index >= 0 ? Index : SlotNone;
+	}
+
+	UParticleModule* GetModuleAtSlot(const UParticleLODLevel* LODLevel, int32 Slot)
+	{
+		if (!LODLevel)
+		{
+			return nullptr;
+		}
+		switch (Slot)
+		{
+		case SlotNone: return nullptr;
+		case SlotTypeData: return LODLevel->GetTypeDataModule();
+		case SlotRequired: return LODLevel->GetRequiredModule();
+		case SlotSpawn: return LODLevel->GetSpawnModule();
+		default:
+			return LODLevel->GetModules().IsValidIndex(Slot) ? LODLevel->GetModules()[Slot] : nullptr;
+		}
+	}
+}
+
+int32 FParticleSystemEditor::GetNumLODs() const
+{
+	return WorkingCopy ? (std::max)(WorkingCopy->GetNumLODs(), 1) : 1;
+}
+
+UParticleLODLevel* FParticleSystemEditor::GetCurrentLODLevel(const UParticleEmitter* Emitter) const
+{
+	if (!Emitter || Emitter->GetNumLODLevels() == 0)
+	{
+		return nullptr;
+	}
+	return Emitter->GetLODLevel((std::min)(CurrentLOD, Emitter->GetNumLODLevels() - 1));
+}
+
+int32 FParticleSystemEditor::GetSelectedModuleSlot() const
+{
+	return FindModuleSlot(GetCurrentLODLevel(SelectedEmitter), SelectedModule);
+}
+
+void FParticleSystemEditor::ResolveSelectedModule(int32 Slot)
+{
+	SelectedModule = GetModuleAtSlot(GetCurrentLODLevel(SelectedEmitter), Slot);
+}
+
+void FParticleSystemEditor::ApplyPreviewLOD() const
+{
+	if (PreviewComponent)
+	{
+		PreviewComponent->SetPreviewLODOverride(CurrentLOD);
+	}
+}
+
+void FParticleSystemEditor::ClampCurrentLOD()
+{
+	const int32 Clamped = (std::clamp)(CurrentLOD, 0, GetNumLODs() - 1);
+	if (Clamped != CurrentLOD)
+	{
+		SetCurrentLOD(Clamped);
+	}
+}
+
+void FParticleSystemEditor::SetCurrentLOD(int32 Index)
+{
+	const int32 Slot = GetSelectedModuleSlot();
+	CurrentLOD = (std::clamp)(Index, 0, GetNumLODs() - 1);
+	ResolveSelectedModule(Slot);
+	ApplyPreviewLOD();
+}
+
+bool FParticleSystemEditor::AddLOD()
+{
+	const int32 Slot = GetSelectedModuleSlot();
+	if (!WorkingCopy->InsertLOD(CurrentLOD + 1))
+	{
+		return false;
+	}
+
+	CurrentLOD += 1;
+	ResolveSelectedModule(Slot);
+	ApplyPreviewLOD();
+	bDirty = true;
+	return true;
+}
+
+bool FParticleSystemEditor::RemoveCurrentLOD()
+{
+	const int32 Slot = GetSelectedModuleSlot();
+	SelectedModule = nullptr;
+	if (!WorkingCopy->RemoveLOD(CurrentLOD))
+	{
+		ResolveSelectedModule(Slot);
+		return false;
+	}
+
+	CurrentLOD = (std::min)(CurrentLOD, GetNumLODs() - 1);
+	ResolveSelectedModule(Slot);
+	ApplyPreviewLOD();
+	bDirty = true;
+	return true;
+}
+
+void FParticleSystemEditor::SetLODDistance(int32 Index, float Distance)
+{
+	WorkingCopy->SetLODDistance(Index, Distance);
+	bDirty = true;
+}
+
 void FParticleSystemEditor::SelectEmitter(UParticleEmitter* Emitter)
 {
 	SelectedEmitter = Emitter;
@@ -158,6 +292,16 @@ UParticleEmitter* FParticleSystemEditor::AddEmitter()
 	LODLevel->AddModule(NewObject<UParticleModuleColor>(LODLevel));
 
 	Emitter->AddLODLevel(LODLevel);
+
+	for (int32 Index = 1; Index < GetNumLODs(); ++Index)
+	{
+		if (!Emitter->DuplicateLODLevel(Index - 1, Index))
+		{
+			KRS_LOG(Warning, "Particle LOD {} could not be added to the new emitter", Index);
+			break;
+		}
+	}
+
 	WorkingCopy->AddEmitter(Emitter);
 
 	NotifyStructureChanged();
@@ -196,39 +340,77 @@ void FParticleSystemEditor::SelectModule(UParticleEmitter* Emitter, UParticleMod
 
 void FParticleSystemEditor::AddModule(UParticleEmitter* Emitter, UClass* ModuleClass)
 {
-	UParticleLODLevel* LODLevel = Emitter ? Emitter->GetLODLevel(0) : nullptr;
-	if (!LODLevel || !ModuleClass)
+	if (!Emitter || !ModuleClass || !GetCurrentLODLevel(Emitter))
 	{
 		return;
 	}
 
-	UParticleModule* Module = NewObject<UParticleModule>(LODLevel, ModuleClass);
-	LODLevel->AddModule(Module);
+	for (UParticleLODLevel* LODLevel : Emitter->GetLODLevels())
+	{
+		if (LODLevel)
+		{
+			LODLevel->AddModule(NewObject<UParticleModule>(LODLevel, ModuleClass));
+		}
+	}
+
 	NotifyStructureChanged();
-	SelectModule(Emitter, Module);
+
+	const TArray<UParticleModule*>& Modules = GetCurrentLODLevel(Emitter)->GetModules();
+	SelectModule(Emitter, Modules.IsEmpty() ? nullptr : Modules[Modules.Num() - 1]);
 }
 
 void FParticleSystemEditor::RemoveModule(UParticleEmitter* Emitter, UParticleModule* Module)
 {
-	UParticleLODLevel* LODLevel = Emitter ? Emitter->GetLODLevel(0) : nullptr;
-	if (!LODLevel || !LODLevel->RemoveModule(Module))
+	const UParticleLODLevel* CurrentLODLevel = GetCurrentLODLevel(Emitter);
+	const int32 ModuleIndex = CurrentLODLevel ? CurrentLODLevel->FindModuleIndex(Module) : -1;
+	if (ModuleIndex < 0)
 	{
 		return;
 	}
 
-	if (SelectedModule == Module)
+	TArray<UParticleModule*> Removed;
+	for (UParticleLODLevel* LODLevel : Emitter->GetLODLevels())
+	{
+		if (!LODLevel || !LODLevel->GetModules().IsValidIndex(ModuleIndex))
+		{
+			continue;
+		}
+		UParticleModule* LODModule = LODLevel->GetModules()[ModuleIndex];
+		if (LODLevel->RemoveModule(LODModule))
+		{
+			Removed.Add(LODModule);
+		}
+	}
+
+	if (Removed.Contains(SelectedModule))
 	{
 		SelectedModule = nullptr;
 	}
 
 	NotifyStructureChanged();
-	delete Module;
+	for (UParticleModule* LODModule : Removed)
+	{
+		delete LODModule;
+	}
 }
 
 void FParticleSystemEditor::MoveModule(UParticleEmitter* Emitter, int32 From, int32 To)
 {
-	UParticleLODLevel* LODLevel = Emitter ? Emitter->GetLODLevel(0) : nullptr;
-	if (LODLevel && LODLevel->MoveModule(From, To))
+	if (!Emitter)
+	{
+		return;
+	}
+
+	bool bMoved = false;
+	for (UParticleLODLevel* LODLevel : Emitter->GetLODLevels())
+	{
+		if (LODLevel && LODLevel->MoveModule(From, To))
+		{
+			bMoved = true;
+		}
+	}
+
+	if (bMoved)
 	{
 		NotifyStructureChanged();
 	}
@@ -236,22 +418,35 @@ void FParticleSystemEditor::MoveModule(UParticleEmitter* Emitter, int32 From, in
 
 void FParticleSystemEditor::SetTypeData(UParticleEmitter* Emitter, UClass* TypeDataClass)
 {
-	UParticleLODLevel* LODLevel = Emitter ? Emitter->GetLODLevel(0) : nullptr;
-	if (!LODLevel)
+	if (!Emitter || !GetCurrentLODLevel(Emitter))
 	{
 		return;
 	}
 
-	UParticleModuleTypeDataBase* Old = LODLevel->GetTypeDataModule();
-	LODLevel->SetTypeDataModule(TypeDataClass ? NewObject<UParticleModuleTypeDataBase>(LODLevel, TypeDataClass) : nullptr);
+	TArray<UParticleModule*> Removed;
+	for (UParticleLODLevel* LODLevel : Emitter->GetLODLevels())
+	{
+		if (!LODLevel)
+		{
+			continue;
+		}
+		if (UParticleModule* Old = LODLevel->GetTypeDataModule())
+		{
+			Removed.Add(Old);
+		}
+		LODLevel->SetTypeDataModule(TypeDataClass ? NewObject<UParticleModuleTypeDataBase>(LODLevel, TypeDataClass) : nullptr);
+	}
 
-	if (SelectedModule == Old)
+	if (Removed.Contains(SelectedModule))
 	{
 		SelectedModule = nullptr;
 	}
 
 	NotifyStructureChanged();
-	delete Old;
+	for (UParticleModule* Old : Removed)
+	{
+		delete Old;
+	}
 }
 
 void FParticleSystemEditor::NotifyPropertyEdited()
@@ -264,6 +459,7 @@ void FParticleSystemEditor::NotifyStructureChanged()
 	PreviewComponent->ResetParticles();
 	WorkingCopy->BuildEmitters();
 	PreviewComponent->ActivateSystem(true);
+	ClampCurrentLOD();
 	bDirty = true;
 }
 
@@ -301,6 +497,8 @@ bool FParticleSystemEditor::RevertToSaved()
 	WorkingCopy = Fresh;
 	PreviewComponent->InitializeSystem(WorkingCopy);
 	PreviewComponent->ActivateSystem(true);
+	CurrentLOD = (std::min)(CurrentLOD, GetNumLODs() - 1);
+	ApplyPreviewLOD();
 	bDirty = false;
 	return true;
 }
@@ -344,6 +542,7 @@ bool FParticleSystemEditor::InitializeResources()
 	}
 
 	PreviewComponent->SetTemplate(WorkingCopy);
+	ApplyPreviewLOD();
 	PreviewComponent->ActivateSystem(true);
 	return true;
 }

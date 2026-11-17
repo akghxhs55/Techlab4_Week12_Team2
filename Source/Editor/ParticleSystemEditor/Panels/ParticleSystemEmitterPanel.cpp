@@ -94,7 +94,7 @@ void FParticleSystemEmitterPanel::DrawContent()
 
 void FParticleSystemEmitterPanel::DrawEmitterColumn(int32 EmitterIndex, UParticleEmitter* Emitter)
 {
-	UParticleLODLevel* LODLevel = Emitter ? Emitter->GetLODLevel(0) : nullptr;
+	UParticleLODLevel* LODLevel = Editor.GetCurrentLODLevel(Emitter);
 	if (!LODLevel)
 	{
 		return;

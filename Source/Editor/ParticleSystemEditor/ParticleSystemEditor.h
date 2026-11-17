@@ -6,6 +6,7 @@
 class UParticleSystemComponent;
 class UParticleModule;
 class UParticleEmitter;
+class UParticleLODLevel;
 class UParticleSystem;
 
 class FParticleSystemEditor : public FAssetEditor
@@ -24,7 +25,15 @@ public:
 	void RestartSimulation() const;
 
 	UObject* GetSelectedObject() const; // Emitter가 선택되어 있으면 Emitter를, Module이 선택되어 있으면 Module을 반환
-	
+
+	int32 GetNumLODs() const;
+	int32 GetCurrentLOD() const { return CurrentLOD; }
+	void SetCurrentLOD(int32 Index);
+	UParticleLODLevel* GetCurrentLODLevel(const UParticleEmitter* Emitter) const;
+	bool AddLOD();
+	bool RemoveCurrentLOD();
+	void SetLODDistance(int32 Index, float Distance);
+
 	void SelectEmitter(UParticleEmitter* Emitter);
 	UParticleEmitter* GetSelectedEmitter() const { return SelectedEmitter; }
 	UParticleEmitter* AddEmitter();
@@ -56,12 +65,18 @@ protected:
 	TUniquePtr<IEditorTab> CreateTab() override;
 
 private:
+	int32 GetSelectedModuleSlot() const;
+	void ResolveSelectedModule(int32 Slot);
+	void ClampCurrentLOD();
+	void ApplyPreviewLOD() const;
+
 	UParticleSystem* OriginalAsset = nullptr;
 	UParticleSystem* WorkingCopy = nullptr;
 	UParticleSystemComponent* PreviewComponent = nullptr;
 
 	UParticleEmitter* SelectedEmitter = nullptr;
 	UParticleModule* SelectedModule = nullptr;
+	int32 CurrentLOD = 0;
 
 	bool bDirty = false;
 

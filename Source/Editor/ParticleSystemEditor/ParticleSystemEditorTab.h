@@ -11,6 +11,7 @@ public:
 
 protected:
 	void BeforeRender() override { ParticleEditor.SetViewportState(0, 0, {}); }
+	void DrawToolbar() override;
 	void BuildDefaultLayout(ImGuiID InDockSpaceId, const ImVec2& Size) override;
 	bool DrawFileMenuItems() override;
 
