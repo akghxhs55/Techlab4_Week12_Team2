@@ -65,6 +65,8 @@ struct FParticleEmitterInstance
 	FVector SimulationToWorld(const FVector& SimulationPosition) const;
 	// 에미터 기준 방향/오프셋 → 시뮬레이션 공간 (회전·스케일만, 이동 제외)
 	FVector EmitterToSimulationVector(const FVector& EmitterVector) const;
+	// 월드 방향 → 시뮬레이션 공간 (로컬 공간이면 컴포넌트 역변환, 이동 제외)
+	FVector WorldToSimulationVector(const FVector& WorldVector) const;
 
 protected:
 	// 서브클래스가 파티클마다 추가로 필요한 바이트 수. Init 안에서 불린다
