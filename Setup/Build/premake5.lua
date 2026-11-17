@@ -95,6 +95,15 @@ function CommonSettings()
 	filter {}
 end
 
+local function ConfigureSourceLink()
+	local Script = ProjectRoot .. "/Setup/Build/GenerateSourceLink.ps1"
+	local Json = "$(IntDir)sourcelink.json"
+
+	-- 프로젝트와 빌드 구성별로 JSON을 만든 뒤 최종 EXE의 PDB에 매핑을 넣는다.
+	local Command = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File '
+	prebuildcommands { Command .. '"' .. Script .. '" -OutputPath "' .. Json .. '"' }
+	linkoptions { '/SOURCELINK:"' .. Json .. '"' }
+end
 
 -- 헤더 툴 (UE의 UnrealHeaderTool 역할). 엔진 코드에 의존하지 않고 std만 쓴다.
 -- KurisuEngine / KurisuEditor가 빌드 전에 이 exe로 *.generated.h를 만든다.
@@ -219,6 +228,7 @@ project "KurisuEditor"
 	-- UClass는 헤더의 정적 객체가 등록하므로, exe가 직접 참조하지 않는 클래스의 .obj를 링커가 버리면
 	-- 그 클래스가 등록되지 않아 씬 로드 때 액터가 사라진다. 엔진 .obj를 전부 링크해 막는다.
 	linkoptions { "/WHOLEARCHIVE:KurisuEngine" }
+	ConfigureSourceLink()
 
 	files
 	{
@@ -276,6 +286,7 @@ project "KurisuGame"
 
 	-- 에디터와 같은 이유. 게임 코드는 라이트 액터 등을 직접 참조하지 않아 특히 빠지기 쉽다.
 	linkoptions { "/WHOLEARCHIVE:KurisuEngine" }
+	ConfigureSourceLink()
 
 	files
 	{
