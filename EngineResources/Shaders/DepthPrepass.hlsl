@@ -1,4 +1,5 @@
 #pragma pack_matrix(row_major)
+#include "VertexFactory.hlsli"
 
 // 기존 메시 경로의 시점·오브젝트 상수 슬롯을 공유한다.
 cbuffer ViewConstants : register(b0)
@@ -11,15 +12,11 @@ cbuffer WorldConstants : register(b2)
     matrix World;
 };
 
-struct VS_INPUT
+// 노멀은 쓰지 않으므로 NormalMatrix 자리에 World를 넘긴다
+float4 mainVS(FVertexFactoryInput Input) : SV_POSITION
 {
-    float3 Position : POSITION;
-};
-
-float4 mainVS(VS_INPUT Input) : SV_POSITION
-{
-    float4 WorldPosition = mul(float4(Input.Position, 1.0f), World);
-    return mul(WorldPosition, VP);
+    const FVFIntermediates VF = VF_GetIntermediates(Input, World, World);
+    return mul(float4(VF.WorldPosition, 1.0f), VP);
 }
 
 void mainPS()

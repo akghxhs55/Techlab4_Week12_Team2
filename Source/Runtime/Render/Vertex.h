@@ -6,8 +6,7 @@
 inline constexpr int32 MaxBoneInfluences = 4;
 
 
-// StaticMesh용 정점. Input Layout을 셰이더 리플렉션(APPEND_ALIGNED)으로 만들므로
-// 이 메시를 그리는 셰이더의 VS_INPUT은 이 필드 순서와 같아야 한다.
+// 입력 레이아웃은 VertexFactory.cpp가 offsetof로 만든다
 struct FVertex
 {
 	FVector Position = FVector(); // 0
@@ -17,7 +16,6 @@ struct FVertex
 	FVector4 Color = FVector4(1.0f, 1.0f, 1.0f, 1.0f); // 48
 };
 
-// GPU 스킨 정점 버퍼의 한 칸. GPU_SKIN 셰이더의 VS_INPUT과 필드 순서가 같아야 한다
 struct FGpuSkinVertex
 {
 	FVertex Vertex; // 0
@@ -25,6 +23,16 @@ struct FGpuSkinVertex
 	float Weight[MaxBoneInfluences] = {}; // 80  float4 BlendWeights
 };
 static_assert(sizeof(FGpuSkinVertex) == 96);
+
+// Transform0~2 = 파티클 World 행렬(row-vector)의 열 0~2, w에 이동값
+struct FParticleMeshInstance
+{
+	FVector4 Transform0;
+	FVector4 Transform1;
+	FVector4 Transform2;
+	FLinearColor Color;
+};
+static_assert(sizeof(FParticleMeshInstance) == 64);
 
 
 struct FLineBatchVertex

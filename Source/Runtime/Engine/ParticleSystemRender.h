@@ -134,23 +134,13 @@ private:
 
 	TUniquePtr<FVertexBuffer> InstanceBuffer;
 	int32 Capacity = 0;
-	// 패킷이 이 주소를 가리키므로 배치가 복사할 때까지 살아 있어야 한다
+	// 패킷이 이 주소들을 가리키므로 배치가 복사할 때까지 살아 있어야 한다
 	FParticleSpriteConstants Constants;
+	FSpriteParticleVertexFactory VertexFactory;
 
 	TArray<FParticleSortEntry> SortScratch;
 	TArray<FParticleSpriteInstance> InstanceScratch;
 };
-
-// ParticleInstanceCommon.hlsli의 PARTICLE_INSTANCE_VS_INPUT과 필드 순서가 같아야 한다
-// Transform0~2 = 파티클 World 행렬(row-vector)의 열 0~2. w에 이동값이 들어간다
-struct FParticleMeshInstance
-{
-	FVector4 Transform0;
-	FVector4 Transform1;
-	FVector4 Transform2;
-	FLinearColor Color;
-};
-static_assert(sizeof(FParticleMeshInstance) == 64, "PARTICLE_INSTANCE_VS_INPUT과 맞아야 한다");
 
 class FDynamicMeshEmitterData final : public FDynamicEmitterDataBase
 {
@@ -166,5 +156,6 @@ private:
 
 	TUniquePtr<FVertexBuffer> InstanceBuffer;
 	int32 Capacity = 0;
+	FMeshParticleVertexFactory VertexFactory;
 	TArray<FParticleMeshInstance> InstanceScratch;
 };

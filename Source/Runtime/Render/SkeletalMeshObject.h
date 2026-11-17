@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Render/SkeletalMesh.h"
+#include "Render/VertexFactory.h"
 
 class FSkeletalMeshObject
 {
@@ -9,7 +10,8 @@ public:
 	virtual ~FSkeletalMeshObject() = default;
 
 	virtual void Update(const TArray<FMatrix>& ComponentSpaceTransforms) = 0;
-	virtual FVertexBuffer* GetVertexBuffer(uint32 LOD) const = 0;
+	// CPU 스킨은 이미 스키닝된 FVertex라 Local, GPU 스킨은 본 버퍼를 함께 묶는 GpuSkin
+	virtual const FVertexFactory* GetVertexFactory(uint32 LOD) const = 0;
 
 	FIndexBuffer* GetIndexBuffer(uint32 LOD) const
 	{
@@ -42,17 +44,18 @@ public:
 	explicit FSkeletalMeshObjectCPUSkin(USkeletalMesh* InMesh);
 
 	void Update(const TArray<FMatrix>& ComponentSpaceTransforms) override;
-	FVertexBuffer* GetVertexBuffer(uint32 LOD) const override { return FinalVertexBuffer.get(); }
+	const FVertexFactory* GetVertexFactory(uint32 LOD) const override { return &VertexFactory; }
 	const TArray<FVertex>* GetCPUSkinnedVertices() const override { return &SkinnedVertices; }
 
 private:
 	void UploadVertices();
 
 	TUniquePtr<FVertexBuffer> FinalVertexBuffer;
+	FLocalVertexFactory VertexFactory;
 	TArray<FVertex> SkinnedVertices;
 };
 
-// 언리얼 기본 GPU 스킨 경로: 정점은 움직이지 않고, 패스의 버텍스 셰이더가 본 행렬을 섞어 스키닝한다.
+// GPU 스킨 경로: 정점은 움직이지 않고, 패스의 버텍스 셰이더가 본 행렬을 섞어 스키닝한다.
 class FSkeletalMeshObjectGPUSkin : public FSkeletalMeshObject
 {
 public:
@@ -60,7 +63,7 @@ public:
 
 	bool IsValid() const;
 	void Update(const TArray<FMatrix>& ComponentSpaceTransforms) override;
-	FVertexBuffer* GetVertexBuffer(uint32 LOD) const override;
+	const FVertexFactory* GetVertexFactory(uint32 LOD) const override { return &VertexFactory; }
 	const FStructuredBuffer* GetBoneMatrixBuffer() const override { return BoneMatrixBuffer.get(); }
 	// 피킹처럼 CPU에서 정점이 필요할 때만 현재 포즈로 계산한다
 	const TArray<FVertex>* GetCPUSkinnedVertices() const override;
@@ -70,6 +73,7 @@ private:
 	void UploadBoneMatrices();
 
 	TUniquePtr<FStructuredBuffer> BoneMatrixBuffer;
+	FGpuSkinVertexFactory VertexFactory;
 	mutable TArray<FVertex> CPUVertices;
 	mutable bool bCPUVerticesDirty = false;
 };

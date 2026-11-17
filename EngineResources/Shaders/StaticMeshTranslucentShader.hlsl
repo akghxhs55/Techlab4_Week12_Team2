@@ -1,5 +1,5 @@
 #pragma pack_matrix(row_major)
-#include "GpuSkinCommon.hlsli"
+#include "VertexFactory.hlsli"
 
 cbuffer Viewconstants : register(b0)
 {
@@ -25,16 +25,6 @@ cbuffer TranslucentFogConstants : register(b3)
     float4 FogColor;
     float4 FogDensityHeight;
     float4 FogDistanceViewport;
-};
-
-struct VS_INPUT
-{
-	float3 p : POSITION;
-	float3 n : NORMAL;
-	float4 tangent : TANGENT;
-	float2 t : TEXCOORD;
-	float4 c : COLOR;
-	GPU_SKIN_VS_INPUT
 };
 
 struct PS_INPUT
@@ -83,16 +73,17 @@ float FogTransmittance(float3 Position)
     return max(saturate(T), 1.0f - FogDistanceViewport.x);
 }
 
-PS_INPUT mainVS(VS_INPUT input)
+// 노멀은 PS가 쓰지 않으므로 NormalMatrix 자리에 World를 넘긴다
+PS_INPUT mainVS(FVertexFactoryInput input)
 {
     PS_INPUT output;
-    GPU_SKIN_APPLY(input, input.p, input.n, input.tangent);
+    const FVFIntermediates VF = VF_GetIntermediates(input, World, World);
 
-    float4 WorldPosition = mul(float4(input.p, 1.0f), World);
+    float4 WorldPosition = float4(VF.WorldPosition, 1.0f);
     output.position = mul(WorldPosition, VP);
-    output.color = input.c;
-    output.uv = input.t;
-    output.normal = input.n;
+    output.color = VF.Color;
+    output.uv = VF.UV;
+    output.normal = VF.WorldNormal;
     output.worldPosition = WorldPosition.xyz;
     return output;
 }

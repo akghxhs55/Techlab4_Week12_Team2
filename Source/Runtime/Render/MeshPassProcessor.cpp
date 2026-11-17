@@ -36,14 +36,12 @@ namespace
 			| (static_cast<uint64>(Group.Mesh->SortID) << 31);
 	}
 
-	bool BuildBatch(FMeshDrawBatch& Batch, FVertexBuffer* VB, FIndexBuffer* IB,
+	bool BuildBatch(FMeshDrawBatch& Batch, const FVertexFactory* VertexFactory,
 		UMaterial* Material, EMeshPassType Pass, const FSceneView& View, ELightingModel LightingModel,
 		const void* OverrideParams = nullptr, uint32 OverrideSize = 0)
 	{
-		if (!VB || !IB || !Material) return false;
-		Batch.VertexBuffer = VB;
-		Batch.IndexBuffer = IB;
-		if (!Batch.VertexBuffer || !Batch.IndexBuffer) return false;
+		if (!VertexFactory || !VertexFactory->IsValid() || !Material) return false;
+		Batch.VertexFactory = VertexFactory;
 		const bool bUsesUberShader = Pass == EMeshPassType::Forward || Pass == EMeshPassType::WorldNormal;
 		if (bUsesUberShader)
 		{
@@ -127,35 +125,14 @@ namespace
 		return true;
 	}
 
-	// 패킷에 본 버퍼가 있으면 같은 패스의 GPU 스킨 변형으로 바꾼다
-	bool ApplyGpuSkin(FMeshDrawBatch& Batch, const FRenderPacket& Packet)
+	// 패스 셰이더를 배치의 정점 타입에 맞는 변형으로 바꾼다. 변형이 없으면 그리지 않는다
+	bool ApplyVertexFactory(FMeshDrawBatch& Batch)
 	{
-		if (!Packet.BoneBuffer) return true;
-		FShaderProgram* Skinned = FRenderResourceManager::GetShaderProgram(Batch.Pipeline.Shader->Name + "#GPU_SKIN");
-		if (!Skinned) return false;
-		Batch.Pipeline.Shader = Skinned;
-		Batch.BoneBuffer = Packet.BoneBuffer;
+		if (!Batch.VertexFactory) return false;
+		FShaderProgram* Shader = FRenderResourceManager::ResolveShader(Batch.Pipeline.Shader, Batch.VertexFactory->GetType());
+		if (!Shader) return false;
+		Batch.Pipeline.Shader = Shader;
 		return true;
-	}
-
-	// 메시 파티클 패킷이면 같은 패스의 인스턴싱 변형으로 바꾼다. false면 이 배치를 그리지 않는다
-	bool ApplyParticleInstance(FMeshDrawBatch& Batch, const FRenderPacket& Packet)
-	{
-		if (!Packet.InstanceBuffer || !Batch.Pipeline.Shader) return true;
-
-		if (FShaderProgram* Instanced = FRenderResourceManager::FindShaderProgram(Batch.Pipeline.Shader->Name + "#PARTICLE_INSTANCE"))
-		{
-			Batch.Pipeline.Shader = Instanced;
-			return true;
-		}
-
-		// 스프라이트는 전용 셰이더가 인스턴스 입력을 직접 받으므로 그대로 그린다
-		const EPSOType Type = Packet.Material ? Packet.Material->PSOType : EPSOType::StaticMesh_Opaque;
-		if (Type == EPSOType::Particle_Additive || Type == EPSOType::Particle_AlphaBlend)
-			return true;
-
-		// 변형이 없는 셰이더로 그리면 모든 인스턴스가 원점에 겹치므로 건너뛴다
-		return false;
 	}
 
 	FMeshDrawBatch::FItem BuildItem(const FMatrix& World, const FSceneView& View,
@@ -249,8 +226,9 @@ bool FMeshPassProcessor::Build(const FSceneView& View, const FRenderQueue& Queue
 		for (const FStaticDrawGroup* Group : Groups)
 		{
 			FMeshDrawBatch Batch; // Render에게 전달하는 최종 구조체
-			if (!BuildBatch(Batch, Group->Mesh->GetVertexBuffer(), Group->Mesh->GetIndexBuffer(), Group->Material, Pass, View, LightingModel))
+			if (!BuildBatch(Batch, Group->Mesh->GetVertexFactory(), Group->Material, Pass, View, LightingModel))
 				return false;
+			if (!ApplyVertexFactory(Batch)) continue;
 
 			Batch.Items.Reserve(static_cast<uint32>(Group->Items.size()));
 
@@ -270,15 +248,11 @@ bool FMeshPassProcessor::Build(const FSceneView& View, const FRenderQueue& Queue
 		if (Pass == EMeshPassType::WorldNormal &&
 			(!Packet.Material || Packet.Material->PSOType != EPSOType::StaticMesh_Opaque)) continue;
 		FMeshDrawBatch Batch;
-		FVertexBuffer* VB = Packet.Mesh ? Packet.Mesh->GetVertexBuffer() : Packet.VertexBuffer;
-		FIndexBuffer* IB = Packet.Mesh ? Packet.Mesh->GetIndexBuffer() : Packet.IndexBuffer;
-		if (!BuildBatch(Batch, VB, IB, Packet.Material, Pass, View,
+		if (!BuildBatch(Batch, GetPacketVertexFactory(Packet), Packet.Material, Pass, View,
 			LightingModel, Packet.MaterialParamData, Packet.MaterialParamDataSize)) return false;
-		if (!ApplyGpuSkin(Batch, Packet)) continue;
-		if (!ApplyParticleInstance(Batch, Packet)) continue;
-		Batch.InstanceBuffer = Packet.InstanceBuffer;
+		if (!ApplyVertexFactory(Batch)) continue;
 
-		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Batch.IndexBuffer->GetIndexCount();
+		const uint32 IndexCount = Packet.IndexCount ? Packet.IndexCount : Batch.VertexFactory->GetIndexBuffer()->GetIndexCount();
 		const void* ObjectKey = Packet.Proxy ? static_cast<const void*>(Packet.Proxy) : static_cast<const void*>(&Packet);
 
 		Batch.Items.Add(BuildItem(PacketWorld(Packet), View, Pass, Packet.Slot,
@@ -320,18 +294,19 @@ bool FMeshPassProcessor::Build(const TArray<FPrimitiveSceneProxy*>& ShadowMeshes
 			Proxy->GetDynamicMeshElements(DynamicPackets, FViewContext());
 			for (const FRenderPacket& Packet : DynamicPackets)
 			{
-				if (!Packet.VertexBuffer || !Packet.IndexBuffer || Packet.IndexCount == 0)
+				const FVertexFactory* VertexFactory = GetPacketVertexFactory(Packet);
+				if (!VertexFactory || !VertexFactory->IsValid() || Packet.IndexCount == 0)
 					continue;
 				FMeshDrawBatch Batch{};
 				Batch.Pipeline = *Pipeline;
-				Batch.VertexBuffer = Packet.VertexBuffer;
-				Batch.IndexBuffer = Packet.IndexBuffer;
-				if (!ApplyGpuSkin(Batch, Packet)) continue;
+				Batch.VertexFactory = VertexFactory;
+				if (!ApplyVertexFactory(Batch)) continue;
 				Batch.bUseObjectSlots = false;
 				Batch.bBindViewConstants = true;
 				Batch.ObjectBindingSlot = 2;
 				Batch.ObjectStages = EShaderBindFlagBits::Vertex;
 				Batch.Items.Add(MakeShadowItem(Proxy, Packet.StartIndex, Packet.IndexCount, PreTranslation));
+				Batch.Items.Last().InstanceCount = Packet.InstanceCount;
 				OutBatches.Add(std::move(Batch));
 			}
 			continue;
@@ -345,17 +320,17 @@ bool FMeshPassProcessor::Build(const TArray<FPrimitiveSceneProxy*>& ShadowMeshes
 
 		FMeshDrawBatch Batch{};
 		Batch.Pipeline = *Pipeline;
-		Batch.VertexBuffer = Mesh->GetVertexBuffer();
-		Batch.IndexBuffer = Mesh->GetIndexBuffer();
+		Batch.VertexFactory = Mesh->GetVertexFactory();
 		Batch.bUseObjectSlots = false;
 		Batch.bBindViewConstants = true;
 		Batch.ObjectBindingSlot = 2;
 		Batch.ObjectStages = EShaderBindFlagBits::Vertex;
 
-		if (!Batch.VertexBuffer || !Batch.IndexBuffer)
+		if (!Batch.VertexFactory->IsValid())
 		{
 			return false;
 		}
+		if (!ApplyVertexFactory(Batch)) continue;
 
 		for (uint32 Index = 0; Index < MeshState.Sections.Num(); ++Index)
 		{

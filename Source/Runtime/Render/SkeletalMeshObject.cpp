@@ -135,6 +135,7 @@ FSkeletalMeshObjectCPUSkin::FSkeletalMeshObjectCPUSkin(USkeletalMesh* InMesh)
 
 	const uint32 Size = sizeof(FVertex) * static_cast<uint32>(SkinnedVertices.Num());
 	FinalVertexBuffer = RenderCommand::CreateDynamicVertexBuffer(Size, sizeof(FVertex));
+	VertexFactory.Init(FinalVertexBuffer.get(), GetIndexBuffer(0));
 
 	UploadVertices();
 }
@@ -164,6 +165,7 @@ FSkeletalMeshObjectGPUSkin::FSkeletalMeshObjectGPUSkin(USkeletalMesh* InMesh)
 {
 	CPUVertices = InMesh->GetRenderData().LODRenderData[0].BindVertices;
 	BoneMatrixBuffer = RenderCommand::CreateDynamicStructuredBuffer(static_cast<uint32>(InMesh->GetNumBones()), sizeof(FMatrix));
+	VertexFactory.Init(InMesh->GetRenderData().LODRenderData[0].GpuSkinVertexBuffer.get(), GetIndexBuffer(0), BoneMatrixBuffer.get());
 
 	// 첫 Update 전에도 바인드 포즈로 그려지도록 단위행렬을 올려 둔다
 	for (FMatrix& Matrix : RefToLocal)
@@ -185,11 +187,6 @@ void FSkeletalMeshObjectGPUSkin::Update(const TArray<FMatrix>& ComponentSpaceTra
 	UpdateSkinnedBoundsFromBones();
 	UploadBoneMatrices();
 	bCPUVerticesDirty = true;
-}
-
-FVertexBuffer* FSkeletalMeshObjectGPUSkin::GetVertexBuffer(uint32 LOD) const
-{
-	return SkeletalMesh->GetRenderData().LODRenderData[LOD].GpuSkinVertexBuffer.get();
 }
 
 const TArray<FVertex>* FSkeletalMeshObjectGPUSkin::GetCPUSkinnedVertices() const

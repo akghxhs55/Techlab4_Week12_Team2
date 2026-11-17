@@ -142,13 +142,13 @@ void FDynamicSpriteEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmi
 		Constants.SubImageSize = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
 	}
 
+	VertexFactory.Init(Context.SpriteQuadVertexBuffer, Context.SpriteQuadIndexBuffer, InstanceBuffer.get());
+
 	FRenderPacket Packet;
 	Packet.Model = Queue.StoreWorldMatrix(FMatrix::Identity);
-	Packet.VertexBuffer = Context.SpriteQuadVertexBuffer;
-	Packet.IndexBuffer = Context.SpriteQuadIndexBuffer;
+	Packet.VertexFactory = &VertexFactory;
 	Packet.StartIndex = 0;
 	Packet.IndexCount = 6;
-	Packet.InstanceBuffer = InstanceBuffer.get();
 	Packet.InstanceCount = static_cast<uint32>(Count);
 	Packet.Material = EmitterMaterial;
 	Packet.MaterialParamData = &Constants;
@@ -232,7 +232,9 @@ void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitC
 	RenderCommand::UpdateBufferData(InstanceBuffer.get(),
 		InstanceScratch.GetData(), sizeof(FParticleMeshInstance) * Count);
 
-	// 섹션마다 메시 머티리얼로 그린다. 머티리얼 PSO가 불투명이면 Forward 패스에서 #PARTICLE_INSTANCE 변형으로 교체된다
+	VertexFactory.Init(Mesh->GetVertexBuffer(), Mesh->GetIndexBuffer(), InstanceBuffer.get());
+
+	// 섹션마다 메시 머티리얼로 그린다. 패스 셰이더는 MeshParticle 정점 타입 변형으로 교체된다
 	for (const FStaticMeshSection& Section : Mesh->GetMeshData().Sections)
 	{
 		UMaterial* SectionMaterial = Mesh->GetMaterial(Section.MaterialSlotIndex);
@@ -240,13 +242,11 @@ void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitC
 			continue;
 
 		FRenderPacket Packet;
-		// 셰이더 변형은 World를 쓰지 않지만 오브젝트 슬롯 상수를 채우는 데 필요하다
+		// 정점 타입이 World를 쓰지 않지만 오브젝트 슬롯 상수를 채우는 데 필요하다
 		Packet.Model = Queue.StoreWorldMatrix(FMatrix::Identity);
-		Packet.VertexBuffer = Mesh->GetVertexBuffer();
-		Packet.IndexBuffer = Mesh->GetIndexBuffer();
+		Packet.VertexFactory = &VertexFactory;
 		Packet.StartIndex = Section.StartIndex;
 		Packet.IndexCount = Section.IndexCount;
-		Packet.InstanceBuffer = InstanceBuffer.get();
 		Packet.InstanceCount = static_cast<uint32>(Count);
 		Packet.Material = SectionMaterial;
 		Packet.CameraToParticleDistance = GetPacketDistance(Context);

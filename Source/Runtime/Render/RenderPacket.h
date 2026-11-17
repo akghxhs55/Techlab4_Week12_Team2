@@ -10,18 +10,14 @@
 
 class FPrimitiveSceneProxy;
 inline constexpr uint32 InvalidObjectSlot = ~0u;
-inline constexpr uint32 BoneMatrixBufferSlot = 14; // GpuSkinCommon.hlsli의 t14
 
 struct FRenderPacket
 {
 	const FPrimitiveSceneProxy* Proxy = nullptr;
 	const FMatrix* Model = nullptr;
 
-	UStaticMesh* Mesh = nullptr; // static
-	FVertexBuffer* VertexBuffer = nullptr; // dynamic
-	FIndexBuffer* IndexBuffer= nullptr; // dynamic
-	const FStructuredBuffer* BoneBuffer = nullptr; // GPU 스킨
-	FVertexBuffer* InstanceBuffer = nullptr;
+	UStaticMesh* Mesh = nullptr; // 정렬 키. VertexFactory가 없으면 이 메시의 Local VF로 그린다
+	const FVertexFactory* VertexFactory = nullptr;
 	uint32 InstanceCount = 0;
 
 	UMaterial* Material = nullptr;
@@ -33,6 +29,12 @@ struct FRenderPacket
 	uint32 Slot = InvalidObjectSlot;
 	int32 DebugWeightBone = -1; // 웨이트 히트맵 본 번호. -1이면 끔
 };
+
+inline const FVertexFactory* GetPacketVertexFactory(const FRenderPacket& Packet)
+{
+	if (Packet.VertexFactory) return Packet.VertexFactory;
+	return Packet.Mesh ? Packet.Mesh->GetVertexFactory() : nullptr;
+}
 
 struct FViewContext
 {
@@ -167,7 +169,8 @@ public:
 		for (int32 Index = 0; Index < TotalPackets; ++Index)
 		{
 			const FRenderPacket& Packet = (*this)[Index];
-			if ((!Packet.Mesh && (!Packet.VertexBuffer || !Packet.IndexBuffer)) || !Packet.Material) continue;
+			const FVertexFactory* VertexFactory = GetPacketVertexFactory(Packet);
+			if (!VertexFactory || !VertexFactory->IsValid() || !Packet.Material) continue;
 			SortItems.Add({ MakeSortKey(Packet), Index });
 		}
 

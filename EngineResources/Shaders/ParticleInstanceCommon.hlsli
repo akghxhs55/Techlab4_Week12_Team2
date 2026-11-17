@@ -1,21 +1,7 @@
-// 메시 파티클 인스턴싱. PARTICLE_INSTANCE=1로 컴파일한 변형에서만 인스턴스 행렬로 정점을 월드까지 옮긴다.
-// 파티클 패킷은 World = 단위 행렬이므로 이후의 World 곱셈은 결과를 바꾸지 않는다.
+// 메시 파티클 인스턴스 행렬 계산 함수. VF_MeshParticle.hlsli가 포함한다.
+// T0~T2 = 파티클 World 행렬(row-vector)의 열 0~2, w에 이동값
 #ifndef PARTICLE_INSTANCE_COMMON_HLSLI
 #define PARTICLE_INSTANCE_COMMON_HLSLI
-
-#ifndef PARTICLE_INSTANCE
-#define PARTICLE_INSTANCE 0
-#endif
-
-#if PARTICLE_INSTANCE
-
-// FParticleMeshInstance와 필드 순서가 같아야 한다. INSTANCE로 시작하는 시맨틱은 슬롯 1, 인스턴스 단위
-// Transform0~2 = 파티클 World 행렬(row-vector)의 열 0~2, w에 이동값
-#define PARTICLE_INSTANCE_VS_INPUT \
-    float4 InstanceTransform0 : INSTANCE_TRANSFORM0; \
-    float4 InstanceTransform1 : INSTANCE_TRANSFORM1; \
-    float4 InstanceTransform2 : INSTANCE_TRANSFORM2; \
-    float4 InstanceColor      : INSTANCE_COLOR;
 
 float3 ParticleInstanceSafeNormalize(float3 V)
 {
@@ -35,7 +21,7 @@ float3 ParticleInstanceTransformVector(float4 T0, float4 T1, float4 T2, float3 D
     return float3(dot(Direction, T0.xyz), dot(Direction, T1.xyz), dot(Direction, T2.xyz));
 }
 
-// 비균등 스케일에서도 면에 수직이 되도록 여인수 행렬로 옮긴다 (GpuSkinTransformNormal과 같은 방식)
+// 비균등 스케일에서도 면에 수직이 되도록 여인수 행렬로 옮긴다
 // 3x3 행렬의 행 i = (T0[i], T1[i], T2[i])
 float3 ParticleInstanceTransformNormal(float4 T0, float4 T1, float4 T2, float3 Normal)
 {
@@ -54,15 +40,5 @@ void ParticleInstanceVertex(float4 T0, float4 T1, float4 T2, inout float3 Positi
     Normal = ParticleInstanceTransformNormal(T0, T1, T2, Normal);
     Tangent.xyz = ParticleInstanceSafeNormalize(ParticleInstanceTransformVector(T0, T1, T2, Tangent.xyz));
 }
-
-#define PARTICLE_INSTANCE_APPLY(Input, Position, Normal, Tangent) \
-    ParticleInstanceVertex(Input.InstanceTransform0, Input.InstanceTransform1, Input.InstanceTransform2, Position, Normal, Tangent)
-
-#else
-
-#define PARTICLE_INSTANCE_VS_INPUT
-#define PARTICLE_INSTANCE_APPLY(Input, Position, Normal, Tangent)
-
-#endif
 
 #endif

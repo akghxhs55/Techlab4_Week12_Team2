@@ -1,6 +1,6 @@
 // Resources/Shader/ShadowDepth.hlsl
 #pragma pack_matrix(row_major)
-#include "GpuSkinCommon.hlsli"
+#include "VertexFactory.hlsli"
 
 cbuffer ViewConstants : register(b0)
 {
@@ -21,18 +21,6 @@ cbuffer ShadowDepthPass : register(b3)
     float3 ShadowPadding;
 };
 
-// FVertex의 앞 두 필드. 입력 레이아웃은 리플렉션(APPEND_ALIGNED)으로 만들어지므로 순서만 맞으면 됨.
-struct VS_INPUT
-{
-    float3 Position : POSITION;
-    float3 Normal : NORMAL;
-#if GPU_SKIN
-    float4 Tangent : TANGENT;   // 깊이에는 안 쓰지만 뒤 필드의 오프셋을 맞추고 GPU_SKIN_APPLY에 넘긴다
-    float2 UV : TEXCOORD;
-    float4 Color : COLOR;
-#endif
-    GPU_SKIN_VS_INPUT
-};
 struct VS_OUTPUT
 {
     float4 Position : SV_POSITION;
@@ -40,7 +28,6 @@ struct VS_OUTPUT
     float DepthBias : TEXCOORD1;
 };
 
-// UE ComputeDepthBiasDirectionalSpot
 float ComputeDepthBias(float3 WorldNormal)
 {
     const float NoL = abs(dot(LightDirection, WorldNormal));
@@ -49,22 +36,22 @@ float ComputeDepthBias(float3 WorldNormal)
     return ShadowParams.x + ShadowParams.y * Slope;
 }
 
-VS_OUTPUT mainVS(VS_INPUT Input)
+VS_OUTPUT mainVS(FVertexFactoryInput Input)
 {
     VS_OUTPUT Output;
-    GPU_SKIN_APPLY(Input, Input.Position, Input.Normal, Input.Tangent);
-    const float4 WorldPosition = mul(float4(Input.Position, 1.0f), World);
-    const float3 WorldNormal = normalize(mul(float4(Input.Normal, 0.0f), NormalMatrix).xyz);
+    const FVFIntermediates VF = VF_GetIntermediates(Input, World, NormalMatrix);
+    const float4 WorldPosition = float4(VF.WorldPosition, 1.0f);
+    const float3 WorldNormal = normalize(VF.WorldNormal);
     Output.Position = mul(WorldPosition, VP);
 
     if (bPerspective)
     {
-        // Week9 Perspective는 w = 라이트 공간 X. near~far를 0~1 선형으로 (UE TransformShadowSpot + PS 선형 깊이)
+        // Perspective는 w = 라이트 공간 X. near~far를 0~1 선형으로
         Output.ShadowDepth = (Output.Position.w - ShadowNear) * ShadowParams.w;
     }
     else
     {
-        // 근평면보다 광원 쪽에 있는 Caster를 0에 붙여서 잘리지 않게 함 (UE bClampToNearPlane)
+        // 근평면보다 광원 쪽에 있는 Caster를 0에 붙여서 잘리지 않게 함
         Output.Position.z = max(Output.Position.z, 0.0f);
         Output.ShadowDepth = Output.Position.z; // Ortho는 이미 선형
     }
