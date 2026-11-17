@@ -174,6 +174,7 @@ void FLevelEditorViewportClient::Draw(const FSceneView* View, FScenePassCallback
 				DrawCollisionShapes(GetWorld(), LineBatcher, SelectedActor);
 				DrawSpringArms(GetWorld(), LineBatcher, SelectedActor);
 				DrawParticleSystems(GetWorld(), LineBatcher);
+				DrawParticleLODDistances(GetWorld(), LineBatcher, SelectedActor);
 
 				LineBatcher->OnRender(SceneView.ViewProjectionMatrix);
 			};

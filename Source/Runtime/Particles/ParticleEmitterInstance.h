@@ -44,6 +44,9 @@ struct FParticleEmitterInstance
 
 	FBox BoundingBox;
 
+	// 디버그: Burst가 터질 때마다 로그 (콘솔 p.LogBursts)
+	static bool bLogBursts;
+
 	virtual void Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent);
 	virtual bool Resize(int32 NewMaxActiveParticles);
 	virtual void Tick(float DeltaTime);

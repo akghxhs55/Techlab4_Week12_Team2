@@ -16,6 +16,8 @@
 #include <malloc.h>
 #include <cstring>
 
+bool FParticleEmitterInstance::bLogBursts = false;
+
 FParticleEmitterInstance::~FParticleEmitterInstance()
 {
 	FreeParticleMemory();
@@ -263,8 +265,13 @@ int32 FParticleEmitterInstance::ComputeBurstCount()
 	{
 		if (!BurstFired[i] && EmitterTime >= Bursts[i].Time)
 		{
-			Total += SpawnModule->GetBurstCount(i, RandomStream);
+			const int32 Count = SpawnModule->GetBurstCount(i, RandomStream);
+			Total += Count;
 			BurstFired[i] = 1;
+			if (bLogBursts)
+			{
+				KRS_LOG(Info, "Particle burst {} fired {} (LOD {}, loop {}, time {:.2f})", i, Count, CurrentLODIndex, LoopCount, EmitterTime);
+			}
 		}
 	}
 	return Total;

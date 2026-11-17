@@ -377,6 +377,7 @@ namespace
 		// 경로로 캐시하므로 목록에서 항목을 제거해도 다른 프로젝트 이미지와 섞이지 않는다.
 		std::map<fs::path, ComPtr<ID3D11ShaderResourceView>> Thumbnails;
 		int32 SelectedRecent = -1;
+		fs::path PendingDoubleClickOpen;   // 더블클릭한 프로젝트. 마우스 버튼을 뗀 뒤에 연다
 		EPage ActivePage = EPage::Home;
 		ImTextureID LogoTexture = ImTextureID_Invalid;
 		ImTextureID NewProjectIcon = ImTextureID_Invalid;
@@ -682,10 +683,19 @@ namespace
 					ImGui::PushID(i);
 					if (DrawProjectCard(i, Recent[i], CardW, CardH, SelectedRecent == i))
 					{
-						TryOpen(Recent[i]);
+						PendingDoubleClickOpen = Recent[i];
 					}
 					ImGui::PopID();
 				}
+			}
+
+			// 더블클릭은 두 번째 누름에서 잡히므로 바로 열면 브라우저 창이 닫힌 뒤 버튼 떼기가
+			// 뒤에 있던 창(탐색기 등)으로 가서 그 창이 활성화되고 스플래시가 뒤로 밀린다.
+			// Open 버튼처럼 버튼을 뗀 뒤에 연다
+			if (!PendingDoubleClickOpen.empty() && !ImGui::IsMouseDown(ImGuiMouseButton_Left))
+			{
+				TryOpen(PendingDoubleClickOpen);
+				PendingDoubleClickOpen.clear();
 			}
 
 			ImGui::EndChild();

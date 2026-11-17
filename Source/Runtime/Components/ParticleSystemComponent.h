@@ -46,6 +46,11 @@ public:
 	void SetLODLevel(int32 InLODLevel);
 	// 카메라 거리로 고른 LOD. 이번 프레임에 기록된 뷰가 없으면 -1
 	int32 ComputeDesiredLOD() const;
+	// 직전 프레임에 그린 카메라 중 가장 가까운 것까지의 거리. 뷰가 없으면 -1
+	float GetDistanceToNearestView() const;
+
+	// 디버그: 선택과 상관없이 모든 컴포넌트의 LOD 경계 구를 그린다 (콘솔 p.ShowLOD)
+	static bool bShowAllLODDistances;
 
 	// 에디터 미리보기 전용 강제 LOD. -1이면 끔. 저장하지 않고 게임 월드에서는 무시한다
 	int32 GetPreviewLODOverride() const { return PreviewLODOverride; }
@@ -72,3 +77,5 @@ private:
 };
 
 void DrawParticleSystems(UWorld* World, FLineBatcher* LineBatcher, const AActor* Selected = nullptr);
+// 선택한 액터(p.ShowLOD가 켜져 있으면 전부)의 다음 LOD 경계 거리를 위도·경도 선 구로 그린다
+void DrawParticleLODDistances(UWorld* World, FLineBatcher* LineBatcher, const AActor* Selected);
