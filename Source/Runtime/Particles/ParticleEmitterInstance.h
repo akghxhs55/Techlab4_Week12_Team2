@@ -21,6 +21,7 @@ struct FParticleEmitterInstance
 	UParticleEmitter* SpriteTemplate = nullptr;
 	UParticleSystemComponent* Component = nullptr;
 	UParticleLODLevel* CurrentLODLevel = nullptr;
+	int32 CurrentLODIndex = 0;
 
 	uint8* ParticleData = nullptr;
 	uint16* ParticleIndices = nullptr;
@@ -46,6 +47,10 @@ struct FParticleEmitterInstance
 	virtual void Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent);
 	virtual bool Resize(int32 NewMaxActiveParticles);
 	virtual void Tick(float DeltaTime);
+
+	// 실행할 LOD 레벨을 바꾼다. 범위 밖이면 에미터의 마지막 레벨로 맞춘다.
+	// 살아 있는 파티클은 그대로 두고 다음 Tick부터 새 레벨의 모듈로 갱신·생성한다
+	virtual void SetCurrentLODIndex(int32 InLODIndex);
 
 	// 루프를 모두 끝내 더 이상 생성하지 않는 상태
 	bool HasCompletedLoops() const;

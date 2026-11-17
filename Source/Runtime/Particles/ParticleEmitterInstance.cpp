@@ -51,6 +51,7 @@ void FParticleEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSyste
 
 	SpriteTemplate = InTemplate;
 	Component = InComponent;
+	CurrentLODIndex = 0;
 	CurrentLODLevel = InTemplate->GetLODLevel(0);
 	ParticleSize = InTemplate->GetParticleSize();
 	assert(ParticleSize >= sizeof(FBaseParticle));
@@ -269,9 +270,42 @@ int32 FParticleEmitterInstance::ComputeBurstCount()
 	return Total;
 }
 
+void FParticleEmitterInstance::SetCurrentLODIndex(int32 InLODIndex)
+{
+	if (SpriteTemplate == nullptr)
+		return;
+
+	const int32 NumLODLevels = SpriteTemplate->GetNumLODLevels();
+	if (NumLODLevels == 0)
+		return;
+
+	const int32 NewIndex = (std::clamp)(InLODIndex, 0, NumLODLevels - 1);
+	UParticleLODLevel* NewLODLevel = SpriteTemplate->GetLODLevel(NewIndex);
+	if (NewLODLevel == nullptr || NewLODLevel == CurrentLODLevel)
+		return;
+
+	CurrentLODIndex = NewIndex;
+	CurrentLODLevel = NewLODLevel;
+
+	// Burst 발사 기록은 항목 번호로 남는다. 항목 수가 다른 레벨로 오면 기록이 통째로 초기화되어
+	// 이미 터진 Burst가 다시 터지므로, 이번 루프에서 시간이 지난 항목은 터진 것으로 둔다
+	const UParticleModuleSpawn* SpawnModule = CurrentLODLevel->GetSpawnModule();
+	if (SpawnModule && SpawnModule->GetBurstList().Num() != BurstFired.Num())
+	{
+		const TArray<FParticleBurst>& Bursts = SpawnModule->GetBurstList();
+		BurstFired.Init(0, Bursts.Num());
+		for (int32 i = 0; i < Bursts.Num(); ++i)
+		{
+			BurstFired[i] = (EmitterTime >= Bursts[i].Time) ? 1 : 0;
+		}
+	}
+}
+
 void FParticleEmitterInstance::Spawn(float DeltaTime)
 {
-	if (!bSpawningEnabled || EmitterTime < 0.0f || HasCompletedLoops())
+	// 꺼진 LOD 레벨은 생성만 멈춘다. bSpawningEnabled(Deactivate)와는 따로 둬야
+	// 꺼진 레벨에서 돌아왔을 때 Deactivate한 이펙트가 다시 살아나지 않는다
+	if (!bSpawningEnabled || !CurrentLODLevel->IsEnabled() || EmitterTime < 0.0f || HasCompletedLoops())
 		return;
 
 	UParticleModuleSpawn* SpawnModule = CurrentLODLevel->GetSpawnModule();
