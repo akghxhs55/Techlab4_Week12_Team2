@@ -203,7 +203,8 @@
                             "SubImages_Vertical": 8,
                             "bDelayFirstLoopOnly": false,
                             "bEnabled": true,
-                            "bUseLocalSpace": false
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 0
                         }
                     },
                     "SpawnModule": {
@@ -434,7 +435,8 @@
                             "SubImages_Vertical": 8,
                             "bDelayFirstLoopOnly": false,
                             "bEnabled": true,
-                            "bUseLocalSpace": false
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 25
                         }
                     },
                     "SpawnModule": {
@@ -665,7 +667,8 @@
                             "SubImages_Vertical": 8,
                             "bDelayFirstLoopOnly": false,
                             "bEnabled": true,
-                            "bUseLocalSpace": false
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 25
                         }
                     },
                     "SpawnModule": {
@@ -869,7 +872,8 @@
                             "SubImages_Vertical": 1,
                             "bDelayFirstLoopOnly": false,
                             "bEnabled": true,
-                            "bUseLocalSpace": false
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 0
                         }
                     },
                     "SpawnModule": {
@@ -1100,7 +1104,8 @@
                             "SubImages_Vertical": 1,
                             "bDelayFirstLoopOnly": false,
                             "bEnabled": true,
-                            "bUseLocalSpace": false
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 25
                         }
                     },
                     "SpawnModule": {
@@ -1331,7 +1336,8 @@
                             "SubImages_Vertical": 1,
                             "bDelayFirstLoopOnly": false,
                             "bEnabled": true,
-                            "bUseLocalSpace": false
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 25
                         }
                     },
                     "SpawnModule": {

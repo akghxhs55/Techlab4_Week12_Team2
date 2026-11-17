@@ -329,10 +329,14 @@ void FParticleEmitterInstance::Spawn(float DeltaTime)
 
 	int32 BurstNumber = ComputeBurstCount();
 
-	const int32 Needed = ActiveParticles + Number + BurstNumber;
+	// 현재 LOD의 상한. 메모리 블록은 이전 LOD에서 더 커져 있을 수 있으므로 생성 수만 이 값으로 자른다
+	const UParticleModuleRequired* Required = CurrentLODLevel->GetRequiredModule();
+	const int32 LODLimit = (Required && Required->GetMaxActiveParticles() > 0) ? Required->GetMaxActiveParticles() : 65535;
+
+	const int32 Needed = (std::min)(ActiveParticles + Number + BurstNumber, LODLimit);
 	if (Needed > MaxActiveParticles)
 	{
-		int32 NewMax = static_cast<int32>(Needed * 1.5f);
+		int32 NewMax = (std::min)(static_cast<int32>(Needed * 1.5f), LODLimit);
 		if (NewMax > 65535)
 		{
 			NewMax = 65535;
@@ -340,15 +344,18 @@ void FParticleEmitterInstance::Spawn(float DeltaTime)
 		Resize(NewMax);
 	}
 
+	// 상한보다 많이 살아 있으면(상한이 낮은 LOD로 바뀐 직후) 줄어들 때까지 생성하지 않는다
+	const int32 SpawnLimit = (std::min)(MaxActiveParticles, LODLimit);
+
 	// 칸이 모자라면 Rate 먼저, 남은 칸에 Burst
-	const int32 FreeSlots = MaxActiveParticles - ActiveParticles;
+	const int32 FreeSlots = (std::max)(SpawnLimit - ActiveParticles, 0);
 	Number = Number < FreeSlots ? Number : FreeSlots;
 	if (Number > 0)
 	{
 		SpawnParticles(Number, StartTime, Increment);
 	}
 
-	const int32 FreeSlotsAfter = MaxActiveParticles - ActiveParticles;
+	const int32 FreeSlotsAfter = (std::max)(SpawnLimit - ActiveParticles, 0);
 	BurstNumber = BurstNumber < FreeSlotsAfter ? BurstNumber : FreeSlotsAfter;
 	if (BurstNumber > 0)
 	{
