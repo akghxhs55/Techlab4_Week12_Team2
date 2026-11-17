@@ -1205,7 +1205,7 @@ void FContentDrawerPanel::RenderContents()
 							OnOpenMesh(PathString);
 						}
 
-						else if ((BlendSpaceFile::IsBlendSpacePath(PathString) || AnimBlueprintFile::IsAnimBlueprintPath(PathString)) && OnOpenMesh)
+						else if ((BlendSpaceFile::IsBlendSpacePath(PathString) || AnimBlueprintFile::IsAnimBlueprintPath(PathString) ||	ParticleSystemFile::IsParticleSystemPath(PathString)) && OnOpenMesh)
 						{
 							OnOpenMesh(PathString);
 						}
