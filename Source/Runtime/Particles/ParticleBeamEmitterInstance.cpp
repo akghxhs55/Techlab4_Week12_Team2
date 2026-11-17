@@ -3,7 +3,10 @@
 #include "ParticleHelper.h"
 #include "ParticleLODLevel.h"
 #include "Module/ParticleModuleTypeDataBeam.h"
+
 #include "Components/ParticleSystemComponent.h"
+
+#include "Engine/ParticleSystemRender.h"
 
 #include <algorithm>
 
@@ -12,6 +15,22 @@ void FParticleBeamEmitterInstance::Init(UParticleEmitter* InEmitter, UParticleSy
 	FParticleEmitterInstance::Init(InEmitter, InComponent);
 
 	BeamTypeData = CurrentLODLevel ? Cast<UParticleModuleTypeDataBeam>(CurrentLODLevel->GetTypeDataModule()) : nullptr;
+}
+
+void FParticleBeamEmitterInstance::UpdateDynamicData(TUniquePtr<FDynamicEmitterDataBase>& InOutData) const
+{
+	if (!InOutData || InOutData->GetType() != EDynamicEmitterType::Beam)
+		InOutData = MakeUnique<FDynamicBeamEmitterData>();
+
+	FDynamicBeamEmitterReplayData& Source = static_cast<FDynamicBeamEmitterData&>(*InOutData).Source;
+	FillReplayData(Source);
+	Source.BeamPayloadOffset = InstancePayloadOffset;
+	if (BeamTypeData)
+	{
+		Source.Sheets = BeamTypeData->GetSheets();
+		Source.Segments = BeamTypeData->GetSegments();
+		Source.TextureTile = BeamTypeData->GetTextureTile();
+	}
 }
 
 FBeamPayloadData& FParticleBeamEmitterInstance::GetBeamPayload(FBaseParticle& Particle) const

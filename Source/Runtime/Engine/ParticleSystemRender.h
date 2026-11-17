@@ -30,6 +30,7 @@ enum class EDynamicEmitterType : uint8
 {
 	Sprite,
 	Mesh,
+	Beam,
 };
 
 // 틱이 끝날 때 에미터가 채우는 렌더용 사본. 렌더 쪽은 이것만 보고 FParticleEmitterInstance는 모른다
@@ -58,6 +59,15 @@ struct FDynamicEmitterReplayDataBase
 	template <typename FuncType>
 	void ForEachParticle(FuncType&& Func) const;
 };
+
+struct FDynamicBeamEmitterReplayData : FDynamicEmitterReplayDataBase
+{
+	int32 BeamPayloadOffset = 0;   // 파티클 메모리에서 FBeamPayloadData 위치
+	int32 Sheets = 1;
+	int32 Segments = 10;
+	float TextureTile = 1.0f;
+};
+
 
 struct FDynamicSpriteEmitterReplayData : FDynamicEmitterReplayDataBase
 {
@@ -116,6 +126,17 @@ struct FParticleSpriteInstance
 };
 static_assert(sizeof(FParticleSpriteInstance) == 44, "ParticleSpriteShader INSTANCE_* 와 맞아야 한다");
 
+struct FParticleTrailVertex
+{
+	FVector      Position;   // 월드 좌표
+	FVector2     UV;
+	FLinearColor Color;
+};
+static_assert(sizeof(FParticleTrailVertex) == 36, "ParticleTrailShader VS_INPUT과 맞아야 한다");
+
+// 위아래 두 줄로 놓인 정점들을 삼각형 인덱스로 만든다
+void AppendTrailIndices(TArray<uint32>& OutIndices, uint32 BaseVertex, uint32 NumSegments);
+
 struct FParticleSpriteConstants
 {
 	FVector4 CameraRight;
@@ -165,10 +186,27 @@ private:
 	TArray<FParticleMeshInstance> InstanceScratch;
 };
 
-struct FParticleTrailVertex
+class FDynamicBeamEmitterData final : public FDynamicEmitterDataBase
 {
-	FVector      Position;   // 월드 좌표
-	FVector2     UV;
-	FLinearColor Color;
+public:
+	EDynamicEmitterType GetType() const override { return EDynamicEmitterType::Beam; }
+	const FDynamicEmitterReplayDataBase& GetSource() const override { return Source; }
+	void Submit(FRenderQueue& Queue, const FParticleSubmitContext& Context) override;
+
+	FDynamicBeamEmitterReplayData Source;
+
+private:
+	bool EnsureBuffers(int32 NumVertices, int32 NumIndices);
+	// 정렬된 빔마다 시트 수만큼 띠를 만든다. 반환값은 인덱스 수
+	int32 BuildGeometry(const FViewContext& View);
+
+	TUniquePtr<FVertexBuffer> VertexBuffer;
+	TUniquePtr<FIndexBuffer>  IndexBuffer;
+	int32 VertexCapacity = 0;
+	int32 IndexCapacity = 0;
+	FTrailVertexFactory VertexFactory;
+
+	TArray<FParticleSortEntry> SortScratch;
+	TArray<FParticleTrailVertex> VertexScratch;
+	TArray<uint32> IndexScratch;
 };
-static_assert(sizeof(FParticleTrailVertex) == 36, "ParticleTrailShader VS_INPUT과 맞아야 한다");

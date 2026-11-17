@@ -49,6 +49,7 @@ namespace
 		{ "GpuSkin",        "VF_GPU_SKIN",        GGpuSkinElements },
 		{ "MeshParticle",   "VF_MESH_PARTICLE",   GMeshParticleElements },
 		{ "SpriteParticle", "VF_SPRITE_PARTICLE", {} },
+		{ "Trail",          "VF_TRAIL",           {} },
 	};
 	static_assert(std::size(GTypeInfos) == static_cast<size_t>(EVertexFactoryType::Count));
 }

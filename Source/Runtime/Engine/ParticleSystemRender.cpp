@@ -25,6 +25,16 @@ void FDynamicEmitterReplayDataBase::ForEachParticle(FuncType&& Func) const
 	}
 }
 
+void AppendTrailIndices(TArray<uint32>& OutIndices, uint32 BaseVertex, uint32 NumSegments)
+{
+	for (uint32 i = 0; i < NumSegments; ++i)
+	{
+		const uint32 b = BaseVertex + i * 2;   // 이번 칸의 왼쪽 아래 점
+		OutIndices.Add(b);     OutIndices.Add(b + 1); OutIndices.Add(b + 2);   // 왼쪽 삼각형
+		OutIndices.Add(b + 2); OutIndices.Add(b + 1); OutIndices.Add(b + 3);   // 오른쪽 삼각형
+	}
+}
+
 float FDynamicEmitterDataBase::GetPacketDistance(const FParticleSubmitContext& Context)
 {
 	const float OrderBias = 1.0f + static_cast<float>(Context.EmitterCount - Context.EmitterIndex) * 1e-4f;
@@ -274,4 +284,108 @@ void FDynamicMeshEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitC
 		Packet.CameraToParticleDistance = GetPacketDistance(Context);
 		Queue.Add(Packet);
 	}
+}
+
+bool FDynamicBeamEmitterData::EnsureBuffers(int32 NumVertices, int32 NumIndices)
+{
+	if (!VertexBuffer || VertexCapacity < NumVertices)
+	{
+		VertexCapacity = std::max(NumVertices, VertexCapacity * 2);
+		VertexBuffer = RenderCommand::CreateDynamicVertexBuffer(
+			sizeof(FParticleTrailVertex) * VertexCapacity, sizeof(FParticleTrailVertex));
+	}
+	if (!IndexBuffer || IndexCapacity < NumIndices)
+	{
+		IndexCapacity = std::max(NumIndices, IndexCapacity * 2);
+		IndexBuffer = RenderCommand::CreateDynamicIndexBuffer(IndexCapacity);
+	}
+	return VertexBuffer && IndexBuffer;
+}
+
+int32 FDynamicBeamEmitterData::BuildGeometry(const FViewContext& View)
+{
+	VertexScratch.SetNum(0, false);
+	IndexScratch.SetNum(0, false);
+
+	// 반투명이라 먼 빔부터 쌓는다
+	SortParticles(Source, View, SortScratch);
+
+	const int32 Sheets = Source.Sheets;
+	const int32 Segments = Source.Segments;
+
+	for (const FParticleSortEntry& Entry : SortScratch)
+	{
+		const FBaseParticle& Particle = *Entry.Particle;
+		const FBeamPayloadData& Payload = ParticleHelper::GetPayload<FBeamPayloadData>(Entry.ParticleBase, Source.BeamPayloadOffset);
+
+		const FVector S = Payload.SourcePoint;
+		const FVector Axis = Payload.TargetPoint - S;
+		const float Length = Axis.Length();
+		if (Length < 1e-4f)
+			continue;
+		const FVector Dir = Axis * (1.0f / Length);
+
+		const float HalfWidth = std::abs(Particle.Size.X * Source.Scale.X) * 0.5f;
+
+		// 빔 축과 시선 둘 다에 수직이면 판이 카메라를 향한다
+		const FVector ViewDir = (S + Axis * 0.5f) - View.CameraPosition;
+		FVector Right0 = FVector::Cross(Dir, ViewDir);
+		if (Right0.Length() < 1e-4f) Right0 = FVector::Cross(Dir, FVector(0.0f, 0.0f, 1.0f));   // 빔을 정면으로 볼 때
+		if (Right0.Length() < 1e-4f) Right0 = FVector::Cross(Dir, FVector(0.0f, 1.0f, 0.0f));   // 빔이 Z축과 평행할 때
+		Right0 = Right0.Normalized();
+		const FVector Up0 = FVector::Cross(Dir, Right0);
+
+		for (int32 Sheet = 0; Sheet < Sheets; ++Sheet)
+		{
+			// 판은 180° 돌리면 같은 모양이라 PI를 나눈다
+			const float Angle = PI / static_cast<float>(Sheets) * static_cast<float>(Sheet);
+			const FVector Offset = (Right0 * std::cos(Angle) + Up0 * std::sin(Angle)) * HalfWidth;
+
+			const uint32 BaseVertex = static_cast<uint32>(VertexScratch.Num());
+			for (int32 i = 0; i <= Segments; ++i)
+			{
+				const float T = static_cast<float>(i) / static_cast<float>(Segments);
+				const FVector P = S + Axis * T;
+				const float U = T * Source.TextureTile;
+				VertexScratch.Add({ P - Offset, FVector2(U, 1.0f), Particle.Color });   // 짝수 = 아래
+				VertexScratch.Add({ P + Offset, FVector2(U, 0.0f), Particle.Color });   // 홀수 = 위
+			}
+			AppendTrailIndices(IndexScratch, BaseVertex, static_cast<uint32>(Segments));
+		}
+	}
+	return IndexScratch.Num();
+}
+
+void FDynamicBeamEmitterData::Submit(FRenderQueue& Queue, const FParticleSubmitContext& Context)
+{
+	if (!Context.View || Source.ActiveParticleCount == 0)
+		return;
+	UMaterial* EmitterMaterial = Source.Material ? Source.Material : Context.DefaultMaterial;
+	if (!EmitterMaterial)
+		return;
+
+	const int32 IndexCount = BuildGeometry(*Context.View);
+	if (IndexCount == 0)
+		return;
+	if (!EnsureBuffers(VertexScratch.Num(), IndexCount))
+		return;
+
+	RenderCommand::UpdateBufferData(VertexBuffer.get(), VertexScratch.GetData(),
+		static_cast<uint32>(sizeof(FParticleTrailVertex) * VertexScratch.Num()));
+	RenderCommand::UpdateBufferData(IndexBuffer.get(), IndexScratch.GetData(),
+		static_cast<uint32>(sizeof(uint32) * IndexCount));
+
+	VertexFactory.Init(VertexBuffer.get(), IndexBuffer.get());
+
+	FRenderPacket Packet;
+	// 정점이 월드 좌표라 Trail 셰이더는 World를 쓰지 않지만 오브젝트 슬롯 상수를 채우는 데 필요하다
+	Packet.Model = Queue.StoreWorldMatrix(FMatrix::Identity);
+	Packet.VertexFactory = &VertexFactory;
+	Packet.StartIndex = 0;
+	// 0이면 버퍼 전체를 그리므로 이번 프레임 개수를 넣는다
+	Packet.IndexCount = static_cast<uint32>(IndexCount);
+	Packet.InstanceCount = 0;
+	Packet.Material = EmitterMaterial;
+	Packet.CameraToParticleDistance = GetPacketDistance(Context);
+	Queue.Add(Packet);
 }

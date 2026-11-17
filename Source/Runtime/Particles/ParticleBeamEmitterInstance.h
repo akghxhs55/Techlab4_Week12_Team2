@@ -7,6 +7,7 @@ class UParticleModuleTypeDataBeam;
 struct FParticleBeamEmitterInstance : public FParticleEmitterInstance
 {
 	void Init(UParticleEmitter* InEmitter, UParticleSystemComponent* InComponent) override;
+	void UpdateDynamicData(TUniquePtr<FDynamicEmitterDataBase>& InOutData) const override;
 	FBeamPayloadData& GetBeamPayload(FBaseParticle& Particle) const;
 
 protected:

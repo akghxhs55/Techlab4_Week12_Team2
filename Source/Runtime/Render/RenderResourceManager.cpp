@@ -257,6 +257,13 @@ void FRenderResourceManager::CompileVertexFactoryVariants(const FString& Path, c
 FShaderProgram* FRenderResourceManager::ResolveShader(FShaderProgram* Base, EVertexFactoryType VF)
 {
 	if (!Base) return nullptr;
+	// 빔, 리본: 파티클 머티리얼의 블렌드와 깊이 설정은 PSO 그대로 두고 셰이더만 정점 형식에 맞는 것으로 바꾼다
+	if (VF == EVertexFactoryType::Trail)
+	{
+		return Base->Name == "EngineResources/Shaders/ParticleSpriteShader.hlsl"
+			? FindShaderProgram("EngineResources/Shaders/ParticleTrailShader.hlsl")
+			: nullptr;
+	}
 	// 전용 셰이더는 자기 입력 하나만 받는다
 	const bool bDedicatedVF = GetVertexFactoryTypeInfo(VF).Elements.empty();
 	if (!Base->bUsesVertexFactory)

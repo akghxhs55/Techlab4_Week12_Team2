@@ -16,6 +16,7 @@ enum class EVertexFactoryType : uint8
 	GpuSkin,
 	MeshParticle,
 	SpriteParticle,
+	Trail,
 	Count
 };
 
@@ -93,4 +94,12 @@ class FSpriteParticleVertexFactory : public FInstancedVertexFactory
 {
 public:
 	EVertexFactoryType GetType() const override { return EVertexFactoryType::SpriteParticle; }
+};
+
+// 빔, 리본 공용. 정점이 이미 월드 좌표이고 인스턴싱하지 않는다
+class FTrailVertexFactory : public FVertexFactory
+{
+public:
+	void Init(FVertexBuffer* VB, FIndexBuffer* IB) { VertexBuffer = VB; IndexBuffer = IB; }
+	EVertexFactoryType GetType() const override { return EVertexFactoryType::Trail; }
 };
