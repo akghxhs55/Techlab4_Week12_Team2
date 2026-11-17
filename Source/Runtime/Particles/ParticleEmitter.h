@@ -36,6 +36,8 @@ public:
 private:
 	// 파티클 한 칸의 크기와 모듈별 Payload 오프셋을 계산
 	void CacheEmitterModuleInfo();
+	// LOD 1 이상이 LOD 0과 같은 구조인지 검사하고 어긋나면 경고
+	void ValidateLODLevels() const;
 
 	int32 ParticleSize = 0;
 	TArray<UParticleLODLevel*> LODLevels;
