@@ -57,6 +57,8 @@ public:
 	bool RevertToSaved();
 	bool ConfirmClose() override;
 	void CloseWithoutPrompt();
+	bool IsUnsavedPromptRequested() const { return bUnsavedPromptRequested; }
+	void ClearUnsavedPromptRequest() { bUnsavedPromptRequested = false; }
 
 	UParticleSystem* GetWorkingCopy() const { return WorkingCopy; }
 

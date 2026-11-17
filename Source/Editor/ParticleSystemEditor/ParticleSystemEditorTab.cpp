@@ -75,6 +75,8 @@ void FParticleSystemEditorTab::OnRender(bool bActive)
             ParticleEditor.Save();
         }
     }
+
+	DrawUnsavedChangesPrompt();
 }
 
 void FParticleSystemEditorTab::DrawToolbar()
@@ -336,4 +338,34 @@ bool FParticleSystemEditorTab::DrawFileMenuItems()
         ParticleEditor.RevertToSaved();
     }
     return true;
+}
+
+void FParticleSystemEditorTab::DrawUnsavedChangesPrompt()
+{
+	if (ParticleEditor.IsUnsavedPromptRequested())
+	{
+		ParticleEditor.ClearUnsavedPromptRequest();
+		ImGui::OpenPopup("Unsaved Particle Changes");
+	}
+
+	if (ImGui::BeginPopupModal("Unsaved Particle Changes", nullptr, ImGuiWindowFlags_AlwaysAutoResize))
+	{
+		if (ImGui::Button("Save and Close") && ParticleEditor.Save())
+		{
+			ImGui::CloseCurrentPopup();
+			ParticleEditor.CloseWithoutPrompt();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Discard and Close"))
+		{
+			ImGui::CloseCurrentPopup();
+			ParticleEditor.CloseWithoutPrompt();
+		}
+		ImGui::SameLine();
+		if (ImGui::Button("Cancel") || ImGui::IsKeyPressed(ImGuiKey_Escape, false))
+		{
+			ImGui::CloseCurrentPopup();
+		}
+		ImGui::EndPopup();
+	}
 }

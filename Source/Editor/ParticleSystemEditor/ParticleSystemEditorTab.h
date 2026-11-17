@@ -18,6 +18,7 @@ protected:
 private:
 	void DrawLODTabs(const UParticleSystem& System) const;
 	void DrawLODDistance(const UParticleSystem& System, float RightPadding) const;
+	void DrawUnsavedChangesPrompt();
 
 	FParticleSystemEditor& ParticleEditor;
 };
