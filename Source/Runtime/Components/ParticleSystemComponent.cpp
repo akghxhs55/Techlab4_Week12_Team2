@@ -9,6 +9,7 @@
 #include "Render/LineBatcher.h"
 #include "UObject/UObjectIterator.h"
 #include "Engine/Scene.h"
+#include "Engine/World.h"
 #include "Engine/ParticleSystemSceneProxy.h"
 
 UParticleSystemComponent::UParticleSystemComponent()
@@ -74,6 +75,9 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 		}
 	}
 	bWasCompleted = false;
+
+	// 새 인스턴스는 LOD 0으로 시작하므로 지금 LOD를 다시 적용한다 (DirectSet 값, 미리보기 유지)
+	ApplyLODLevel(IsPreviewLODActive() ? PreviewLODOverride : LODLevel);
 }
 
 void UParticleSystemComponent::SetTemplate(UParticleSystem* NewTemplate)
@@ -112,6 +116,23 @@ void UParticleSystemComponent::ActivateSystem(bool bReset)
 		Instance->bSpawningEnabled = true;
 	}
 	bWasCompleted = false;
+
+	// 첫 Tick 전에 거리로 정해 둔다. 멀리서 터진 폭발이 LOD 0 Burst로 시작하지 않게 한다
+	LODCheckTimer = 0.0f;
+	bPendingActivateLOD = false;
+	if (Template && !IsPreviewLODActive() && Template->GetLODMethod() != EParticleSystemLODMethod::DirectSet)
+	{
+		const int32 DesiredLOD = ComputeDesiredLOD();
+		if (DesiredLOD >= 0)
+		{
+			ApplyLODLevel(DesiredLOD);
+		}
+		else
+		{
+			// 아직 그려진 뷰가 없으면(시작 직후) 뷰가 생기는 첫 Tick에서 정한다
+			bPendingActivateLOD = true;
+		}
+	}
 }
 
 void UParticleSystemComponent::DeactivateSystem()
@@ -138,6 +159,9 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	if (EmitterInstances.IsEmpty())
 		return;
 
+	// 인스턴스가 이번 Tick을 새 LOD의 모듈로 돌도록 먼저 고른다
+	UpdateLODLevel(DeltaTime);
+
 	bool bAllComplete = true;
 	for (FParticleEmitterInstance* Instance : EmitterInstances)
 	{
@@ -153,6 +177,116 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	if (FPrimitiveSceneProxy* Proxy = GetSceneProxy())
 	{
 		Proxy->GetScene()->MarkDirty(Proxy);
+	}
+}
+
+void UParticleSystemComponent::SetLODLevel(int32 InLODLevel)
+{
+	ApplyLODLevel(InLODLevel);
+}
+
+void UParticleSystemComponent::SetPreviewLODOverride(int32 InLODLevel)
+{
+	PreviewLODOverride = InLODLevel < 0 ? -1 : InLODLevel;
+	if (IsPreviewLODActive())
+	{
+		ApplyLODLevel(PreviewLODOverride);
+	}
+	else
+	{
+		// 미리보기를 끄면 다음 Tick에서 바로 거리로 다시 고르게 한다
+		LODCheckTimer = Template ? Template->GetLODDistanceCheckTime() : 0.0f;
+	}
+}
+
+bool UParticleSystemComponent::IsPreviewLODActive() const
+{
+	if (PreviewLODOverride < 0)
+		return false;
+	const UWorld* World = GetWorld();
+	return !(World && World->IsGameWorld());
+}
+
+int32 UParticleSystemComponent::ComputeDesiredLOD() const
+{
+	if (!Template)
+		return -1;
+
+	const UWorld* World = GetWorld();
+	if (!World)
+		return -1;
+
+	// 여러 뷰 중 가장 가까운 카메라 기준 (가장 자세히 보이는 곳에 맞춘다)
+	const TArray<FVector>& ViewLocations = World->GetViewLocationsRenderedLastFrame();
+	if (ViewLocations.IsEmpty())
+		return -1;
+
+	const FVector Location = GetWorldLocation();
+	float MinDistanceSq = FLT_MAX;
+	for (const FVector& ViewLocation : ViewLocations)
+	{
+		const FVector Delta = ViewLocation - Location;
+		const float DistanceSq = Delta.Dot(Delta);
+		if (DistanceSq < MinDistanceSq)
+		{
+			MinDistanceSq = DistanceSq;
+		}
+	}
+
+	// 제곱끼리 비교해 sqrt를 피한다
+	const TArray<float>& Distances = Template->GetLODDistances();
+	for (int32 i = Distances.Num() - 1; i > 0; --i)
+	{
+		if (MinDistanceSq >= Distances[i] * Distances[i])
+			return i;
+	}
+	return 0;
+}
+
+void UParticleSystemComponent::UpdateLODLevel(float DeltaTime)
+{
+	if (!Template || IsPreviewLODActive())
+		return;
+
+	if (bPendingActivateLOD)
+	{
+		const int32 DesiredLOD = ComputeDesiredLOD();
+		if (DesiredLOD >= 0)
+		{
+			ApplyLODLevel(DesiredLOD);
+			bPendingActivateLOD = false;
+			LODCheckTimer = 0.0f;
+		}
+		return;
+	}
+
+	// DirectSet은 코드가 정한 값, ActivateAutomatic은 활성화 때 정한 값을 유지한다
+	if (Template->GetLODMethod() != EParticleSystemLODMethod::Automatic)
+		return;
+
+	LODCheckTimer += DeltaTime;
+	if (LODCheckTimer < Template->GetLODDistanceCheckTime())
+		return;
+	LODCheckTimer = 0.0f;
+
+	const int32 DesiredLOD = ComputeDesiredLOD();
+	if (DesiredLOD >= 0 && DesiredLOD != LODLevel)
+	{
+		ApplyLODLevel(DesiredLOD);
+	}
+}
+
+void UParticleSystemComponent::ApplyLODLevel(int32 InLODLevel)
+{
+	const int32 NumLODs = Template ? Template->GetNumLODs() : 1;
+	LODLevel = (std::clamp)(InLODLevel, 0, (std::max)(NumLODs - 1, 0));
+
+	for (FParticleEmitterInstance* Instance : EmitterInstances)
+	{
+		if (Instance)
+		{
+			Instance->SetCurrentLODIndex(LODLevel);
+		}
 	}
 }
 
