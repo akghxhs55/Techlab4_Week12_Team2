@@ -15,5 +15,9 @@ protected:
 	void BuildDefaultLayout(ImGuiID InDockSpaceId, const ImVec2& Size) override;
 	bool DrawFileMenuItems() override;
 
+private:
+	void DrawLODTabs(const UParticleSystem& System) const;
+	void DrawLODDistance(const UParticleSystem& System, float RightPadding) const;
+
 	FParticleSystemEditor& ParticleEditor;
 };

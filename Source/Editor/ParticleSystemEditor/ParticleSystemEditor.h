@@ -30,7 +30,8 @@ public:
 	int32 GetCurrentLOD() const { return CurrentLOD; }
 	void SetCurrentLOD(int32 Index);
 	UParticleLODLevel* GetCurrentLODLevel(const UParticleEmitter* Emitter) const;
-	bool AddLOD();
+	// Index 위치에 Index - 1 LOD의 복사본을 넣고 선택한다 (Index >= 1)
+	bool InsertLOD(int32 Index);
 	bool RemoveCurrentLOD();
 	void SetLODDistance(int32 Index, float Distance);
 

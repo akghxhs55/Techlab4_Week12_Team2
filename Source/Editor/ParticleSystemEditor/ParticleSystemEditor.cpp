@@ -234,15 +234,15 @@ void FParticleSystemEditor::SetCurrentLOD(int32 Index)
 	ApplyPreviewLOD();
 }
 
-bool FParticleSystemEditor::AddLOD()
+bool FParticleSystemEditor::InsertLOD(int32 Index)
 {
 	const int32 Slot = GetSelectedModuleSlot();
-	if (!WorkingCopy->InsertLOD(CurrentLOD + 1))
+	if (!WorkingCopy->InsertLOD(Index))
 	{
 		return false;
 	}
 
-	CurrentLOD += 1;
+	CurrentLOD = Index;
 	ResolveSelectedModule(Slot);
 	ApplyPreviewLOD();
 	bDirty = true;
