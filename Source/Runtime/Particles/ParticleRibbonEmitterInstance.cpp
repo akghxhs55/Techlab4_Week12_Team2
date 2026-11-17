@@ -42,6 +42,8 @@ void FParticleRibbonEmitterInstance::UpdateDynamicData(TUniquePtr<FDynamicEmitte
 	Source.Sheets = RibbonTypeData->GetSheets();
 	const float TilingDistance = RibbonTypeData->GetTilingDistance();
 	Source.bTiling = TilingDistance > 0.0f;
+	Source.TessellationStepSize = RibbonTypeData->GetDistanceTessellationStepSize();
+	Source.MaxTessellation = RibbonTypeData->GetMaxTessellationBetweenParticles();
 
 	Source.HeadPosition = Component->GetWorldLocation();
 	Source.HeadTrailId = TrailId;

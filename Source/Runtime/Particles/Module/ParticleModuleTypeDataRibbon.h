@@ -17,6 +17,8 @@ public:
 	int32 GetSheets() const { return std::max(1, Sheets); }
 	bool IsRenderHead() const { return bRenderHead; }
 	bool IsSpawnInitialParticle() const { return bSpawnInitialParticle; }
+	float GetDistanceTessellationStepSize() const { return DistanceTessellationStepSize; }
+	int32 GetMaxTessellationBetweenParticles() const { return std::max(0, MaxTessellationBetweenParticles); }
 
 private:
 	UPROPERTY(EditAnywhere)
@@ -39,4 +41,10 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	bool bSpawnInitialParticle = true;   // 움직이기 시작하면 SpawnDistance를 채우기 전에 첫 점을 만든다
+
+	UPROPERTY(EditAnywhere)
+	float DistanceTessellationStepSize = 0.f;   // 점 사이 거리 / 이 값만큼 렌더 점을 곡선으로 채운다. 0이면 끔
+
+	UPROPERTY(EditAnywhere)
+	int32 MaxTessellationBetweenParticles = 8;
 };

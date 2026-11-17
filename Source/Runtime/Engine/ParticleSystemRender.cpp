@@ -36,6 +36,21 @@ void AppendTrailIndices(TArray<uint32>& OutIndices, uint32 BaseVertex, uint32 Nu
 	}
 }
 
+// 90°보다 더 꺾인 점에서 폭 배율을 줄인다. 되돌아가는 꼭짓점에서 폭이 진행 방향으로 누워 띠가 접히는 것을 막는다
+static float ComputePinch(const TArray<FTrailPoint>& Points, int32 i, float MinPinch)
+{
+	if (i <= 0 || i >= Points.Num() - 1)
+		return 1.0f;
+	const FVector In = Points[i].Position - Points[i - 1].Position;
+	const FVector Out = Points[i + 1].Position - Points[i].Position;
+	if (In.Length() < 1e-4f || Out.Length() < 1e-4f)
+		return 1.0f;
+	const float C = In.Normalized().Dot(Out.Normalized());
+	if (C >= 0.0f)
+		return 1.0f;
+	return MinPinch + (1.0f - MinPinch) * (C + 1.0f);
+}
+
 void AppendTrailStrip(const TArray<FTrailPoint>& Points, const FTrailStripParams& Params,
 	TArray<FParticleTrailVertex>& OutVertices, TArray<uint32>& OutIndices)
 {
@@ -65,7 +80,8 @@ void AppendTrailStrip(const TArray<FTrailPoint>& Points, const FTrailStripParams
 			Right0 = Right0.Length() < 1e-4f ? Params.CameraUp : Right0.Normalized();
 			const FVector Up0 = FVector::Cross(Tangent, Right0);
 
-			const FVector Offset = (Right0 * CosA + Up0 * SinA) * Point.HalfWidth;
+			const float HalfWidth = Point.HalfWidth * ComputePinch(Points, i, Params.MinPinch);
+			const FVector Offset = (Right0 * CosA + Up0 * SinA) * HalfWidth;
 			OutVertices.Add({ Point.Position - Offset, FVector2(Point.U, 1.0f), Point.Color });   // 짝수 = 아래
 			OutVertices.Add({ Point.Position + Offset, FVector2(Point.U, 0.0f), Point.Color });   // 홀수 = 위
 		}
@@ -488,6 +504,44 @@ bool FDynamicRibbonEmitterData::EnsureBuffers(int32 NumVertices, int32 NumIndice
 	return VertexBuffer && IndexBuffer;
 }
 
+void FDynamicRibbonEmitterData::TessellatePoints()
+{
+	SmoothScratch.SetNum(0, false);
+	const int32 Num = PointScratch.Num();
+	for (int32 j = 0; j < Num - 1; ++j)
+	{
+		const FTrailPoint& A = PointScratch[j];
+		const FTrailPoint& B = PointScratch[j + 1];
+		SmoothScratch.Add(A);
+
+		const float Distance = (B.Position - A.Position).Length();
+		const int32 Extra = (std::min)(static_cast<int32>(Distance / Source.TessellationStepSize), Source.MaxTessellation);
+		if (Extra <= 0)
+			continue;
+
+		// Catmull-Rom: 이웃 점으로 접선을 만든 Hermite라 원래 점을 반드시 지난다
+		const FVector& P0 = PointScratch[std::max(j - 1, 0)].Position;
+		const FVector& P3 = PointScratch[std::min(j + 2, Num - 1)].Position;
+		const FVector T1 = (B.Position - P0) * 0.5f;
+		const FVector T2 = (P3 - A.Position) * 0.5f;
+		for (int32 k = 1; k <= Extra; ++k)
+		{
+			const float Alpha = static_cast<float>(k) / static_cast<float>(Extra + 1);
+			FTrailPoint P;
+			P.Position = FMath::CubicInterp(A.Position, T1, B.Position, T2, Alpha);
+			P.HalfWidth = A.HalfWidth + (B.HalfWidth - A.HalfWidth) * Alpha;
+			P.Color = FLinearColor(
+				A.Color.R + (B.Color.R - A.Color.R) * Alpha,
+				A.Color.G + (B.Color.G - A.Color.G) * Alpha,
+				A.Color.B + (B.Color.B - A.Color.B) * Alpha,
+				A.Color.A + (B.Color.A - A.Color.A) * Alpha);
+			P.U = A.U + (B.U - A.U) * Alpha;
+			SmoothScratch.Add(P);
+		}
+	}
+	SmoothScratch.Add(PointScratch[Num - 1]);
+}
+
 int32 FDynamicRibbonEmitterData::BuildGeometry(const FParticleSubmitContext& Context)
 {
 	VertexScratch.SetNum(0, false);
@@ -557,7 +611,15 @@ int32 FDynamicRibbonEmitterData::BuildGeometry(const FParticleSubmitContext& Con
 				PointScratch[k].U = 1.0f - static_cast<float>(k) / LastIndex;
 		}
 
-		AppendTrailStrip(PointScratch, Params, VertexScratch, IndexScratch);
+		if (Source.TessellationStepSize > 0.0f && Source.MaxTessellation > 0)
+		{
+			TessellatePoints();
+			AppendTrailStrip(SmoothScratch, Params, VertexScratch, IndexScratch);
+		}
+		else
+		{
+			AppendTrailStrip(PointScratch, Params, VertexScratch, IndexScratch);
+		}
 	}
 	return IndexScratch.Num();
 }

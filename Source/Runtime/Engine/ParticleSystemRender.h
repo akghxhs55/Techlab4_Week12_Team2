@@ -79,6 +79,8 @@ struct FDynamicRibbonEmitterReplayData : FDynamicEmitterReplayDataBase
 	int32 RibbonPayloadOffset = 0;   // 파티클 메모리에서 FRibbonPayloadData 위치
 	int32 Sheets = 1;
 	bool  bTiling = false;           // TilingDistance > 0
+	float TessellationStepSize = 0.0f;
+	int32 MaxTessellation = 0;
 
 	bool    bHeadValid = false;      // head를 현재 트레일에 이을지
 	uint32  HeadTrailId = 0;
@@ -168,6 +170,7 @@ struct FTrailStripParams
 	FVector CameraPosition;
 	FVector CameraUp;
 	int32 Sheets = 1;
+	float MinPinch = 0.1f;   // 완전히 되돌아가는 꼭짓점의 폭 배율
 };
 
 // Points를 따라 시트 수만큼 띠를 만들어 정점과 인덱스를 덧붙인다. 빔, 리본 공용
@@ -265,6 +268,8 @@ public:
 private:
 	bool EnsureBuffers(int32 NumVertices, int32 NumIndices);
 	int32 BuildGeometry(const FParticleSubmitContext& Context);
+	// PointScratch의 점 사이를 곡선으로 채워 SmoothScratch에 넣는다
+	void TessellatePoints();
 
 	TUniquePtr<FVertexBuffer> VertexBuffer;
 	TUniquePtr<FIndexBuffer>  IndexBuffer;
@@ -280,6 +285,7 @@ private:
 	};
 	TArray<FRibbonSortEntry> SortScratch;
 	TArray<FTrailPoint> PointScratch;
+	TArray<FTrailPoint> SmoothScratch;
 	TArray<FParticleTrailVertex> VertexScratch;
 	TArray<uint32> IndexScratch;
 };
