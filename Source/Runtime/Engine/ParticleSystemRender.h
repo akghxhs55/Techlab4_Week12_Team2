@@ -66,6 +66,11 @@ struct FDynamicBeamEmitterReplayData : FDynamicEmitterReplayDataBase
 	int32 Sheets = 1;
 	int32 Segments = 10;
 	float TextureTile = 1.0f;
+
+	int32 NoiseOffset = 0;          // BeamNoise Payload 위치. 0이면 노이즈 없음
+	int32 NoiseFrequency = 0;
+	bool  bNoiseSmooth = false;
+	int32 NoiseTessellation = 1;
 };
 
 
@@ -212,6 +217,8 @@ private:
 	bool EnsureBuffers(int32 NumVertices, int32 NumIndices);
 	// 정렬된 빔마다 시트 수만큼 띠를 만든다. 반환값은 인덱스 수
 	int32 BuildGeometry(const FViewContext& View);
+	// 노이즈 점을 월드로 펼치고 bSmooth면 곡선으로 채워 PathScratch에 넣는다
+	void BuildNoisePath(const FVector& S, const FVector& T, const uint8* ParticleBase);
 
 	TUniquePtr<FVertexBuffer> VertexBuffer;
 	TUniquePtr<FIndexBuffer>  IndexBuffer;
@@ -221,6 +228,7 @@ private:
 
 	TArray<FParticleSortEntry> SortScratch;
 	TArray<FVector> PathScratch;
+	TArray<FVector> NoiseScratch;
 	TArray<FParticleTrailVertex> VertexScratch;
 	TArray<uint32> IndexScratch;
 };

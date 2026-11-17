@@ -462,6 +462,17 @@ void UAssetManager::CreateParticleMaterial()
 	MakeSpriteMaterial(EPSOType::Particle_Additive, EBlendState::Additive, "ParticleSpriteAdditive");
 	MakeSpriteMaterial(EPSOType::Particle_AlphaBlend, EBlendState::AlphaBlend, "ParticleSpriteAlphaBlend");
 
+	// 빔, 리본용. U(길이 방향)는 반복, V(폭 방향)는 가장자리가 번지지 않게 Clamp
+	// 셰이더는 스프라이트 것을 두어야 Trail 정점 타입일 때 Trail 셰이더로 바뀐다
+	UMaterial* BeamMat = NewObject<UMaterial>();
+	BeamMat->PSOType = EPSOType::Particle_Additive;
+	BeamMat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/ParticleSpriteShader.hlsl");
+	BeamMat->Textures.Add(GetAssetByPath<UTexture2D>("Engine/Textures/BeamGlow.png"));
+	BeamMat->BlendState = EBlendState::Additive;
+	BeamMat->DepthStencilState = EDepthStencilState::ReadOnly;
+	BeamMat->SamplerState = ESamplerState::LinearWrapUClampV;
+	RegisterAsset("ParticleBeamAdditive", BeamMat);
+
 	// 메시 에미터의 머티리얼 오버라이드용. 스프라이트 셰이더는 메시 파티클 정점을 받지 못한다
 	auto MakeMeshMaterial = [this](EPSOType PSOType, EBlendState Blend, const char* Name)
 		{

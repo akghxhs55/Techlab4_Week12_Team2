@@ -4,6 +4,7 @@
 #include "Particles/ParticleHelper.h"
 #include "Particles/Module/ParticleModuleRequired.h"
 #include "Particles/Module/ParticleModuleSubUV.h"
+#include "Particles/Module/ParticleModuleBeamNoise.h"
 #include "Render/RenderCommand.h"
 #include "Render/Material.h"
 #include "Render/Mesh.h"
@@ -342,6 +343,54 @@ bool FDynamicBeamEmitterData::EnsureBuffers(int32 NumVertices, int32 NumIndices)
 	return VertexBuffer && IndexBuffer;
 }
 
+void FDynamicBeamEmitterData::BuildNoisePath(const FVector& S, const FVector& T, const uint8* ParticleBase)
+{
+	const int32 F = Source.NoiseFrequency;
+	if (F < 1)
+		return;
+	const FVector Axis = T - S;
+	const FVector Dir = Axis.Normalized();
+
+	// 노이즈 오프셋을 펼칠 축. 카메라와 무관해야 카메라를 돌려도 번개 모양이 그대로다
+	FVector Right = FVector::Cross(Dir, FVector(0.0f, 0.0f, 1.0f));
+	if (Right.Length() < 1e-4f) Right = FVector::Cross(Dir, FVector(0.0f, 1.0f, 0.0f));   // 빔이 Z축과 평행할 때
+	Right = Right.Normalized();
+	const FVector Up = FVector::Cross(Dir, Right);
+
+	const FBeamNoisePoint* Points = UParticleModuleBeamNoise::GetPoints(ParticleBase, Source.NoiseOffset);
+	NoiseScratch.SetNum(0, false);
+	for (int32 j = 0; j <= F; ++j)
+	{
+		const FVector Base = S + Axis * (static_cast<float>(j) / static_cast<float>(F));
+		NoiseScratch.Add(Base + Right * Points[j].Current.X + Up * Points[j].Current.Y);
+	}
+
+	if (!Source.bNoiseSmooth)
+	{
+		for (const FVector& P : NoiseScratch)
+			PathScratch.Add(P);
+		return;
+	}
+
+	// Catmull-Rom: 이웃 점으로 접선을 만든 Hermite. 노이즈 점을 반드시 지난다
+	const int32 Tess = Source.NoiseTessellation;
+	for (int32 j = 0; j < F; ++j)
+	{
+		const FVector& P0 = NoiseScratch[std::max(j - 1, 0)];
+		const FVector& P1 = NoiseScratch[j];
+		const FVector& P2 = NoiseScratch[j + 1];
+		const FVector& P3 = NoiseScratch[std::min(j + 2, F)];
+		const FVector T1 = (P2 - P0) * 0.5f;
+		const FVector T2 = (P3 - P1) * 0.5f;
+		for (int32 k = 0; k < Tess; ++k)
+		{
+			const float Alpha = static_cast<float>(k) / static_cast<float>(Tess);
+			PathScratch.Add(FMath::CubicInterp(P1, T1, P2, T2, Alpha));
+		}
+	}
+	PathScratch.Add(NoiseScratch[F]);
+}
+
 int32 FDynamicBeamEmitterData::BuildGeometry(const FViewContext& View)
 {
 	VertexScratch.SetNum(0, false);
@@ -368,10 +417,17 @@ int32 FDynamicBeamEmitterData::BuildGeometry(const FViewContext& View)
 			continue;
 
 		PathScratch.SetNum(0, false);
-		for (int32 i = 0; i <= Segments; ++i)
+		if (Source.NoiseOffset > 0)
 		{
-			const float T = static_cast<float>(i) / static_cast<float>(Segments);
-			PathScratch.Add(S + Axis * T);
+			BuildNoisePath(S, Payload.TargetPoint, Entry.ParticleBase);
+		}
+		else
+		{
+			for (int32 i = 0; i <= Segments; ++i)
+			{
+				const float T = static_cast<float>(i) / static_cast<float>(Segments);
+				PathScratch.Add(S + Axis * T);
+			}
 		}
 
 		Params.HalfWidth = std::abs(Particle.Size.X * Source.Scale.X) * 0.5f;

@@ -2,6 +2,7 @@
 #include "Core/Types.h"
 #include "Particles/ParticleModule.h"
 #include <algorithm>
+#include <cmath>
 #include "ParticleModuleBeamNoise.generated.h"
 
 // 빔을 따라 놓은 노이즈 점을 축에 수직인 방향으로 흔든다. 경로를 만드는 건 렌더 쪽이다
@@ -21,6 +22,7 @@ public:
 	int32 GetFrequency() const { return std::clamp(Frequency, 1, 250); }
 	bool IsSmooth() const { return bSmooth; }
 	int32 GetNoiseTessellation() const { return std::clamp(NoiseTessellation, 1, 16); }
+	float GetNoiseRange() const { return std::abs(NoiseRange); }
 
 	static FBeamNoiseHeader& GetHeader(uint8* ParticleBase, int32 Offset);
 	static FBeamNoisePoint* GetPoints(uint8* ParticleBase, int32 Offset);

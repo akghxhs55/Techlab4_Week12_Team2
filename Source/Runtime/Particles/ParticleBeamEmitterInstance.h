@@ -3,6 +3,7 @@
 #include "ParticleTypes.h"
 
 class UParticleModuleTypeDataBeam;
+class UParticleModuleBeamNoise;
 
 struct FParticleBeamEmitterInstance : public FParticleEmitterInstance
 {
@@ -17,5 +18,7 @@ protected:
 
 private:
 	void ResolveBeamPoints(FBeamPayloadData& Payload) const;
+	// 현재 LOD에서 켜져 있는 BeamNoise 모듈. 없으면 nullptr
+	UParticleModuleBeamNoise* FindNoiseModule() const;
 	UParticleModuleTypeDataBeam* BeamTypeData = nullptr;
 };
