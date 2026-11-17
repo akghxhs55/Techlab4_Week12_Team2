@@ -384,9 +384,18 @@ void FParticleEmitterInstance::UpdateBoundingBox(float DeltaTime)
 		// 이번 프레임에 생성된 파티클은 PostSpawn에서 이미 이동했다
 		const bool bJustSpawned = (Particle->Flags & STATE_Particle_JustSpawned) != 0;
 		Particle->Flags &= ~STATE_Particle_JustSpawned;
-		if (!bJustSpawned)
+
+		// Freeze 계열은 모듈 순회(ForEachParticle)만으로는 멈추지 않는다.
+		// Reset이 Velocity를 되돌려도 여기서 적분하지 않아야 실제로 멈춘다. 수명(RelativeTime)은 계속 흐른다
+		const bool bFrozen = (Particle->Flags & STATE_Particle_Freeze) != 0;
+		const bool bMove = !bJustSpawned && !bFrozen && (Particle->Flags & STATE_Particle_FreezeTranslation) == 0;
+		const bool bRotate = !bJustSpawned && !bFrozen && (Particle->Flags & STATE_Particle_FreezeRotation) == 0;
+		if (bMove)
 		{
 			Particle->Location += Particle->Velocity * DeltaTime;
+		}
+		if (bRotate)
+		{
 			Particle->Rotation += Particle->RotationRate * DeltaTime;
 		}
 

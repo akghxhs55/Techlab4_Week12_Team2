@@ -11,6 +11,7 @@
 #include "Components/SkinnedMeshComponent.h"
 #include "Components/ParticleSystemComponent.h"
 #include "Particles/ParticleEmitterInstance.h"
+#include "Particles/ParticleTypes.h"
 #include "UObject/UObjectIterator.h"
 #include "Engine/World.h"
 #include <format>
@@ -891,6 +892,34 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
+	// 디버그: 살아 있는 모든 파티클의 Freeze 플래그를 켜고 끈다 (Freeze 처리 확인용)
+	Add("p.Freeze", "p.Freeze <0|1>", [](const TArray<FString>& Args, const FString&)
+		{
+			if (Args.Num() != 2 || (Args[1] != "0" && Args[1] != "1")) return false;
+			const bool bFreeze = Args[1] == "1";
+
+			int32 Count = 0;
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				for (FParticleEmitterInstance* Instance : PSC->GetEmitterInstances())
+				{
+					if (!Instance) continue;
+					for (int32 i = 0; i < Instance->ActiveParticles; ++i)
+					{
+						uint8* Base = Instance->ParticleData + Instance->ParticleIndices[i] * Instance->ParticleStride;
+						FBaseParticle& Particle = *reinterpret_cast<FBaseParticle*>(Base);
+						if (bFreeze) Particle.Flags |= STATE_Particle_Freeze;
+						else Particle.Flags &= ~STATE_Particle_Freeze;
+						++Count;
+					}
+				}
+			}
+			FLog::Log(ELogVerbosity::Info, "p.Freeze {}: {} particles", bFreeze ? 1 : 0, Count);
+			return true;
+		});
+
 	// 등록된 모든 파티클 컴포넌트 (에디터·PIE 월드 모두)
 	Add("p.Particles", "p.Particles <Activate|Deactivate>", [](const TArray<FString>& Args, const FString&)
 		{
@@ -934,6 +963,8 @@ void FOutputLogPanel::RegisterCommands()
 	RegisterSuggestion("CVar", "p.LogBursts", "p.LogBursts", "[0|1] Log each particle burst", true);
 	RegisterSuggestion("CVar", "p.ShowLOD", "p.ShowLOD", "[0|1] Draw LOD distance spheres for all particles", true);
 	RegisterSuggestion("Cmd", "p.LODInfo", "p.LODInfo", "Print LOD, camera distance, particle count");
+	RegisterSuggestion("Cmd", "p.Freeze 1", "p.Freeze 1", "Freeze all live particles in place");
+	RegisterSuggestion("Cmd", "p.Freeze 0", "p.Freeze 0", "Unfreeze all live particles");
 	RegisterSuggestion("Cmd", "p.Particles Activate", "p.Particles Activate", "Activate all particle components");
 	RegisterSuggestion("Cmd", "p.Particles Deactivate", "p.Particles Deactivate", "Stop spawning on all particle components");
 }
