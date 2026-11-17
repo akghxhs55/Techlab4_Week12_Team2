@@ -355,6 +355,10 @@ namespace
 		{
 			return { "Blend Space", IM_COL32(138, 198, 72, 255), true };
 		}
+		if (ParticleSystemFile::IsParticleSystemPath(PathString))
+		{
+			return { "Particle System", IM_COL32(1, 202, 252, 255), true };
+		}
 		if (FFbxMeshBake::IsBakedPath(PathString))
 		{
 			const std::string LowerPath = ToLowerAscii(PathString);
@@ -1091,6 +1095,11 @@ void FContentDrawerPanel::RenderContents()
 
 						// 폰트는 글리프 아틀라스를 그대로 미리보기로 쓴다
 						Thumbnail = FontAsset->AtlasTexture;
+					}
+
+					if (ParticleSystemFile::IsParticleSystemPath(PathString))
+					{
+						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(ParticleSystemIconPath);
 					}
 
 					if (MeshThumbId == ImTextureID_Invalid && Thumbnail == nullptr)
