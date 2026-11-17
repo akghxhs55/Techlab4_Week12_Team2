@@ -76,6 +76,30 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 	bWasCompleted = false;
 }
 
+void UParticleSystemComponent::SetTemplate(UParticleSystem* NewTemplate)
+{
+	if (Template == NewTemplate && !EmitterInstances.IsEmpty())
+	{
+		return;
+	}
+
+	ResetParticles();
+	Template = NewTemplate;
+	bWasCompleted = false;
+
+	if (!Template)
+		return;
+
+	if (IsRegistered() && (IsActive() || IsAutoActivate()))
+	{
+		ActivateSystem(true);
+	}
+	else
+	{
+		InitializeSystem();
+	}
+}
+
 void UParticleSystemComponent::ActivateSystem(bool bReset)
 {
 	if (EmitterInstances.IsEmpty() || bReset)

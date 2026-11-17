@@ -33,6 +33,7 @@ public:
 	void TickComponent(float DeltaTime) override;
 
 	UParticleSystem* GetTemplate() const { return Template; }
+	void SetTemplate(UParticleSystem* NewTemplate);
 	const TArray<FParticleEmitterInstance*>& GetEmitterInstances() const { return EmitterInstances; }
 	bool HasCompleted() const { return bWasCompleted; }
 

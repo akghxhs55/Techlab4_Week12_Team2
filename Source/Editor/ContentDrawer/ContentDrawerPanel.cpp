@@ -15,6 +15,7 @@
 #include "Animation/AnimSequenceFile.h"
 #include "Animation/BlendSpaceFile.h"
 #include "Animation/AnimBlueprintFile.h"
+#include "Particles/ParticleSystemFile.h"
 
 namespace
 {
@@ -1164,6 +1165,15 @@ void FContentDrawerPanel::RenderContents()
 					if (FontAsset && ImGui::BeginDragDropSource())
 					{
 						ImGui::SetDragDropPayload(EditorDragDrop::Font, &FontAsset, sizeof(UFont*));
+
+						ImGui::TextUnformatted(FilenameString.c_str());
+
+						ImGui::EndDragDropSource();
+					}
+					// 파티클은 경로를 페이로드로 전달한다
+					if (!bIsDirectory && ParticleSystemFile::IsParticleSystemPath(PathString) && ImGui::BeginDragDropSource())
+					{
+						ImGui::SetDragDropPayload(EditorDragDrop::ParticleSystem, PathString.c_str(), PathString.size() + 1);
 
 						ImGui::TextUnformatted(FilenameString.c_str());
 

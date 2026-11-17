@@ -24,6 +24,9 @@
 #include "Components/ScriptComponent.h"
 #include <commdlg.h>
 #include "Components/ProjectileMovementComponent.h"
+#include "Components/ParticleSystemComponent.h"
+#include "Particles/ParticleSystem.h"
+#include "Particles/ParticleSystemFile.h"
 
 #include "Animation/AnimSingleNodeInstance.h"
 #include "Animation/AnimSequence.h"
@@ -798,6 +801,143 @@ namespace
 		}
 	}
 
+	// ParticleSystem Template
+	bool DrawParticleSystemPicker(UParticleSystem* Current, bool bMixed, const char* Id, const std::function<void(UParticleSystem*)>& OnPick)
+	{
+		static std::vector<FString> Paths;
+		static FString ScanMessage;
+
+		if (bMixed)
+		{
+			Current = nullptr;
+		}
+		const FString CurrentPath = Current ? Current->GetAssetPath() : "";
+		const FString CurrentName = bMixed ? "Multiple Values"
+			: (Current ? (CurrentPath.empty() ? Current->GetName() : GetAssetDisplayName(CurrentPath)) : "None");
+
+		bool bChanged = false;
+		auto Apply = [&](UParticleSystem* NewTemplate)
+		{
+			if (!bMixed && NewTemplate == Current)
+			{
+				return;
+			}
+			OnPick(NewTemplate);
+			bChanged = true;
+		};
+
+		ImGui::SetNextItemWidth(-1.0f);
+		const bool bOpen = ImGui::BeginCombo(Id, CurrentName.c_str());
+		if (ImGui::IsItemHovered() && !CurrentPath.empty() && !ImGui::GetDragDropPayload())
+		{
+			ImGui::SetTooltip("%s", CurrentPath.c_str());
+		}
+
+		if (ImGui::BeginDragDropTarget())
+		{
+			if (const ImGuiPayload* Payload = ImGui::AcceptDragDropPayload(EditorDragDrop::ParticleSystem))
+			{
+				const FString DroppedPath(static_cast<const char*>(Payload->Data));
+				if (UParticleSystem* Dropped = UAssetManager::LoadParticleSystem(DroppedPath))
+				{
+					Apply(Dropped);
+				}
+			}
+			ImGui::EndDragDropTarget();
+		}
+
+		if (!bOpen)
+		{
+			return bChanged;
+		}
+
+		if (ImGui::IsWindowAppearing())
+		{
+			Paths.clear();
+			ScanMessage.clear();
+			std::error_code Error;
+			std::filesystem::recursive_directory_iterator It(FPaths::ProjectContentDir(), Error);
+			const std::filesystem::recursive_directory_iterator End;
+
+			while (!Error && It != End)
+			{
+				if (It->is_regular_file(Error))
+				{
+					const FString Path = FPaths::ToUtf8(It->path());
+					if (ParticleSystemFile::IsParticleSystemPath(Path))
+					{
+						Paths.push_back(FAssetUtils::GetAssetKey(Path));
+					}
+				}
+				if (!Error)
+				{
+					It.increment(Error);
+				}
+			}
+
+			std::sort(Paths.begin(), Paths.end());
+
+			if (Error)
+			{
+				ScanMessage = "Cannot read the asset folder: " + Error.message();
+			}
+		}
+
+		if (ImGui::Selectable("None", !bMixed && Current == nullptr))
+		{
+			Apply(nullptr);
+		}
+
+		const FString CurrentKey = CurrentPath.empty() ? FString() : FAssetUtils::GetAssetKey(CurrentPath);
+		for (const FString& Path : Paths)
+		{
+			ImGui::PushID(Path.c_str());
+			const bool bSelected = !CurrentKey.empty() && CurrentKey == Path;
+			if (ImGui::Selectable(GetAssetDisplayName(Path).c_str(), bSelected))
+			{
+				if (UParticleSystem* Picked = UAssetManager::LoadParticleSystem(Path))
+				{
+					Apply(Picked);
+				}
+			}
+			if (ImGui::IsItemHovered())
+			{
+				ImGui::SetTooltip("%s", Path.c_str());
+			}
+			if (bSelected)
+			{
+				ImGui::SetItemDefaultFocus();
+			}
+			ImGui::PopID();
+		}
+
+		if (!ScanMessage.empty())
+		{
+			ImGui::TextWrapped("%s", ScanMessage.c_str());
+		}
+		else if (Paths.empty())
+		{
+			ImGui::TextUnformatted("No particle system files in Assets.");
+		}
+
+		ImGui::EndCombo();
+		return bChanged;
+	}
+
+	void ApplyParticleTemplate(UObject* Owner, UParticleSystem** TemplatePtr, UParticleSystem* NewTemplate)
+	{
+		if (UParticleSystemComponent* Component = Cast<UParticleSystemComponent>(Owner))
+			Component->SetTemplate(NewTemplate);
+		else
+			*TemplatePtr = NewTemplate;
+	}
+
+	bool DrawParticleSystemSlot(UObject* Owner, UParticleSystem** TemplatePtr)
+	{
+		return DrawParticleSystemPicker(*TemplatePtr, false, "##ParticleSystem",
+			[Owner, TemplatePtr](UParticleSystem* Picked) { ApplyParticleTemplate(Owner, TemplatePtr, Picked); });
+	}
+
 	UMaterial* EnsureMaterialOverride(UMeshComponent* MeshComponent, int32 Slot, UMaterial* Effective, UMaterial* Override)
 	{
 		// 이 컴포넌트 전용 인스턴스가 아니면 지금 적용 중인 머티리얼을 복제해서 덮어쓰기로 만든다.
@@ -1326,6 +1466,10 @@ namespace
 			else if (PropertyClass == UStaticMesh::StaticClass())
 			{
 				DrawMeshSlot(Object, reinterpret_cast<UStaticMesh**>(ObjPtr));
+			}
+			else if (PropertyClass == UParticleSystem::StaticClass())
+			{
+				return DrawParticleSystemSlot(Object, reinterpret_cast<UParticleSystem**>(ObjPtr));
 			}
 			else if (PropertyClass == UTexture2D::StaticClass())
 			{
@@ -2248,6 +2392,18 @@ namespace
 					ImGui::EndCombo();
 				}
 				return bPicked;
+			}
+			else if (PropertyClass == UParticleSystem::StaticClass())
+			{
+				return DrawParticleSystemPicker(Cast<UParticleSystem>(First), bMixed, "##MultiParticleSystem",
+					[&](UParticleSystem* Picked)
+					{
+						for (int32 i = 0; i < Objects.Num(); ++i)
+						{
+							ApplyParticleTemplate(Objects[i],
+								reinterpret_cast<UParticleSystem**>(&ObjectProp->GetPropertyValue(ValuePtrs[i])), Picked);
+						}
+					});
 			}
 			else if (PropertyClass == UTexture2D::StaticClass())
 			{
