@@ -6,6 +6,7 @@
 
 // 두 키 사이의 값을 계산할 보간 방식을 선택합니다.
 // Constant는 값 유지, Linear는 직선, Cubic은 접선을 이용한 곡선을 의미합니다.
+UENUM()
 enum class ECurveInterpMode : uint8
 {
     Constant,
@@ -15,14 +16,17 @@ enum class ECurveInterpMode : uint8
 
 // 커브의 한 키에 대한 시간·값·보간 방식·접선을 담습니다.
 // 안정적인 ID를 함께 보관해 키가 정렬되거나 이동해도 같은 키를 선택할 수 있습니다.
+USTRUCT()
 struct FFloatCurveKey
 {
-    int32 KeyId = -1; // 배열 인덱스가 아니다. 드래그/정렬 후에도 유지한다.
-    float Time = 0.0f;
-    float Value = 0.0f;
-    ECurveInterpMode InterpMode = ECurveInterpMode::Linear; // 이 키 -> 다음 키
-    float ArriveTangent = 0.0f; // value / second
-    float LeaveTangent = 0.0f;
+    GENERATED_BODY()
+
+    UPROPERTY() int32 KeyId = -1; // 배열 인덱스가 아니다. 드래그/정렬 후에도 유지한다.
+    UPROPERTY() float Time = 0.0f;
+    UPROPERTY() float Value = 0.0f;
+    UPROPERTY() ECurveInterpMode InterpMode = ECurveInterpMode::Linear; // 이 키 -> 다음 키
+    UPROPERTY() float ArriveTangent = 0.0f; // value / second
+    UPROPERTY() float LeaveTangent = 0.0f;
 };
 
 UCLASS()

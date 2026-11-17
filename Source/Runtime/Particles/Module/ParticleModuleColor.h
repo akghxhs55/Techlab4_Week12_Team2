@@ -19,7 +19,9 @@ public:
 	FFloatDistribution& GetStartAlpha() { return StartAlpha; }
 
 private:
+	UPROPERTY(EditAnywhere)
 	FVectorDistribution StartColor;   // RGB
+	UPROPERTY(EditAnywhere)
 	FFloatDistribution  StartAlpha;   // A
 
 	UPROPERTY(EditAnywhere)

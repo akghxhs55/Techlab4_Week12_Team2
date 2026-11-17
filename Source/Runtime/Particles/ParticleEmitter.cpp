@@ -33,6 +33,15 @@ void UParticleEmitter::AddLODLevel(UParticleLODLevel* InLODLevel)
 	}
 }
 
+UParticleEmitter::~UParticleEmitter()
+{
+	for (UParticleLODLevel* LODLevel : LODLevels)
+	{
+		delete LODLevel;
+	}
+	LODLevels.Reset();
+}
+
 void UParticleEmitter::Build()
 {
 	UParticleLODLevel* LODLevel = GetLODLevel(0);
@@ -91,4 +100,36 @@ int32 UParticleEmitter::GetModuleOffset(UParticleModule* Module) const
 {
 	const int32* Found = ModuleOffsetMap.Find(Module);
 	return Found ? *Found : 0;
+}
+
+void UParticleEmitter::Serialize(FStructuredArchive::FRecord Record)
+{
+	Super::Serialize(Record);
+
+	FArchive& Ar = Record.GetUnderlyingArchive();
+
+	int32 Count = Ar.IsSaving() ? LODLevels.Num() : 0;
+	auto LODArray = Record.EnterArray("LODLevels", Count);
+
+	if (Ar.IsLoading())
+	{
+		assert(LODLevels.IsEmpty());
+		LODLevels.SetNum(Count);
+	}
+
+	for (int32 i = 0; i < Count; ++i)
+	{
+		if (Ar.IsLoading())
+		{
+			LODLevels[i] = NewObject<UParticleLODLevel>(this);
+			LODLevels[i]->SetLevel(i);
+		}
+
+		LODLevels[i]->Serialize(LODArray.EnterElement().EnterRecord());
+
+		if (Ar.IsError())
+		{
+			break;
+		}
+	}
 }

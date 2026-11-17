@@ -19,5 +19,6 @@ public:
 
 private:
 	// 에미터 원점 기준 오프셋
+	UPROPERTY(EditAnywhere)
 	FVectorDistribution StartLocation;
 };

@@ -1,27 +1,15 @@
 #include "EnginePCH.h"
 #include "ParticleSystemComponent.h"
-#include "Particles/ParticleSystem.h"
 #include "Particles/ParticleEmitter.h"
-#include "Particles/ParticleLODLevel.h"
 #include "Particles/ParticleEmitterInstance.h"
-#include "Particles/Module/ParticleModuleRequired.h"
-#include "Particles/Module/ParticleModuleSpawn.h"
-#include "Particles/Module/ParticleModuleLifetime.h"
-#include "Particles/Module/ParticleModuleVelocity.h"
-#include "Particles/Module/ParticleModuleSize.h"
-#include "Particles/Module/ParticleModuleColor.h"
-#include "Particles/Module/ParticleModuleSubUV.h"
-#include "Particles/Module/ParticleModuleLocation.h"
 #include "Particles/Module/ParticleModuleTypeDataMesh.h"
 #include "Particles/ParticleMeshEmitterInstance.h"
-#include "Asset/AssetManager.h"
 #include "Render/Mesh.h"
-#include <cmath>
 #include "Particles/ParticleHelper.h"
 #include "Render/LineBatcher.h"
 #include "UObject/UObjectIterator.h"
-#include "Engine/ParticleSystemSceneProxy.h"
 #include "Engine/Scene.h"
+#include "Engine/ParticleSystemSceneProxy.h"
 
 UParticleSystemComponent::UParticleSystemComponent()
 {
@@ -32,18 +20,11 @@ UParticleSystemComponent::UParticleSystemComponent()
 UParticleSystemComponent::~UParticleSystemComponent()
 {
 	ResetParticles();
-	DestroyOwnedTemplate();
 }
 
 void UParticleSystemComponent::OnRegister()
 {
 	Super::OnRegister();
-
-	// PIE 복제본은 Template이 복사되지 않으므로 여기서 자기 것을 만든다
-	if (!Template)
-	{
-		CreateDefaultTemplate();
-	}
 
 	// 에디터 월드는 BeginPlay가 없으므로 여기서 시작
 	if (IsAutoActivate())
@@ -93,6 +74,30 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 		}
 	}
 	bWasCompleted = false;
+}
+
+void UParticleSystemComponent::SetTemplate(UParticleSystem* NewTemplate)
+{
+	if (Template == NewTemplate && !EmitterInstances.IsEmpty())
+	{
+		return;
+	}
+
+	ResetParticles();
+	Template = NewTemplate;
+	bWasCompleted = false;
+
+	if (!Template)
+		return;
+
+	if (IsRegistered() && (IsActive() || IsAutoActivate()))
+	{
+		ActivateSystem(true);
+	}
+	else
+	{
+		InitializeSystem();
+	}
 }
 
 void UParticleSystemComponent::ActivateSystem(bool bReset)
@@ -174,89 +179,6 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	SendRenderDynamicData();
 }
 
-void UParticleSystemComponent::CreateDefaultTemplate()
-{
-	UParticleSystem*   System  = NewObject<UParticleSystem>(this);
-	UParticleEmitter*  Emitter = NewObject<UParticleEmitter>(System);
-	UParticleLODLevel* LOD     = NewObject<UParticleLODLevel>(Emitter);
-
-	UParticleModuleRequired* Required = NewObject<UParticleModuleRequired>(LOD);
-	UParticleModuleSpawn*    Spawn    = NewObject<UParticleModuleSpawn>(LOD);
-	UParticleModuleLifetime* Lifetime = NewObject<UParticleModuleLifetime>(LOD);
-	UParticleModuleLocation* Location = NewObject<UParticleModuleLocation>(LOD);
-	UParticleModuleVelocity* Velocity = NewObject<UParticleModuleVelocity>(LOD);
-	UParticleModuleSize*     Size     = NewObject<UParticleModuleSize>(LOD);
-	UParticleModuleColor*    Color    = NewObject<UParticleModuleColor>(LOD);
-	UParticleModuleSubUV*    SubUV    = NewObject<UParticleModuleSubUV>(LOD);
-
-	// StarParticle.png는 8x8 아틀라스
-	Required->SetSubUV(EParticleSubUVInterpMethod::Random, 8, 8, 1.0f);
-
-	LOD->SetRequiredModule(Required);
-	LOD->SetSpawnModule(Spawn);
-	LOD->AddModule(Lifetime);
-	// Velocity의 Radial이 이동된 위치를 기준으로 방향을 잡도록 먼저
-	LOD->AddModule(Location);
-	LOD->AddModule(Velocity);
-	LOD->AddModule(Size);
-	LOD->AddModule(Color);
-	LOD->AddModule(SubUV);
-	Emitter->AddLODLevel(LOD);
-	System->AddEmitter(Emitter);
-
-	// 메시 에미터: TypeDataMesh가 있으면 에미터가 메시 인스턴스를 만든다
-	UParticleEmitter*  MeshEmitter = NewObject<UParticleEmitter>(System);
-	UParticleLODLevel* MeshLOD     = NewObject<UParticleLODLevel>(MeshEmitter);
-
-	UParticleModuleRequired*     MeshRequired = NewObject<UParticleModuleRequired>(MeshLOD);
-	UParticleModuleSpawn*        MeshSpawn    = NewObject<UParticleModuleSpawn>(MeshLOD);
-	UParticleModuleLifetime*     MeshLifetime = NewObject<UParticleModuleLifetime>(MeshLOD);
-	UParticleModuleLocation*     MeshLocation = NewObject<UParticleModuleLocation>(MeshLOD);
-	UParticleModuleVelocity*     MeshVelocity = NewObject<UParticleModuleVelocity>(MeshLOD);
-	UParticleModuleSize*         MeshSize     = NewObject<UParticleModuleSize>(MeshLOD);
-	UParticleModuleColor*        MeshColor    = NewObject<UParticleModuleColor>(MeshLOD);
-	UParticleModuleTypeDataMesh* MeshTypeData = NewObject<UParticleModuleTypeDataMesh>(MeshLOD);
-
-	MeshTypeData->SetMesh(UAssetManager::GetAssetByPath<UStaticMesh>("Cube"));
-	MeshSpawn->GetRate().Constant = 5.0f;
-	MeshLifetime->GetLifetime().Constant = 2.0f;
-	MeshSize->GetStartSize().Constant = FVector(3.0f, 3.0f, 3.0f);
-
-	MeshLOD->SetRequiredModule(MeshRequired);
-	MeshLOD->SetSpawnModule(MeshSpawn);
-	MeshLOD->SetTypeDataModule(MeshTypeData);
-	MeshLOD->AddModule(MeshLifetime);
-	MeshLOD->AddModule(MeshLocation);
-	MeshLOD->AddModule(MeshVelocity);
-	MeshLOD->AddModule(MeshSize);
-	MeshLOD->AddModule(MeshColor);
-	MeshEmitter->AddLODLevel(MeshLOD);
-	System->AddEmitter(MeshEmitter);
-
-	// 인스턴스 Init 전에 ParticleSize 계산이 끝나 있어야 한다 (생성 후 바꾼 분포도 여기서 다시 굽는다)
-	System->BuildEmitters();
-
-	OwnedObjects = { Required, Spawn, Lifetime, Location, Velocity, Size, Color, SubUV, LOD, Emitter,
-		MeshRequired, MeshSpawn, MeshLifetime, MeshLocation, MeshVelocity, MeshSize, MeshColor, MeshTypeData, MeshLOD, MeshEmitter,
-		System };
-	Template = System;
-	bOwnsTemplate = true;
-}
-
-void UParticleSystemComponent::DestroyOwnedTemplate()
-{
-	if (!bOwnsTemplate)
-		return;
-
-	for (UObject* Object : OwnedObjects)
-	{
-		delete Object;
-	}
-	OwnedObjects.Empty();
-	Template = nullptr;
-	bOwnsTemplate = false;
-}
-
 FPrimitiveSceneProxy* UParticleSystemComponent::CreateSceneProxy()
 {
 	return new FParticleSystemSceneProxy(this);
@@ -287,8 +209,6 @@ FBox UParticleSystemComponent::CalcLocalBounds() const
 	// 로컬 박스를 요구하는 곳(디버그 박스)용. 회전이 있으면 실제보다 커진다
 	return CalcBounds().GetWorldAABB(GetWorldMatrix().Inverse());
 }
-
-
 
 void DrawParticleSystems(UWorld* World, FLineBatcher* LineBatcher, const AActor* Selected)
 {

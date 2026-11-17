@@ -1,13 +1,13 @@
 #pragma once
 
 #include "PrimitiveComponent.h"
+#include "Particles/ParticleSystem.h"
 #include "ParticleSystemComponent.generated.h"
 
 class UWorld;
 class FLineBatcher;
 class AActor;
 class UObject;
-class UParticleSystem;
 struct FParticleEmitterInstance;
 
 UCLASS()
@@ -33,6 +33,7 @@ public:
 	void TickComponent(float DeltaTime) override;
 
 	UParticleSystem* GetTemplate() const { return Template; }
+	void SetTemplate(UParticleSystem* NewTemplate);
 	const TArray<FParticleEmitterInstance*>& GetEmitterInstances() const { return EmitterInstances; }
 	bool HasCompleted() const { return bWasCompleted; }
 
@@ -41,15 +42,11 @@ public:
 	FBox CalcLocalBounds() const override;
 
 private:
-	// 에셋이 없을 때 쓰는 테스트 템플릿
-	void CreateDefaultTemplate();
-	// 에미터마다 렌더 사본을 갱신해 프록시에 넘긴다 (UE SendRenderDynamicData_Concurrent)
+	// 에미터마다 렌더 사본을 갱신해 프록시에 넘긴다
 	void SendRenderDynamicData();
-	void DestroyOwnedTemplate();
 
+	UPROPERTY(EditAnywhere)
 	UParticleSystem* Template = nullptr;
-	bool bOwnsTemplate = false;
-	TArray<UObject*> OwnedObjects;   // CreateDefaultTemplate이 만든 것. 소멸자에서 delete
 
 	TArray<FParticleEmitterInstance*> EmitterInstances;
 	bool bWasCompleted = false;

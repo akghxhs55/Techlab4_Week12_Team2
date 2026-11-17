@@ -43,30 +43,6 @@ try {
             }
         }
         if (-not (Test-Path -LiteralPath $solution -PathType Leaf)) { throw "Solution was not generated: $solution" }
-        $gameProject = Join-Path $engineRoot 'Build\Projects\KurisuGame.vcxproj'
-        [xml]$gameXml = [IO.File]::ReadAllText($gameProject)
-        $namespace = $gameXml.DocumentElement.NamespaceURI
-        # SLNX BuildDependency is unconditional, even when Premake dependson is
-        # filtered. A conditional project reference keeps Debug editor-only.
-        $editorProject = Join-Path $engineRoot 'Build\Projects\KurisuEditor.vcxproj'
-        [xml]$editorXml = [IO.File]::ReadAllText($editorProject)
-        $references = $editorXml.CreateElement('ItemGroup', $namespace)
-        $references.SetAttribute('Condition', "'`$(Configuration)' == 'Release'")
-        $reference = $editorXml.CreateElement('ProjectReference', $namespace)
-        $reference.SetAttribute('Include', 'KurisuGame.vcxproj')
-        foreach ($entry in @{
-            Project = $gameXml.SelectSingleNode("//*[local-name()='ProjectGuid']").InnerText
-            LinkLibraryDependencies = 'false'
-            ReferenceOutputAssembly = 'false'
-        }.GetEnumerator()) {
-            $metadata = $editorXml.CreateElement($entry.Key, $namespace)
-            $metadata.InnerText = $entry.Value
-            [void]$reference.AppendChild($metadata)
-        }
-        [void]$references.AppendChild($reference)
-        $cppTargets = $editorXml.SelectSingleNode("//*[local-name()='Import' and contains(@Project, 'Microsoft.Cpp.targets')]")
-        [void]$editorXml.DocumentElement.InsertBefore($references, $cppTargets)
-        $editorXml.Save($editorProject)
     }
     finally { Pop-Location }
     Write-Host "Solution: $solution"

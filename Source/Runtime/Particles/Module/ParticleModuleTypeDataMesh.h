@@ -1,9 +1,8 @@
 #pragma once
 #include "Particles/Module/ParticleModuleTypeDataBase.h"
 #include "Particles/Distributions.h"
+#include "Render/Mesh.h"
 #include "ParticleModuleTypeDataMesh.generated.h"
-
-class UStaticMesh;
 
 UCLASS()
 class UParticleModuleTypeDataMesh : public UParticleModuleTypeDataBase
@@ -24,9 +23,11 @@ public:
 	FVectorDistribution& GetRollPitchYaw() { return RollPitchYaw; }
 
 private:
+	UPROPERTY(EditAnywhere)
 	UStaticMesh* Mesh = nullptr;
 	UPROPERTY(EditAnywhere)
 	bool bCastShadows = false;
 	// 생성 시 초기 회전(도). X = Roll, Y = Pitch, Z = Yaw
+	UPROPERTY(EditAnywhere)
 	FVectorDistribution RollPitchYaw;
 };
