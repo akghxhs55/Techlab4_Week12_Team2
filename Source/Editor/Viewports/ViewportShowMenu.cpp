@@ -25,7 +25,6 @@ void FViewportsPanel::DrawShowMenu()
         Settings.bDrawBoundingBox = Defaults.bDrawBoundingBox;
         Settings.bShowUUID = Defaults.bShowUUID;
         Settings.bDrawCascadeBounds = Defaults.bDrawCascadeBounds;
-        Settings.bShowCollision = Defaults.bShowCollision;
         Settings.bShowRootDebug = Defaults.bShowRootDebug;
         Settings.bShowVignette = Defaults.bShowVignette;
         Settings.bShowCameraOverlay = Defaults.bShowCameraOverlay;
@@ -77,7 +76,6 @@ void FViewportsPanel::DrawShowMenu()
     Flag("Cascade", "Cascade Bounds", Settings.bDrawCascadeBounds);
     Flag("Pivot", "Object UUID", Settings.bShowUUID);
     SectionHeader("PIE");
-    Flag("Collision", "Collision", Settings.bShowCollision);
     Flag("SkeletalMesh", "Root Bone", Settings.bShowRootDebug);
     Flag("Lighting", "Vignette", Settings.bShowVignette);
     Flag("Camera", "Camera Fade / Letterbox", Settings.bShowCameraOverlay);

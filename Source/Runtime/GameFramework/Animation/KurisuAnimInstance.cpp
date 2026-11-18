@@ -2,6 +2,8 @@
 #include "GameFramework/Animation/KurisuAnimInstance.h"
 #include "GameFramework/Actor/KurisuCharacter.h"
 #include "Animation/BlendSpace1D.h"
+#include "Animation/AnimSequence.h"
+#include "GameFramework/Animation/AnimNotifyState_AttackWindow.h"
 #include "Asset/AssetManager.h"
 #include <algorithm>
 
@@ -10,6 +12,19 @@ namespace
 	UAnimSequence* LoadSequence(const FString& Path)
 	{
 		return Path.empty() ? nullptr : UAssetManager::Get().LoadAnimSequence(Path);
+	}
+
+	// 클립에 공격 판정 구간이 없으면 붙인다. 시퀀스는 캐시돼 다시 초기화될 수 있으므로 이미 있으면 건드리지 않는다
+	void EnsureAttackWindow(UAnimSequence* Sequence, float StartTime, float EndTime)
+	{
+		if (!Sequence || EndTime <= StartTime)
+			return;
+		for (const FAnimNotifyEvent& Event : Sequence->GetNotifies())
+		{
+			if (Cast<UAnimNotifyState_AttackWindow>(Event.NotifyStateClass))
+				return;
+		}
+		Sequence->AddNotify<UAnimNotifyState_AttackWindow>(StartTime, EndTime - StartTime);
 	}
 }
 
@@ -53,9 +68,24 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 
 	RollPlayer.Sequence = LoadSequence(RollAnimationPath);
 	RollPlayer.bLooping = false;
+	RollPlayer.bForwardRootMotionOnly = true;
 
 	SlidePlayer.Sequence = LoadSequence(SlideAnimationPath);
 	SlidePlayer.bLooping = false;
+
+	// 공격 클립은 제자리라 루트 모션을 뽑지 않는다 (공격 중에는 MaxWalkSpeed 0이라 그 자리에 선다)
+	JabPlayer.Sequence = LoadSequence(JabAnimationPath);
+	JabPlayer.bLooping = false;
+	JabPlayer.bExtractRootMotion = false;
+	JabPlayer.StartTime = JabStartTime;
+
+	PunchPlayer.Sequence = LoadSequence(PunchAnimationPath);
+	PunchPlayer.bLooping = false;
+	PunchPlayer.bExtractRootMotion = false;
+	PunchPlayer.StartTime = PunchStartTime;
+
+	EnsureAttackWindow(JabPlayer.Sequence, JabHitStartTime, JabHitEndTime);
+	EnsureAttackWindow(PunchPlayer.Sequence, PunchHitStartTime, PunchHitEndTime);
 
 	// ---- 상태 ----
 	LocomotionState = StateMachine.AddState("Locomotion", &LocomotionPlayer);
@@ -82,6 +112,18 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 	SlideDesc.Pose.SetLinkNode(&SlidePlayer);
 	SlideDesc.OnEnter = [this](UAnimInstance*) { bSlideRequested = false; };
 	const int32 Slide = StateMachine.AddState(SlideDesc);
+
+	FAnimStateDesc JabDesc;
+	JabDesc.Name = "Jab";
+	JabDesc.Pose.SetLinkNode(&JabPlayer);
+	JabDesc.OnEnter = [this](UAnimInstance*) { bJabRequested = false; };
+	JabState = StateMachine.AddState(JabDesc);
+
+	FAnimStateDesc PunchDesc;
+	PunchDesc.Name = "Punch";
+	PunchDesc.Pose.SetLinkNode(&PunchPlayer);
+	PunchDesc.OnEnter = [this](UAnimInstance*) { bPunchRequested = false; };
+	PunchState = StateMachine.AddState(PunchDesc);
 
 	StateMachine.SetInitialState(LocomotionState);
 
@@ -134,6 +176,55 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 	SlideToLoco.CrossfadeDuration = ActionBlendOutTime;
 	SlideToLoco.Rule = [this](const FAnimTransitionContext&) { return SlidePlayer.GetTimeRemaining() <= ActionBlendOutTime; };
 	StateMachine.AddTransition(SlideToLoco);
+
+	// ---- 공격 ----
+	// 시작은 짧게 섞어 손이 바로 나가게 한다
+	FAnimTransitionDesc LocoToJab;
+	LocoToJab.From = LocomotionState;
+	LocoToJab.To = JabState;
+	LocoToJab.Priority = 1;
+	LocoToJab.CrossfadeDuration = 0.08f;
+	LocoToJab.Rule = [this](const FAnimTransitionContext&) { return bJabRequested; };
+	StateMachine.AddTransition(LocoToJab);
+
+	FAnimTransitionDesc LocoToPunch;
+	LocoToPunch.From = LocomotionState;
+	LocoToPunch.To = PunchState;
+	LocoToPunch.Priority = 1;
+	LocoToPunch.CrossfadeDuration = 0.08f;
+	LocoToPunch.Rule = [this](const FAnimTransitionContext&) { return bPunchRequested; };
+	StateMachine.AddTransition(LocoToPunch);
+
+	// 콤보: 손을 거둬들이기 시작한 뒤에 다음 공격이 걸려 있으면 끊고 넘어간다. 끝나서 나가는 전환보다 먼저 본다
+	FAnimTransitionDesc JabToPunch;
+	JabToPunch.From = JabState;
+	JabToPunch.To = PunchState;
+	JabToPunch.CrossfadeDuration = 0.1f;
+	JabToPunch.Rule = [this](const FAnimTransitionContext&) { return bPunchRequested && JabPlayer.CurrentTime >= JabComboTime; };
+	StateMachine.AddTransition(JabToPunch);
+
+	FAnimTransitionDesc PunchToJab;
+	PunchToJab.From = PunchState;
+	PunchToJab.To = JabState;
+	PunchToJab.CrossfadeDuration = 0.1f;
+	PunchToJab.Rule = [this](const FAnimTransitionContext&) { return bJabRequested && PunchPlayer.CurrentTime >= PunchComboTime; };
+	StateMachine.AddTransition(PunchToJab);
+
+	FAnimTransitionDesc JabToLoco;
+	JabToLoco.From = JabState;
+	JabToLoco.To = LocomotionState;
+	JabToLoco.Priority = 1;
+	JabToLoco.CrossfadeDuration = ActionBlendOutTime;
+	JabToLoco.Rule = [this](const FAnimTransitionContext&) { return JabPlayer.GetTimeRemaining() <= ActionBlendOutTime; };
+	StateMachine.AddTransition(JabToLoco);
+
+	FAnimTransitionDesc PunchToLoco;
+	PunchToLoco.From = PunchState;
+	PunchToLoco.To = LocomotionState;
+	PunchToLoco.Priority = 1;
+	PunchToLoco.CrossfadeDuration = ActionBlendOutTime;
+	PunchToLoco.Rule = [this](const FAnimTransitionContext&) { return PunchPlayer.GetTimeRemaining() <= ActionBlendOutTime; };
+	StateMachine.AddTransition(PunchToLoco);
 }
 
 void UKurisuAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
@@ -141,17 +232,36 @@ void UKurisuAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 	if (const AKurisuCharacter* Character = Cast<AKurisuCharacter>(TryGetPawnOwner()))
 	{
 		// Blend Space 축은 실제 속도가 아니라 "원하는 속도"다. 실제 속도는 이 값으로 고른 클립의 루트 모션이 만든다
-		LocomotionPlayer.X = Character->GetDesiredGroundSpeed();
+		// Run 속도를 넘는 만큼은 Run 클립을 빨리 돌려서 낸다
+		const float Desired = Character->GetDesiredGroundSpeed();
+		LocomotionPlayer.X = std::min(Desired, RunSpeed);
+		LocomotionPlayer.PlayRate = (Desired > RunSpeed && RunSpeed > 0.0f) ? Desired / RunSpeed : 1.0f;
 		bIsInAir = Character->IsFalling();
+		bHasMoveInput = Character->HasMovementInput();
 	}
 
+	// 구르기: 준비 동작과 (계속 움직이려 할 때의) 일어서기만 빠르게
+	const float RollTime = RollPlayer.CurrentTime;
+	if (RollTime < RollWindupEndTime)
+		RollPlayer.PlayRate = RollWindupPlayRate;
+	else if (RollTime >= RollRecoverStartTime && bHasMoveInput)
+		RollPlayer.PlayRate = RollRecoverPlayRate;
+	else
+		RollPlayer.PlayRate = 1.0f;
+
 	// 지난 프레임에 클립이 도약 시각을 넘었으면 캐릭터에 알린다
-	if (StateMachine.GetCurrentStateIndex() == JumpState && !bJumpTakeoffDone
-		&& JumpPlayer.CurrentTime >= JumpTakeoffTime)
+	const bool bInJumpState = StateMachine.GetCurrentStateIndex() == JumpState;
+	if (bInJumpState && !bJumpTakeoffDone && JumpPlayer.CurrentTime >= JumpTakeoffTime)
 	{
 		bJumpTakeoffDone = true;
 		bJumpTakeoffPending = true;
 	}
+
+	// 높아진 만큼 길어진 체공 시간에 맞춰 공중 구간만 느리게 재생한다. 실제로 떠 있는 동안에만 적용
+	const float ClipAirTime = JumpLandTime - JumpTakeoffTime;
+	const bool bInAirSegment = bInJumpState && bJumpTakeoffDone && bIsInAir
+		&& JumpPlayer.CurrentTime >= JumpTakeoffTime && JumpPlayer.CurrentTime < JumpLandTime;
+	JumpPlayer.PlayRate = (bInAirSegment && ClipAirTime > 0.0f) ? ClipAirTime / GetJumpAirTime() : 1.0f;
 }
 
 bool UKurisuAnimInstance::RequestJump()
@@ -175,10 +285,29 @@ bool UKurisuAnimInstance::RequestSlide()
 	return true;
 }
 
+bool UKurisuAnimInstance::RequestJab()
+{
+	if (bIsInAir) return false;
+	// Locomotion에서 바로, 또는 펀치 도중이면 콤보로 예약
+	const bool bFromPunch = StateMachine.GetCurrentStateIndex() == PunchState && !bPunchRequested;
+	if (!bFromPunch && IsInAction()) return false;
+	bJabRequested = true;
+	return true;
+}
+
+bool UKurisuAnimInstance::RequestPunch()
+{
+	if (bIsInAir) return false;
+	const bool bFromJab = StateMachine.GetCurrentStateIndex() == JabState && !bJabRequested;
+	if (!bFromJab && IsInAction()) return false;
+	bPunchRequested = true;
+	return true;
+}
+
 bool UKurisuAnimInstance::IsInAction() const
 {
 	// 요청은 다음 Update에서 상태가 바뀌므로, 아직 Locomotion이어도 요청이 걸려 있으면 액션 중으로 본다
-	return bJumpRequested || bRollRequested || bSlideRequested
+	return bJumpRequested || bRollRequested || bSlideRequested || bJabRequested || bPunchRequested
 		|| StateMachine.GetCurrentStateIndex() != LocomotionState;
 }
 

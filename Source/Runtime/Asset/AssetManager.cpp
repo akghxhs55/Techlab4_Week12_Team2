@@ -377,6 +377,9 @@ void UAssetManager::CreateDefaultMeshes()
 	FStaticMeshData* RingMeshData = FGeometryGenerator::GetMeshData("Ring");
 	RegisterAsset("Ring", CreateStaticMesh(RingMeshData));
 
+	FStaticMeshData* TorusData = FGeometryGenerator::GetMeshData("Torus");
+	RegisterAsset("Torus", CreateStaticMesh(TorusData));
+
 	FStaticMeshData* ScaleBarData = FGeometryGenerator::GetMeshData("ScaleBar");
 	RegisterAsset("ScaleBar", CreateStaticMesh(ScaleBarData));
 
@@ -741,6 +744,8 @@ namespace
 				return false;
 			}
 			Material->BaseColor = Slot.BaseColor;
+			// 임포트 메쉬의 UV는 0~1 밖의 타일을 쓰는 경우가 많아 반복 샘플링을 기본으로 한다.
+			Material->SamplerState = ESamplerState::LinearWrap;
 			if (Material->BaseColor.W < 1.0f)
 			{
 				Material->BlendState = EBlendState::AlphaBlend;

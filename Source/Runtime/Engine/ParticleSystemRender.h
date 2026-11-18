@@ -56,7 +56,8 @@ struct FDynamicEmitterReplayDataBase
 		return bUseLocalSpace ? LocalToWorld.TransformPosition(Position) : Position;
 	}
 
-	// 시뮬레이션의 ParticleHelper::ForEachParticle과 같은 순서로 Freeze를 건너뛴다
+	// 시뮬레이션의 ParticleHelper::ForEachParticle과 같은 순서로 돈다.
+	// Freeze는 갱신만 멈추는 상태라 그리기에서는 건너뛰지 않는다 (멈춘 자리에 계속 보여야 한다)
 	template <typename FuncType>
 	void ForEachParticle(FuncType&& Func) const;
 };

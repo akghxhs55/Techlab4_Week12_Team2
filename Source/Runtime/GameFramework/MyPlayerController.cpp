@@ -13,9 +13,22 @@ void AMyPlayerController::InputKey(int32 Key, bool bDown)
 
 	if (Key == static_cast<int32>(EKeyCode::LButton))
 	{
-		if (AMyCharacter* MyCharacter = Cast<AMyCharacter>(GetPawn()))
+		// Kurisu는 좌클릭 잽, 다른 캐릭터는 기존 공격
+		if (AKurisuCharacter* Kurisu = Cast<AKurisuCharacter>(GetPawn()))
+		{
+			Kurisu->Jab();
+		}
+		else if (AMyCharacter* MyCharacter = Cast<AMyCharacter>(GetPawn()))
 		{
 			MyCharacter->Attack();
+		}
+	}
+
+	if (Key == static_cast<int32>(EKeyCode::RButton))
+	{
+		if (AKurisuCharacter* Kurisu = Cast<AKurisuCharacter>(GetPawn()))
+		{
+			Kurisu->Punch();
 		}
 	}
 
@@ -27,10 +40,16 @@ void AMyPlayerController::InputKey(int32 Key, bool bDown)
 		}
 	}
 
-	// Kurisu 슬라이드: E. Shift(짧게 구르기 / 길게 Run)와 C(걷기)는 캐릭터 Tick이 키 상태를 읽는다
+	// Kurisu 슬라이드: E / 구르기: R. Shift(Run)는 캐릭터 Tick이 키 상태를 읽는다
 	if (Key == static_cast<int32>(EKeyCode::E))
 	{
 		if (AKurisuCharacter* Kurisu = Cast<AKurisuCharacter>(GetPawn()))
 			Kurisu->Slide();
+	}
+
+	if (Key == static_cast<int32>(EKeyCode::R))
+	{
+		if (AKurisuCharacter* Kurisu = Cast<AKurisuCharacter>(GetPawn()))
+			Kurisu->Roll();
 	}
 }

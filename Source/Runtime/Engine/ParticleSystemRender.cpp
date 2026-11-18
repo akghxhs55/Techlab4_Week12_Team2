@@ -20,8 +20,6 @@ void FDynamicEmitterReplayDataBase::ForEachParticle(FuncType&& Func) const
 	{
 		const uint8* ParticleBase = Data + ParticleIndices[i] * ParticleStride;
 		const FBaseParticle& Particle = *reinterpret_cast<const FBaseParticle*>(ParticleBase);
-		if (Particle.Flags & STATE_Particle_Freeze)
-			continue;
 		Func(Particle, ParticleBase);
 	}
 }

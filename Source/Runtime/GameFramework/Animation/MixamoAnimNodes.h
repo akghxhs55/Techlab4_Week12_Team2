@@ -32,6 +32,8 @@ struct FAnimNode_MixamoSequencePlayer : public FAnimNode_SequencePlayer
 	// 이 구간 동안 루트가 AirborneStartTime 높이보다 올라간 만큼 포즈에서 뺀다. 그 높이는 캡슐(물리 점프)이 대신 낸다
 	float AirborneStartTime = -1.0f;
 	float AirborneEndTime = -1.0f;
+	// 뒤로 가는 루트 모션은 버린다 (준비 동작에서 뒤로 무르는 걸음 때문에 달리다 뒤로 끌려가지 않게)
+	bool bForwardRootMotionOnly = false;
 
 	void Initialize(const FAnimationInitializeContext& Context) override;
 	void Update(const FAnimationUpdateContext& Context) override;
