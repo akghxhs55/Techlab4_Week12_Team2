@@ -128,6 +128,10 @@ void UParticleModuleCollision::Update(FParticleEmitterInstance& Owner, int32 Off
 			const bool bFirstHit = (Particle.Flags & STATE_Particle_CollisionHasOccurred) == 0;
 			const bool bLastHit = MaxCollisions > 0 && Payload.UsedCollisions == 1;
 			Owner.ReportCollisionEvent(Particle, Owner.SimulationToWorld(HitPoint), Hit.Normal, T, Hit.HitComponent, bFirstHit, bLastHit);
+			if (UParticleSystemComponent::bShowCollisions)
+			{
+				Owner.Component->AddDebugCollision(Owner.SimulationToWorld(HitPoint), Hit.Normal);
+			}
 
 			// V' = Vt × (1 − 마찰) − Vn × 반발계수
 			const FVector Velocity = Particle.Velocity;

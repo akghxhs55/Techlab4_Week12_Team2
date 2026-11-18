@@ -904,6 +904,15 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
+	Add("p.ShowCollisions", "p.ShowCollisions [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, UParticleSystemComponent::bShowCollisions, bOn)) return false;
+			UParticleSystemComponent::bShowCollisions = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.ShowCollisions = {}", bOn ? 1 : 0);
+			return true;
+		});
+
 	// 디버그: 모든 파티클 컴포넌트의 OnParticleCollide에 테스트 콜백을 건다
 	//  log            : 30번째 충돌마다 로그
 	//  clear-template : 첫 충돌 콜백 안에서 SetTemplate(nullptr) (콜백 중 컴포넌트 변경이 안전한지)
@@ -1036,6 +1045,7 @@ void FOutputLogPanel::RegisterCommands()
 	RegisterSuggestion("CVar", "p.ShowLOD", "p.ShowLOD", "[0|1] Draw LOD distance spheres for all particles", true);
 	RegisterSuggestion("Cmd", "p.LODInfo", "p.LODInfo", "Print LOD, camera distance, particle count");
 	RegisterSuggestion("CVar", "p.LogEvents", "p.LogEvents", "[0|1] Log particle event counts (needs EventGenerator)", true);
+	RegisterSuggestion("CVar", "p.ShowCollisions", "p.ShowCollisions", "[0|1] Draw particle collision points and normals", true);
 	RegisterSuggestion("Cmd", "p.BindCollide log", "p.BindCollide log", "Log OnParticleCollide callbacks");
 	RegisterSuggestion("Cmd", "p.BindCollide clear-template", "p.BindCollide clear-template", "SetTemplate(nullptr) inside the callback");
 	RegisterSuggestion("Cmd", "p.BindCollide off", "p.BindCollide off", "Remove test callbacks");

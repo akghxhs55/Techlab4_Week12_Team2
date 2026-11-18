@@ -169,6 +169,16 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	// 이벤트 버퍼는 여기서 비우지 않는다. 지난 Tick의 배달 중에 생긴 이벤트(Receiver가 생성한 파티클의 Spawn 등)가
 	// 이번 Tick에 이어서 배달돼야 한다. 배달한 이벤트는 DispatchEvents가 버퍼에서 꺼낸다
 
+	// 디버그 충돌 표시는 잠깐 남겼다가 사라진다
+	for (int32 i = DebugCollisions.Num() - 1; i >= 0; --i)
+	{
+		DebugCollisions[i].TimeLeft -= DeltaTime;
+		if (DebugCollisions[i].TimeLeft <= 0.0f)
+		{
+			DebugCollisions.RemoveAt(static_cast<uint32>(i));
+		}
+	}
+
 	if (EmitterInstances.IsEmpty())
 		return;
 
@@ -261,6 +271,16 @@ void UParticleSystemComponent::BroadcastGameEvents()
 }
 
 bool UParticleSystemComponent::bLogEvents = false;
+bool UParticleSystemComponent::bShowCollisions = false;
+
+void UParticleSystemComponent::AddDebugCollision(const FVector& WorldLocation, const FVector& WorldNormal)
+{
+	// 파티클이 많아도 선이 넘치지 않게 개수를 제한한다
+	constexpr int32 MaxDebugCollisions = 256;
+	if (DebugCollisions.Num() >= MaxDebugCollisions)
+		return;
+	DebugCollisions.Add({ WorldLocation, WorldNormal, 0.5f });
+}
 
 int32 UParticleSystemComponent::GetEmitterIndex(const FParticleEmitterInstance* Instance) const
 {
@@ -622,6 +642,22 @@ void DrawParticleSystems(UWorld* World, FLineBatcher* LineBatcher, const AActor*
 					LineBatcher->AddLine(P - FVector(0, HalfLength, 0), P + FVector(0, HalfLength, 0), Color);
 					LineBatcher->AddLine(P - FVector(0, 0, HalfLength), P + FVector(0, 0, HalfLength), Color);
 				});
+		}
+
+		// 충돌 지점(빨간 십자)과 법선(초록 선)
+		if (UParticleSystemComponent::bShowCollisions)
+		{
+			const FVector4 HitColor(1.0f, 0.2f, 0.2f, 1.0f);
+			const FVector4 NormalColor(0.2f, 1.0f, 0.3f, 1.0f);
+			constexpr float Cross = 4.0f;
+			constexpr float NormalLength = 20.0f;
+			for (const UParticleSystemComponent::FDebugCollision& Hit : PSC->GetDebugCollisions())
+			{
+				const FVector& P = Hit.Location;
+				LineBatcher->AddLine(P - FVector(Cross, 0, 0), P + FVector(Cross, 0, 0), HitColor);
+				LineBatcher->AddLine(P - FVector(0, Cross, 0), P + FVector(0, Cross, 0), HitColor);
+				LineBatcher->AddLine(P, P + Hit.Normal * NormalLength, NormalColor);
+			}
 		}
 	}
 }

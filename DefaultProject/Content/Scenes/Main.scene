@@ -116,7 +116,7 @@
                             "Name": "UParticleSystemComponent",
                             "Parent": "",
                             "Properties": {
-                                "Template": "Particles/DefaultTest_Collision.particle",
+                                "Template": "Particles/DefaultTest_SplashLOD.particle",
                                 "Transform": {
                                     "Location": {
                                         "X": 0.0,

@@ -24,6 +24,9 @@ public:
 	// 배달 단계에서 이 모듈을 가진 에미터 인스턴스(Owner)로 부른다
 	virtual void ProcessEvent(FParticleEmitterInstance& Owner, const FParticleEventData& Event) {}
 
+	EParticleEventType GetEventGeneratorType() const { return EventGeneratorType; }
+	const FString& GetEventName() const { return EventName; }
+
 protected:
 	UPROPERTY(EditAnywhere)
 	EParticleEventType EventGeneratorType = EParticleEventType::Any;

@@ -81,6 +81,17 @@ public:
 	// 디버그: 이벤트 수를 1초마다 로그 (콘솔 p.LogEvents)
 	static bool bLogEvents;
 
+	// 디버그: 충돌 지점과 법선을 잠깐 그린다 (콘솔 p.ShowCollisions). Generator 없이도 기록된다
+	static bool bShowCollisions;
+	struct FDebugCollision
+	{
+		FVector Location;
+		FVector Normal;
+		float TimeLeft;
+	};
+	void AddDebugCollision(const FVector& WorldLocation, const FVector& WorldNormal);
+	const TArray<FDebugCollision>& GetDebugCollisions() const { return DebugCollisions; }
+
 	// Receiver 배달이 끝난 뒤 Tick의 맨 마지막에 부른다.
 	// 콜백 안에서 SetTemplate·Deactivate·액터 파괴를 해도 된다 (이후 이 컴포넌트를 건드리지 않는다)
 	FOnParticleSpawnSignature OnParticleSpawn;
@@ -131,6 +142,8 @@ private:
 	TArray<FParticleEventDeathData> DispatchingDeathEvents;
 	TArray<FParticleEventCollisionData> DispatchingCollisionEvents;
 	TArray<FParticleEventBurstData> DispatchingBurstEvents;
+
+	TArray<FDebugCollision> DebugCollisions;
 
 	// p.LogEvents용 누적 ("종류:이름" → 개수). 템플릿이 바뀌면 비운다
 	float EventLogTimer = 0.0f;

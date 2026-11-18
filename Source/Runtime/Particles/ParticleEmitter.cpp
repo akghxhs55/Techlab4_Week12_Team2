@@ -7,6 +7,8 @@
 #include "Module/ParticleModuleRequired.h"
 #include "Module/ParticleModuleSpawn.h"
 #include "Module/ParticleModuleTypeDataBase.h"
+#include "Module/ParticleModuleEventGenerator.h"
+#include "Module/ParticleModuleEventReceiverBase.h"
 
 FParticleEmitterInstance* UParticleEmitter::CreateInstance(UParticleSystemComponent* InComponent)
 {
@@ -157,6 +159,32 @@ void UParticleEmitter::ValidateLODLevels() const
 			if (!IsSameModuleSlot(HighModules[i], Modules[i]))
 			{
 				KRS_LOG(Warning, "Particle LOD {} module {} does not match LOD 0", LODIndex, i);
+				continue;
+			}
+
+			// 이벤트 이름·종류가 LOD마다 다르면 전환 순간 Receiver가 이벤트를 놓친다. 양(Frequency·SpawnCount)만 바꾼다
+			if (const auto* HighGen = Cast<UParticleModuleEventGenerator>(HighModules[i]))
+			{
+				const auto* Gen = Cast<UParticleModuleEventGenerator>(Modules[i]);
+				const auto& HighEvents = HighGen->GetEvents();
+				const auto& Events = Gen->GetEvents();
+				bool bSame = HighEvents.Num() == Events.Num();
+				for (int32 e = 0; bSame && e < Events.Num(); ++e)
+				{
+					bSame = HighEvents[e].Type == Events[e].Type && HighEvents[e].CustomName == Events[e].CustomName;
+				}
+				if (!bSame)
+				{
+					KRS_LOG(Warning, "Particle LOD {} event generator {} differs from LOD 0 (types/names must match)", LODIndex, i);
+				}
+			}
+			else if (const auto* HighRecv = Cast<UParticleModuleEventReceiverBase>(HighModules[i]))
+			{
+				const auto* Recv = Cast<UParticleModuleEventReceiverBase>(Modules[i]);
+				if (HighRecv->GetEventGeneratorType() != Recv->GetEventGeneratorType() || HighRecv->GetEventName() != Recv->GetEventName())
+				{
+					KRS_LOG(Warning, "Particle LOD {} event receiver {} filter differs from LOD 0", LODIndex, i);
+				}
 			}
 		}
 
