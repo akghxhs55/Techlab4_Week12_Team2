@@ -22,9 +22,9 @@ public:
 	const char* GetEditorTypeName() const override { return "ParticleSystem"; }
 
 	void SetViewportState(uint32 Width, uint32 Height, const FViewportCameraInput& Input);
-	void FocusPreview() const;
+	void FocusPreview();
 
-	void RestartSimulation() const;
+	void RestartSimulation();
 
 	bool IsSimulationPaused() const { return bSimulationPaused; }
 	void SetSimulationPaused(bool bPaused) { bSimulationPaused = bPaused; }
@@ -93,7 +93,7 @@ private:
 	int32 GetSelectedModuleSlot() const;
 	void ResolveSelectedModule(int32 Slot);
 	void ClampCurrentLOD();
-	void ApplyPreviewLOD() const;
+	void ApplyPreviewLOD();
 	void UpdateOrbitPreview(float DeltaTime);
 
 	UParticleSystem* OriginalAsset = nullptr;

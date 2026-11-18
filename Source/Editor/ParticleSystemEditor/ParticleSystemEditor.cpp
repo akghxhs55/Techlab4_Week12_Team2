@@ -193,7 +193,7 @@ void FParticleSystemEditor::SetViewportState(uint32 Width, uint32 Height, const 
 	CameraInput = Input;
 }
 
-void FParticleSystemEditor::FocusPreview() const
+void FParticleSystemEditor::FocusPreview()
 {
 	if (!ViewportClient || !PreviewComponent)
 	{
@@ -202,19 +202,27 @@ void FParticleSystemEditor::FocusPreview() const
 
 	constexpr float MinFocusRadius = 100.0f;
 
-	const FBox& Box = PreviewComponent->CalcLocalBounds();
+	// 카메라는 월드 좌표로 맞추므로 월드 바운드를 쓴다 (오빗 중에는 컴포넌트가 원점에 있지 않다)
+	FBox Box = PreviewComponent->CalcBounds();
+	if (bOrbitPreview)
+	{
+		// 오빗 원 전체가 화면에 들어오도록 원의 바운드를 합친다
+		const FVector OrbitCenter = PreviewComponent->GetWorldLocation() - PreviewComponent->GetRelativeLocation();
+		const FVector OrbitExtent(OrbitRadius, OrbitRadius, 0.0f);
+		Box.Expand(FBox(OrbitCenter - OrbitExtent, OrbitCenter + OrbitExtent));
+	}
 	const FVector Extent = (Box.Max - Box.Min) * 0.5f;
 	FBoxSphereBounds Bound
 	{
 		.Origin = (Box.Min + Box.Max) * 0.5f,
 		.BoxExtent = Extent,
-		.SphereRadius = FMath::Max(Extent.Size() + (bOrbitPreview ? OrbitRadius : 0.0f), MinFocusRadius),
+		.SphereRadius = FMath::Max(Extent.Size(), MinFocusRadius),
 	};
 
 	ViewportClient->FocusOnBounds(Bound);
 }
 
-void FParticleSystemEditor::RestartSimulation() const
+void FParticleSystemEditor::RestartSimulation()
 {
 	if (PreviewComponent)
 	{
@@ -302,7 +310,7 @@ void FParticleSystemEditor::ResolveSelectedModule(int32 Slot)
 	SelectedModule = GetModuleAtSlot(GetCurrentLODLevel(SelectedEmitter), Slot);
 }
 
-void FParticleSystemEditor::ApplyPreviewLOD() const
+void FParticleSystemEditor::ApplyPreviewLOD()
 {
 	if (PreviewComponent)
 	{
@@ -516,6 +524,27 @@ void FParticleSystemEditor::SetTypeData(const UParticleEmitter* Emitter, UClass*
 		return;
 	}
 
+	// 모든 LOD가 이미 같은 종류면 다시 만들지 않는다 (기존 설정 유지)
+	bool bAlreadySet = true;
+	for (const UParticleLODLevel* LODLevel : Emitter->GetLODLevels())
+	{
+		if (!LODLevel)
+		{
+			continue;
+		}
+		const UParticleModuleTypeDataBase* Current = LODLevel->GetTypeDataModule();
+		const UClass* CurrentClass = Current ? Current->GetClass() : nullptr;
+		if (CurrentClass != TypeDataClass)
+		{
+			bAlreadySet = false;
+			break;
+		}
+	}
+	if (bAlreadySet)
+	{
+		return;
+	}
+
 	TArray<UParticleModule*> Removed;
 	for (UParticleLODLevel* LODLevel : Emitter->GetLODLevels())
 	{
@@ -567,7 +596,9 @@ bool FParticleSystemEditor::Save()
 	}
 	if (!OriginalAsset->CopyContentsFrom(*WorkingCopy, Error))
 	{
-		KRS_LOG(Warning, "Saved, but failed to update loaded asset: {}", Error);
+		// 파일은 썼지만 로드된 에셋이 옛 내용이다. Revert가 옛 내용으로 돌아가지 않도록 dirty를 유지한다
+		KRS_LOG(Warning, "Saved, but failed to update loaded asset: {} ({})", GetAssetPath(), Error);
+		return false;
 	}
 
 	bDirty = false;

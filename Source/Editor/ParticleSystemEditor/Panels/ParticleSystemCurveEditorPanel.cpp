@@ -131,7 +131,8 @@ void FParticleSystemCurveEditorPanel::CollectModuleTracks(UParticleModule* Modul
 			}
 
 			void* ValuePtr = StructProp->ContainerPtrToValuePtr(Module);
-			const FString BaseId = std::to_string(reinterpret_cast<uintptr_t>(Module)) + "/" + Property->GetName();
+			// 주소는 삭제 후 새 모듈에 재사용될 수 있어 선택·숨김 상태가 엉뚱한 커브로 옮겨 붙는다. 재사용되지 않는 UUID를 쓴다
+			const FString BaseId = std::to_string(Module->GetUUID()) + "/" + Property->GetName();
 
 			auto AddTrack = [&](TArray<FFloatCurveKey>& Keys, const char* Suffix, ImU32 Color)
 			{
