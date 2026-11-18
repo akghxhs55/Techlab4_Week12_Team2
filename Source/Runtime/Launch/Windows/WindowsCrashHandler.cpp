@@ -69,6 +69,7 @@ static bool WriteCrashDump(const wchar_t* DumpPath, EXCEPTION_POINTERS* Exceptio
         return false;
     }
 
+
     MINIDUMP_EXCEPTION_INFORMATION ExceptionInfo{};
     ExceptionInfo.ThreadId = GetCurrentThreadId();
     ExceptionInfo.ExceptionPointers = ExceptionPointers;

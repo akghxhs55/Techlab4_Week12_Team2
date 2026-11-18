@@ -96,7 +96,8 @@ function CommonSettings()
 end
 
 local function ConfigureSourceLink()
-	local Script = ProjectRoot .. "/Setup/Build/GenerateSourceLink.ps1"
+	-- 크래시 분석 도구 폴더의 스크립트를 빌드 전에 실행해 소스 매핑을 만든다.
+	local Script = ProjectRoot .. "/Setup/CrashDump/GenerateSourceLink.ps1"
 	local Json = "$(IntDir)sourcelink.json"
 
 	-- 프로젝트와 빌드 구성별로 JSON을 만든 뒤 최종 EXE의 PDB에 매핑을 넣는다.

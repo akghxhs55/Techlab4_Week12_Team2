@@ -1,7 +1,8 @@
-#requires -Version 5.1
+﻿#requires -Version 5.1
 param([Parameter(Mandatory)][string]$OutputPath)
 
 $ErrorActionPreference = 'Stop'
+# Setup\CrashDump 기준으로 두 단계 위를 구해 빌드 PC의 프로젝트 경로를 찾는다.
 $RepoRoot = (Resolve-Path -LiteralPath "$PSScriptRoot\..\..").Path
 
 # origin의 HTTPS 또는 SSH 주소에서 GitHub의 OWNER/REPO를 구한다.

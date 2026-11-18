@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<UserSettings>
+  <ApplicationIdentity version="18.0" />
+  <ToolsOptions />
+  <Category name="Debugger" Category="{EEDBF29A-5C8B-4E01-827C-263382C18CFE}" Package="{C9DD4A57-47FB-11D2-83E7-00C04F9902C1}" RegisteredName="Debugger" PackageName="Visual Studio Debugger">
+    <!--PDB에 기록된 Source Link로 빌드 당시 GitHub 소스를 조회한다.-->
+    <PropertyValue name="UseSourceLink">1</PropertyValue>
+    <!--팀 SymStore 공유 경로를 사용한다.-->
+    <PropertyValue name="SymbolPath">\\172.21.10.22\KurisuSymbols</PropertyValue>
+    <!--등록한 공유 심볼 경로를 활성화한다.-->
+    <PropertyValue name="SymbolPathState">1</PropertyValue>
+    <!--서버에서 받은 파일을 현재 PC의 이 경로에 캐시한다.-->
+    <PropertyValue name="SymbolCacheDir">C:\KurisuSymbolCache</PropertyValue>
+  </Category>
+</UserSettings>
