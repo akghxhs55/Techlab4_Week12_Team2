@@ -1292,6 +1292,12 @@ namespace
 
 	bool DrawPropertyRow(UObject* Object, void* Container, const FProperty& Property, ImFont* CustomFont);
 
+	TMap<const UScriptStruct*, FPropertyEditor::FStructDrawer>& GetStructDrawers()
+	{
+		static TMap<const UScriptStruct*, FPropertyEditor::FStructDrawer> Drawers;
+		return Drawers;
+	}
+
 	// 프로퍼티 타입에 맞는 위젯 하나를 그린다. 값이 바뀌면 true
 	// UE도 FProperty는 위젯을 모르고, 에디터(PropertyEditor 모듈)가 CastField로 타입을 보고 위젯을 고른다.
 	bool DrawPropertyValue(UObject* Object, const FProperty& Property, void* ValuePtr, const char* Label, ImFont* CustomFont)
@@ -1485,6 +1491,14 @@ namespace
 			// USTRUCT: 구조체의 프로퍼티를 한 단계 들여 그린다. 컨테이너가 객체가 아니라 이 멤버의 주소다.
 			ImGui::Indent();
 			ImGui::PushID(Label);
+
+			if (const FPropertyEditor::FStructDrawer* Drawer = GetStructDrawers().Find(StructProperty->Struct))
+			{
+				const bool bCustomChanged = (*Drawer)(Object, ValuePtr, *StructProperty->Struct, CustomFont);
+				ImGui::PopID();
+				ImGui::Unindent();
+				return bCustomChanged;
+			}
 
 			TArray<const UStruct*> StructChain;
 			for (const UStruct* Struct = StructProperty->Struct; Struct; Struct = Struct->GetSuperStruct())
@@ -2813,6 +2827,30 @@ namespace
 // 보조 함수들이 이 파일의 익명 네임스페이스에 있어 구현은 옮기지 않고 넘겨 준다.
 namespace FPropertyEditor
 {
+	void RegisterStructDrawer(const UScriptStruct* Struct, FStructDrawer Drawer)
+	{
+		if (Struct && Drawer)
+		{
+			GetStructDrawers().Add(Struct, Drawer);
+		}
+	}
+
+	bool DrawStructMember(UObject* Owner, void* StructPtr, const UScriptStruct& Struct, const char* MemberName, ImFont* CustomFont)
+	{
+		const FProperty* Member = Struct.FindPropertyByName(MemberName);
+		if (!Member)
+		{
+			ImGui::TextDisabled("(Missing %s)", MemberName);
+			return false;
+		}
+
+		const bool bReadOnly = Member->HasAnyFlags(CPF_EditConst);
+		if (bReadOnly) ImGui::BeginDisabled();
+		const bool bChanged = DrawPropertyRow(Owner, StructPtr, *Member, CustomFont);
+		if (bReadOnly) ImGui::EndDisabled();
+		return bChanged;
+	}
+
 	bool DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont)
 	{
 		return ::DrawProperty(Object, Property, CustomFont);
