@@ -15,7 +15,7 @@ public:
 	FString IdleAnimationPath = "FBX/Strike_Freedom/Strike_Freedom.anim.bin";
 
 	UPROPERTY(EditAnywhere)
-	FString ShootAnimationPath = "FBX/Strike_Freedom/Strike_Freedom_Shoot.anim.bin";
+	FString ShootAnimationPath = "FBX/Strike_Freedom_Shoot/Strike_Freedom_Shoot.anim.bin";
 
 	void RequestShoot();
 

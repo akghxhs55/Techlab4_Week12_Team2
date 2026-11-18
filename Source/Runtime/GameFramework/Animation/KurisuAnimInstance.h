@@ -18,7 +18,7 @@ class UKurisuAnimInstance : public UAnimInstance
 
 public:
 	UPROPERTY(EditAnywhere)
-	FString IdleAnimationPath = "FBX/Idle/Idle.anim.bin";
+	FString IdleAnimationPath = "FBX/Kurisu_Idle/Kurisu_Idle.anim.bin";
 	UPROPERTY(EditAnywhere)
 	FString WalkAnimationPath = "FBX/Kurisu_Walking/Kurisu_Walking.anim.bin";
 	UPROPERTY(EditAnywhere)
