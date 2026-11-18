@@ -7,6 +7,7 @@
 #include "Module/ParticleModuleRequired.h"
 #include "Module/ParticleModuleSpawn.h"
 #include "Module/ParticleModuleSubUV.h"
+#include "Module/ParticleModuleEventGenerator.h"
 
 #include "Components/ParticleSystemComponent.h"
 
@@ -119,12 +120,22 @@ bool FParticleEmitterInstance::Resize(int32 NewMaxActiveParticles)
 
 void FParticleEmitterInstance::KillParticles()
 {
+	const bool bReportDeath = WantsEvent(EParticleEventType::Death);
 	for (int32 i = ActiveParticles - 1; i >= 0; i--)
 	{
 		uint16 SlotIndex = ParticleIndices[i];
 		FBaseParticle* Particle = GetParticle(SlotIndex);
 		if (Particle->RelativeTime > 1.0f)
 		{
+			// swap 뒤에는 이 칸을 다른 파티클이 재사용하므로 지우기 전에 값을 복사해 둔다
+			if (bReportDeath)
+			{
+				FParticleEventDeathData Event;
+				FillEventData(Event, EParticleEventType::Death, *Particle);
+				Event.ParticleTime = Particle->OneOverMaxLifetime > 0.0f ? Particle->RelativeTime / Particle->OneOverMaxLifetime : 0.0f;
+				SendEvent(Event, &UParticleSystemComponent::ReportEventDeath);
+			}
+
 			uint16 DeadIndex = ParticleIndices[i];
 			ParticleIndices[i] = ParticleIndices[ActiveParticles - 1];
 			ParticleIndices[ActiveParticles - 1] = DeadIndex;
@@ -165,6 +176,7 @@ void FParticleEmitterInstance::PostSpawn(FBaseParticle* Particle, float SpawnTim
 void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, float Increment)
 {
 	const FVector Origin = GetEmitterOrigin();
+	const bool bReportSpawn = WantsEvent(EParticleEventType::Spawn);
 
 	for (int32 i = 0; i < Count; i++)
 	{
@@ -181,6 +193,13 @@ void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, floa
 		}
 		PostSpawn(Particle, SpawnTime);
 		ActiveParticles++;
+
+		if (bReportSpawn)
+		{
+			FParticleEventSpawnData Event;
+			FillEventData(Event, EParticleEventType::Spawn, *Particle);
+			SendEvent(Event, &UParticleSystemComponent::ReportEventSpawn);
+		}
 	}
 }
 
@@ -224,6 +243,87 @@ FVector FParticleEmitterInstance::EmitterToSimulationVector(const FVector& Emitt
 		return EmitterVector;
 	}
 	return Component->GetWorldMatrix().TransformVector(EmitterVector);
+}
+
+FVector FParticleEmitterInstance::SimulationToWorldVector(const FVector& SimulationVector) const
+{
+	if (IsLocalSpace() && Component)
+	{
+		return Component->GetWorldMatrix().TransformVector(SimulationVector);
+	}
+	return SimulationVector;
+}
+
+bool FParticleEmitterInstance::WantsEvent(EParticleEventType Type) const
+{
+	if (Component == nullptr || CurrentLODLevel == nullptr)
+		return false;
+	const UParticleModuleEventGenerator* Generator = CurrentLODLevel->GetEventGenerator();
+	return Generator && Generator->IsEnabled() && Generator->HasEvent(Type);
+}
+
+template <typename TEvent>
+void FParticleEmitterInstance::SendEvent(TEvent& Event, void (UParticleSystemComponent::*Report)(const TEvent&), bool bFirstHit, bool bLastHit)
+{
+	const UParticleModuleEventGenerator* Generator = CurrentLODLevel ? CurrentLODLevel->GetEventGenerator() : nullptr;
+	if (Component == nullptr || Generator == nullptr || !Generator->IsEnabled())
+		return;
+
+	const TArray<FParticleEventGeneratorInfo>& Infos = Generator->GetEvents();
+	if (EventCounters.Num() != Infos.Num())
+	{
+		EventCounters.Init(0, Infos.Num());
+	}
+
+	// 같은 종류의 설정이 여러 개면 설정마다 하나씩 (이름이 다른 이벤트로) 보낸다
+	for (int32 i = 0; i < Infos.Num(); ++i)
+	{
+		const FParticleEventGeneratorInfo& Info = Infos[i];
+		if (Info.Type != Event.Type)
+			continue;
+		if (Event.Type == EParticleEventType::Collision)
+		{
+			if (Info.bFirstTimeOnly && !bFirstHit)
+				continue;
+			if (Info.bLastTimeOnly && !bLastHit)
+				continue;
+		}
+
+		const int32 Frequency = Info.Frequency > 1 ? Info.Frequency : 1;
+		if ((EventCounters[i]++ % Frequency) != 0)
+			continue;
+
+		Event.EventName = Generator->GetEventName(i);
+		Event.CustomData = Info.CustomData;
+		(Component->*Report)(Event);
+	}
+}
+
+void FParticleEmitterInstance::FillEventData(FParticleEventData& OutEvent, EParticleEventType Type, const FBaseParticle& Particle) const
+{
+	OutEvent.Type = Type;
+	OutEvent.EmitterIndex = Component ? Component->GetEmitterIndex(this) : -1;
+	OutEvent.EmitterTime = EmitterTime;
+	OutEvent.Location = SimulationToWorld(Particle.Location);
+	OutEvent.Velocity = SimulationToWorldVector(Particle.Velocity);
+	OutEvent.Direction = OutEvent.Velocity.GetSafeNormal();
+}
+
+void FParticleEmitterInstance::ReportCollisionEvent(const FBaseParticle& Particle, const FVector& WorldLocation,
+	const FVector& WorldNormal, float Time, UPrimitiveComponent* HitComponent, bool bFirstHit, bool bLastHit)
+{
+	if (!WantsEvent(EParticleEventType::Collision))
+		return;
+
+	FParticleEventCollisionData Event;
+	FillEventData(Event, EParticleEventType::Collision, Particle);
+	Event.Location = WorldLocation;
+	Event.Normal = WorldNormal;
+	Event.Time = Time;
+	Event.ParticleTime = Particle.OneOverMaxLifetime > 0.0f ? Particle.RelativeTime / Particle.OneOverMaxLifetime : 0.0f;
+	Event.HitComponent = HitComponent;
+	Event.HitActor = HitComponent ? HitComponent->GetOwner() : nullptr;
+	SendEvent(Event, &UParticleSystemComponent::ReportEventCollision, bFirstHit, bLastHit);
 }
 
 FVector FParticleEmitterInstance::WorldToSimulationVector(const FVector& WorldVector) const
@@ -277,6 +377,17 @@ int32 FParticleEmitterInstance::ComputeBurstCount()
 			const int32 Count = SpawnModule->GetBurstCount(i, RandomStream);
 			Total += Count;
 			BurstFired[i] = 1;
+			if (WantsEvent(EParticleEventType::Burst))
+			{
+				// 에미터 단위 이벤트라 위치는 에미터 원점
+				FParticleEventBurstData Event;
+				Event.Type = EParticleEventType::Burst;
+				Event.EmitterIndex = Component->GetEmitterIndex(this);
+				Event.EmitterTime = EmitterTime;
+				Event.Location = Component->GetWorldLocation();
+				Event.ParticleCount = Count;
+				SendEvent(Event, &UParticleSystemComponent::ReportEventBurst);
+			}
 			if (bLogBursts)
 			{
 				KRS_LOG(Info, "Particle burst {} fired {} (LOD {}, loop {}, time {:.2f})", i, Count, CurrentLODIndex, LoopCount, EmitterTime);

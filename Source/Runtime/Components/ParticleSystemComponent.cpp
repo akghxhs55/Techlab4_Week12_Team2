@@ -11,6 +11,8 @@
 #include "Engine/Scene.h"
 #include "Engine/World.h"
 #include "Engine/ParticleSystemSceneProxy.h"
+#include "Particles/ParticleLODLevel.h"
+#include "Particles/Module/ParticleModuleEventReceiverBase.h"
 
 UParticleSystemComponent::UParticleSystemComponent()
 {
@@ -62,6 +64,7 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 	{
 		Template = InTemplate;
 	}
+	InitializedTemplate = Template;
 	if (!Template)
 		return;
 
@@ -75,6 +78,10 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 		}
 	}
 	bWasCompleted = false;
+
+	// 이전 템플릿에서 쌓인 이벤트와 로그 누적이 새 템플릿 이름으로 찍히지 않게 비운다
+	ClearEvents();
+	ResetEventLog();
 
 	// 새 인스턴스는 LOD 0으로 시작하므로 지금 LOD를 다시 적용한다 (DirectSet 값, 미리보기 유지)
 	ApplyLODLevel(IsPreviewLODActive() ? PreviewLODOverride : LODLevel);
@@ -106,7 +113,8 @@ void UParticleSystemComponent::SetTemplate(UParticleSystem* NewTemplate)
 
 void UParticleSystemComponent::ActivateSystem(bool bReset)
 {
-	if (EmitterInstances.IsEmpty() || bReset)
+	// 인스턴스가 다른 템플릿으로 만들어졌으면(씬 로드로 Template만 바뀐 경우 등) 다시 만든다
+	if (EmitterInstances.IsEmpty() || bReset || InitializedTemplate != Template)
 	{
 		InitializeSystem();
 	}
@@ -156,6 +164,9 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 {
 	Super::TickComponent(DeltaTime);
 
+	// 이벤트 버퍼는 여기서 비우지 않는다. 지난 Tick의 배달 중에 생긴 이벤트(Receiver가 생성한 파티클의 Spawn 등)가
+	// 이번 Tick에 이어서 배달돼야 한다. 배달한 이벤트는 DispatchEvents가 버퍼에서 꺼낸다
+
 	if (EmitterInstances.IsEmpty())
 		return;
 
@@ -173,11 +184,137 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	}
 	bWasCompleted = bAllComplete;
 
+	if (bLogEvents)
+	{
+		LogEventCounts(DeltaTime);
+	}
+
+	// 모든 에미터 Tick이 끝난 뒤에 배달한다. 순회 중인 파티클 배열을 Receiver가 건드리지 않게
+	const int32 Delivered = DispatchEvents();
+	if (bLogEvents && Delivered > 0)
+	{
+		LoggedEventCounts["Delivered"] += Delivered;
+	}
+
 	// 바운드는 Transform이 바뀔 때만 갱신되므로 매 프레임 요청
 	if (FPrimitiveSceneProxy* Proxy = GetSceneProxy())
 	{
 		Proxy->GetScene()->MarkDirty(Proxy);
 	}
+}
+
+bool UParticleSystemComponent::bLogEvents = false;
+
+int32 UParticleSystemComponent::GetEmitterIndex(const FParticleEmitterInstance* Instance) const
+{
+	for (int32 i = 0; i < EmitterInstances.Num(); ++i)
+	{
+		if (EmitterInstances[i] == Instance)
+			return i;
+	}
+	return -1;
+}
+
+int32 UParticleSystemComponent::DispatchEvents()
+{
+	if (SpawnEvents.IsEmpty() && DeathEvents.IsEmpty() && CollisionEvents.IsEmpty() && BurstEvents.IsEmpty())
+		return 0;
+
+	// 배달할 목록을 꺼내고 버퍼를 비운다. 배달 중에 새로 생긴 이벤트는 버퍼에 쌓여 다음 Tick에 배달된다
+	// (A → B → C 연쇄가 한 프레임에 한 단계씩만 진행되어, 서로를 계속 부르는 설정이어도 한 프레임에 끝난다)
+	DispatchingSpawnEvents = SpawnEvents;
+	DispatchingDeathEvents = DeathEvents;
+	DispatchingCollisionEvents = CollisionEvents;
+	DispatchingBurstEvents = BurstEvents;
+	ClearEvents();
+
+	int32 Delivered = 0;
+	for (FParticleEmitterInstance* Instance : EmitterInstances)
+	{
+		if (!Instance || !Instance->CurrentLODLevel)
+			continue;
+
+		// 먼 LOD에서 Receiver를 끄면 그 에미터는 이벤트를 받지 않는다
+		for (UParticleModuleEventReceiverBase* Receiver : Instance->CurrentLODLevel->GetEventReceivers())
+		{
+			if (!Receiver || !Receiver->IsEnabled())
+				continue;
+
+			auto Deliver = [&](const auto& Events)
+				{
+					for (const auto& Event : Events)
+					{
+						if (Receiver->WillProcessEvent(Event))
+						{
+							Receiver->ProcessEvent(*Instance, Event);
+							++Delivered;
+						}
+					}
+				};
+			Deliver(DispatchingSpawnEvents);
+			Deliver(DispatchingDeathEvents);
+			Deliver(DispatchingCollisionEvents);
+			Deliver(DispatchingBurstEvents);
+		}
+	}
+	return Delivered;
+}
+
+void UParticleSystemComponent::ClearEvents()
+{
+	SpawnEvents.Reset();
+	DeathEvents.Reset();
+	CollisionEvents.Reset();
+	BurstEvents.Reset();
+}
+
+void UParticleSystemComponent::LogEventCounts(float DeltaTime)
+{
+	// 종류:이름 별로 1초 동안 누적 (같은 종류라도 Generator 설정마다 이름이 다르다)
+	auto Count = [this](const char* TypeName, const FParticleEventData& Event)
+		{
+			const FString Name = Event.EventName.IsNone() ? FString("None") : Event.EventName.ToString();
+			++LoggedEventCounts[FString(TypeName) + ":" + Name];
+		};
+	for (const FParticleEventSpawnData& Event : SpawnEvents) Count("Spawn", Event);
+	for (const FParticleEventDeathData& Event : DeathEvents) Count("Death", Event);
+	for (const FParticleEventCollisionData& Event : CollisionEvents) Count("Collision", Event);
+	for (const FParticleEventBurstData& Event : BurstEvents) Count("Burst", Event);
+
+	// 1초에 한 번, 그 프레임 충돌 하나의 내용도 보여 준다 (위치·법선 확인용)
+	if (!CollisionEvents.IsEmpty())
+	{
+		LastLoggedCollision = CollisionEvents[0];
+		bHasLoggedCollision = true;
+	}
+
+	EventLogTimer += DeltaTime;
+	if (EventLogTimer < 1.0f)
+		return;
+
+	FString Summary;
+	for (const auto& [Key, Value] : LoggedEventCounts)
+	{
+		Summary += (Summary.empty() ? "" : ", ") + Key + " " + std::to_string(Value);
+	}
+	KRS_LOG(Info, "Particle events / {:.1f}s ({}): {}", EventLogTimer,
+		Template ? Template->GetAssetPath() : FString("None"), Summary.empty() ? FString("none") : Summary);
+
+	if (bHasLoggedCollision)
+	{
+		const FParticleEventCollisionData& Hit = LastLoggedCollision;
+		KRS_LOG(Info, "  sample collision '{}': emitter {} at ({:.0f}, {:.0f}, {:.0f}) normal ({:.0f}, {:.0f}, {:.0f}) t {:.2f}",
+			Hit.EventName.ToString(), Hit.EmitterIndex, Hit.Location.X, Hit.Location.Y, Hit.Location.Z,
+			Hit.Normal.X, Hit.Normal.Y, Hit.Normal.Z, Hit.Time);
+	}
+	ResetEventLog();
+}
+
+void UParticleSystemComponent::ResetEventLog()
+{
+	EventLogTimer = 0.0f;
+	LoggedEventCounts.clear();
+	bHasLoggedCollision = false;
 }
 
 void UParticleSystemComponent::SetLODLevel(int32 InLODLevel)
@@ -317,6 +454,25 @@ void UParticleSystemComponent::ApplyLODLevel(int32 InLODLevel)
 		if (Instance)
 		{
 			Instance->SetCurrentLODIndex(LODLevel);
+		}
+	}
+}
+
+void UParticleSystemComponent::Serialize(FStructuredArchive::FRecord Record)
+{
+	Super::Serialize(Record);
+
+	// 액터 생성자가 기본 템플릿으로 인스턴스를 만들고, 씬 로드는 SpawnActor(등록·활성화) 뒤에 속성을 읽는다.
+	// 그대로 두면 Template만 바뀌고 옛 템플릿의 에미터가 계속 도므로, SetTemplate과 같은 규칙으로 다시 시작한다
+	if (Record.GetUnderlyingArchive().IsLoading() && InitializedTemplate != Template)
+	{
+		if (IsRegistered() && (IsActive() || IsAutoActivate()))
+		{
+			ActivateSystem(true);
+		}
+		else
+		{
+			InitializeSystem();
 		}
 	}
 }

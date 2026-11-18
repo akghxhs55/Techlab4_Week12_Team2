@@ -258,6 +258,48 @@
                                     "bEnabled": true
                                 }
                             }
+                        },
+                        {
+                            "Class": "UParticleModuleEventGenerator",
+                            "Data": {
+                                "Properties": {
+                                    "Events": [
+                                        {
+                                            "Type": "Collision",
+                                            "CustomName": "Hit",
+                                            "Frequency": 1,
+                                            "bFirstTimeOnly": false,
+                                            "bLastTimeOnly": false,
+                                            "CustomData": 0
+                                        },
+                                        {
+                                            "Type": "Collision",
+                                            "CustomName": "FirstHit",
+                                            "Frequency": 1,
+                                            "bFirstTimeOnly": true,
+                                            "bLastTimeOnly": false,
+                                            "CustomData": 0
+                                        },
+                                        {
+                                            "Type": "Collision",
+                                            "CustomName": "LastHit",
+                                            "Frequency": 1,
+                                            "bFirstTimeOnly": false,
+                                            "bLastTimeOnly": true,
+                                            "CustomData": 0
+                                        },
+                                        {
+                                            "Type": "Death",
+                                            "CustomName": "Dead",
+                                            "Frequency": 5,
+                                            "bFirstTimeOnly": false,
+                                            "bLastTimeOnly": false,
+                                            "CustomData": 0
+                                        }
+                                    ],
+                                    "bEnabled": true
+                                }
+                            }
                         }
                     ],
                     "Properties": {

@@ -123,6 +123,12 @@ void UParticleModuleCollision::Update(FParticleEmitterInstance& Owner, int32 Off
 			FVector Normal = Owner.WorldToSimulationVector(Hit.Normal).GetSafeNormal();
 			const FVector HitPoint = StartSim + DeltaSim * T + Normal * SurfaceOffset;
 
+			// 반사 전에 보고해야 이벤트의 속도·방향이 들어오던 방향이 된다.
+			// 첫 충돌 = 아직 충돌 표시가 없음, 마지막 충돌 = 이번에 남은 횟수가 0이 됨
+			const bool bFirstHit = (Particle.Flags & STATE_Particle_CollisionHasOccurred) == 0;
+			const bool bLastHit = MaxCollisions > 0 && Payload.UsedCollisions == 1;
+			Owner.ReportCollisionEvent(Particle, Owner.SimulationToWorld(HitPoint), Hit.Normal, T, Hit.HitComponent, bFirstHit, bLastHit);
+
 			// V' = Vt × (1 − 마찰) − Vn × 반발계수
 			const FVector Velocity = Particle.Velocity;
 			const FVector Vn = Normal * Velocity.Dot(Normal);

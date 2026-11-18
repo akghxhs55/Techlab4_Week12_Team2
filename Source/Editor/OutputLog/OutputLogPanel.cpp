@@ -892,6 +892,15 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
+	Add("p.LogEvents", "p.LogEvents [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, UParticleSystemComponent::bLogEvents, bOn)) return false;
+			UParticleSystemComponent::bLogEvents = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.LogEvents = {}", bOn ? 1 : 0);
+			return true;
+		});
+
 	// 디버그: 살아 있는 모든 파티클의 Freeze 플래그를 켜고 끈다 (Freeze 처리 확인용)
 	Add("p.Freeze", "p.Freeze <0|1>", [](const TArray<FString>& Args, const FString&)
 		{
@@ -963,6 +972,7 @@ void FOutputLogPanel::RegisterCommands()
 	RegisterSuggestion("CVar", "p.LogBursts", "p.LogBursts", "[0|1] Log each particle burst", true);
 	RegisterSuggestion("CVar", "p.ShowLOD", "p.ShowLOD", "[0|1] Draw LOD distance spheres for all particles", true);
 	RegisterSuggestion("Cmd", "p.LODInfo", "p.LODInfo", "Print LOD, camera distance, particle count");
+	RegisterSuggestion("CVar", "p.LogEvents", "p.LogEvents", "[0|1] Log particle event counts (needs EventGenerator)", true);
 	RegisterSuggestion("Cmd", "p.Freeze 1", "p.Freeze 1", "Freeze all live particles in place");
 	RegisterSuggestion("Cmd", "p.Freeze 0", "p.Freeze 0", "Unfreeze all live particles");
 	RegisterSuggestion("Cmd", "p.Particles Activate", "p.Particles Activate", "Activate all particle components");

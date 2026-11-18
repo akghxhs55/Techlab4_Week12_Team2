@@ -8,6 +8,8 @@ class UParticleModule;
 class UParticleModuleRequired;
 class UParticleModuleSpawn;
 class UParticleModuleTypeDataBase;
+class UParticleModuleEventGenerator;
+class UParticleModuleEventReceiverBase;
 
 UCLASS()
 class UParticleLODLevel : public UObject
@@ -47,6 +49,10 @@ public:
 	// UpdateModuleLists()만 채운다. 바깥에서는 읽기만 한다.
 	const TArray<UParticleModule*>& GetSpawnModules() const { return SpawnModules; }
 	const TArray<UParticleModule*>& GetUpdateModules() const { return UpdateModules; }
+	// Modules 중 첫 EventGenerator. 없으면 nullptr. 꺼져 있어도 돌려주므로 호출자가 IsEnabled를 본다
+	UParticleModuleEventGenerator* GetEventGenerator() const { return EventGenerator; }
+	// Modules 중 이벤트 Receiver들 (꺼진 것 포함)
+	const TArray<UParticleModuleEventReceiverBase*>& GetEventReceivers() const { return EventReceivers; }
 
 	using Super::Serialize; // FArchive& 오버로드가 가려지지 않도록
 	virtual void Serialize(FStructuredArchive::FRecord Record) override;
@@ -63,4 +69,6 @@ private:
 	TArray<UParticleModule*> Modules;
 	TArray<UParticleModule*> SpawnModules;
 	TArray<UParticleModule*> UpdateModules;
+	UParticleModuleEventGenerator* EventGenerator = nullptr;
+	TArray<UParticleModuleEventReceiverBase*> EventReceivers;
 };
