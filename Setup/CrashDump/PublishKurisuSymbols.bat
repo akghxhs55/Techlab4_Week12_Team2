@@ -11,14 +11,14 @@ if not exist "%SymStore%" set "SymStore=symstore.exe"
 
 REM Identify this publication using the computer name and UTC timestamp.
 for /f %%T in ('powershell.exe -NoProfile -Command "[DateTime]::UtcNow.ToString('yyyyMMdd-HHmmss')"') do (
-    set "BuildId=%COMPUTERNAME%-Debug-%%T"
+    set "BuildId=%COMPUTERNAME%-Release-%%T"
 )
 
 REM Register the build output EXE, DLL, and PDB files with SymStore.
 powershell.exe -NoProfile -ExecutionPolicy RemoteSigned ^
     -File "%~dp0PublishSymbols.ps1" ^
     -Store "%Store%" -BuildId "%BuildId%" ^
-    -Configuration Debug -SymStorePath "%SymStore%"
+    -Configuration Release -SymStorePath "%SymStore%"
 
 REM Preserve the publishing result and keep the window open.
 set "Result=%ERRORLEVEL%"

@@ -13,7 +13,12 @@
     <PropertyValue name="SymbolCacheDir">%LOCALAPPDATA%\Kurisu\SymbolCache</PropertyValue>
     <!--Windows DLL과 심볼은 Microsoft 서버에서도 검색한다.-->
     <PropertyValue name="SymbolUseMSSymbolServers">1</PropertyValue>
-    <!--제외 목록에 지정하지 않은 모듈의 심볼을 자동으로 로드한다.-->
-    <PropertyValue name="SymbolUseExcludeList">1</PropertyValue>
+    <!--로컬에 인접한 PDB뿐 아니라 등록된 심볼 경로에서도 자동 검색한다.-->
+    <PropertyValue name="AutoLoadFromSymbolPath">1</PropertyValue>
+    <PropertyValue name="SymbolsAlwaysLoadAdjacent">1</PropertyValue>
+    <!--기존 제외 목록의 영향을 받지 않도록 필요한 모듈을 명시한다.-->
+    <PropertyValue name="SymbolUseExcludeList">0</PropertyValue>
+    <PropertyValue name="SymbolIncludeList">KurisuEditor.exe;KurisuGame.exe;libfbxsdk.dll;kernelbase.dll;kernel32.dll;ntdll.dll</PropertyValue>
+    <PropertyValue name="SymbolIncludeListState">1;1;1;1;1;1</PropertyValue>
   </Category>
 </UserSettings>

@@ -48,7 +48,11 @@ try {
         SymbolPathState = 'string'
         SymbolCacheDir = 'string'
         SymbolUseMSSymbolServers = 'dword'
+        AutoLoadFromSymbolPath = 'dword'
+        SymbolsAlwaysLoadAdjacent = 'dword'
         SymbolUseExcludeList = 'dword'
+        SymbolIncludeList = 'string'
+        SymbolIncludeListState = 'string'
     }
     $values = @{}
     foreach ($name in $valueTypes.Keys) {
@@ -62,6 +66,13 @@ try {
         if ($valueTypes[$name] -eq 'dword') {
             $values[$name] = ([uint32]$property.InnerText).ToString()
         }
+    }
+
+    $includedModules = @($values['SymbolIncludeList'] -split ';')
+    $includedStates = @($values['SymbolIncludeListState'] -split ';')
+    if ($includedModules.Count -ne $includedStates.Count -or
+        @($includedStates | Where-Object { $_ -notin @('0', '1') }).Count -gt 0) {
+        throw 'Invalid SymbolIncludeList or SymbolIncludeListState.'
     }
 
     $cacheDirectory = [Environment]::ExpandEnvironmentVariables(
@@ -143,7 +154,10 @@ try {
         '_NT_SYMBOL_PATH', $symbolSearchPath, 'Process')
 
     Write-Host 'Kurisu debugger settings applied without opening Visual Studio.'
+    Write-Host "Automatic symbol search: $($values['AutoLoadFromSymbolPath'])"
+    Write-Host "Included modules: $($values['SymbolIncludeList'])"
     Write-Host "Symbol search path: $symbolSearchPath"
+    Write-Host 'OpenKurisuDump verifies matching shared PDBs before starting Visual Studio.'
     Write-Host 'Restart any running Visual Studio instances to use the settings.'
     exit 0
 }
