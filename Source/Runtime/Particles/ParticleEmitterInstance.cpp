@@ -175,7 +175,12 @@ void FParticleEmitterInstance::PostSpawn(FBaseParticle* Particle, float SpawnTim
 
 void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, float Increment)
 {
-	const FVector Origin = GetEmitterOrigin();
+	SpawnParticles(Count, StartTime, Increment, GetEmitterOrigin(), FVector::ZeroVector);
+}
+
+void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, float Increment,
+	const FVector& InitialLocation, const FVector& ExtraVelocity)
+{
 	const bool bReportSpawn = WantsEvent(EParticleEventType::Spawn);
 
 	for (int32 i = 0; i < Count; i++)
@@ -184,13 +189,16 @@ void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, floa
 		FBaseParticle* Particle = GetParticle(SlotIndex);
 		float SpawnTime = StartTime - Increment * i;
 
-		PreSpawn(Particle, Origin);
+		PreSpawn(Particle, InitialLocation);
 		for (UParticleModule* Module : CurrentLODLevel->GetSpawnModules())
 		{
 			if (!Module->IsEnabled())
 				continue;
 			Module->Spawn(*this, SpriteTemplate->GetModuleOffset(Module), SpawnTime, *Particle);
 		}
+		// 이벤트로 생성할 때 물려받는 속도. Spawn 모듈이 정한 속도 위에 더한다
+		Particle->Velocity += ExtraVelocity;
+		Particle->BaseVelocity += ExtraVelocity;
 		PostSpawn(Particle, SpawnTime);
 		ActiveParticles++;
 
@@ -201,6 +209,43 @@ void FParticleEmitterInstance::SpawnParticles(int32 Count, float StartTime, floa
 			SendEvent(Event, &UParticleSystemComponent::ReportEventSpawn);
 		}
 	}
+}
+
+void FParticleEmitterInstance::ForceSpawn(int32 Count, const FVector& WorldLocation, const FVector& WorldVelocity)
+{
+	// Deactivate된 이펙트, 꺼진 LOD 레벨에서는 이벤트로도 생성하지 않는다
+	if (Count <= 0 || !bSpawningEnabled || CurrentLODLevel == nullptr || !CurrentLODLevel->IsEnabled())
+		return;
+
+	// Spawn()과 같은 규칙: 현재 LOD 상한과 메모리 한도 안에서만
+	const UParticleModuleRequired* Required = CurrentLODLevel->GetRequiredModule();
+	const int32 LODLimit = (Required && Required->GetMaxActiveParticles() > 0) ? Required->GetMaxActiveParticles() : 65535;
+	const int32 Needed = (std::min)(ActiveParticles + Count, LODLimit);
+	if (Needed > MaxActiveParticles)
+	{
+		Resize((std::min)((std::min)(static_cast<int32>(Needed * 1.5f), LODLimit), 65535));
+	}
+	const int32 FreeSlots = (std::max)((std::min)(MaxActiveParticles, LODLimit) - ActiveParticles, 0);
+	Count = (std::min)(Count, FreeSlots);
+	if (Count <= 0)
+		return;
+
+	SpawnParticles(Count, 0.0f, 0.0f, WorldToSimulation(WorldLocation), WorldToSimulationVector(WorldVelocity));
+}
+
+void FParticleEmitterInstance::KillAllParticles()
+{
+	// 인덱스 배열은 그대로 두면 빈 칸 목록으로 다시 쓰인다
+	ActiveParticles = 0;
+}
+
+FVector FParticleEmitterInstance::WorldToSimulation(const FVector& WorldPosition) const
+{
+	if (IsLocalSpace() && Component)
+	{
+		return Component->GetWorldMatrix().Inverse().TransformPosition(WorldPosition);
+	}
+	return WorldPosition;
 }
 
 bool FParticleEmitterInstance::HasCompletedLoops() const

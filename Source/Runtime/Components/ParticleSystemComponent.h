@@ -3,6 +3,7 @@
 #include "PrimitiveComponent.h"
 #include "Particles/ParticleSystem.h"
 #include "Particles/ParticleEventTypes.h"
+#include "Core/Delegate/Delegate.h"
 #include <map>
 #include "ParticleSystemComponent.generated.h"
 
@@ -11,6 +12,13 @@ class FLineBatcher;
 class AActor;
 class UObject;
 struct FParticleEmitterInstance;
+class UParticleSystemComponent;
+
+// 게임 코드가 파티클 이벤트를 받는 델리게이트. EventGenerator가 내보낸 이벤트만 온다
+DECLARE_DELEGATE(FOnParticleSpawnSignature, UParticleSystemComponent*, const FParticleEventSpawnData&);
+DECLARE_DELEGATE(FOnParticleDeathSignature, UParticleSystemComponent*, const FParticleEventDeathData&);
+DECLARE_DELEGATE(FOnParticleCollideSignature, UParticleSystemComponent*, const FParticleEventCollisionData&);
+DECLARE_DELEGATE(FOnParticleBurstSignature, UParticleSystemComponent*, const FParticleEventBurstData&);
 
 UCLASS()
 class UParticleSystemComponent : public UPrimitiveComponent
@@ -73,6 +81,13 @@ public:
 	// 디버그: 이벤트 수를 1초마다 로그 (콘솔 p.LogEvents)
 	static bool bLogEvents;
 
+	// Receiver 배달이 끝난 뒤 Tick의 맨 마지막에 부른다.
+	// 콜백 안에서 SetTemplate·Deactivate·액터 파괴를 해도 된다 (이후 이 컴포넌트를 건드리지 않는다)
+	FOnParticleSpawnSignature OnParticleSpawn;
+	FOnParticleDeathSignature OnParticleDeath;
+	FOnParticleCollideSignature OnParticleCollide;
+	FOnParticleBurstSignature OnParticleBurst;
+
 	// 에디터 미리보기 전용 강제 LOD. -1이면 끔. 저장하지 않고 게임 월드에서는 무시한다
 	int32 GetPreviewLODOverride() const { return PreviewLODOverride; }
 	void SetPreviewLODOverride(int32 InLODLevel);
@@ -101,6 +116,8 @@ private:
 	void ClearEvents();
 	// 모인 이벤트를 각 에미터의 Receiver에 배달하고 버퍼를 비운다. 배달한 수를 돌려준다
 	int32 DispatchEvents();
+	// 방금 배달한 이벤트를 델리게이트와 소유 액터의 스크립트로 보낸다. Tick의 맨 마지막에서만 부른다
+	void BroadcastGameEvents();
 	void LogEventCounts(float DeltaTime);
 	void ResetEventLog();
 

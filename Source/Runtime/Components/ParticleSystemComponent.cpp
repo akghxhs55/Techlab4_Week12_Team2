@@ -13,6 +13,8 @@
 #include "Engine/ParticleSystemSceneProxy.h"
 #include "Particles/ParticleLODLevel.h"
 #include "Particles/Module/ParticleModuleEventReceiverBase.h"
+#include "UObject/UObjectHash.h"
+#include "GameFramework/Actor.h"
 
 UParticleSystemComponent::UParticleSystemComponent()
 {
@@ -201,6 +203,61 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	{
 		Proxy->GetScene()->MarkDirty(Proxy);
 	}
+
+	// 게임 코드 콜백은 반드시 맨 마지막. 콜백이 이 컴포넌트를 바꾸거나 파괴할 수 있다
+	BroadcastGameEvents();
+}
+
+void UParticleSystemComponent::BroadcastGameEvents()
+{
+	const bool bScripts = GetOwner() != nullptr;
+	if (DispatchingCollisionEvents.IsEmpty() && DispatchingSpawnEvents.IsEmpty() &&
+		DispatchingDeathEvents.IsEmpty() && DispatchingBurstEvents.IsEmpty())
+		return;
+	if (!bScripts && !OnParticleSpawn.IsBound() && !OnParticleDeath.IsBound() &&
+		!OnParticleCollide.IsBound() && !OnParticleBurst.IsBound())
+		return;
+
+	// 콜백이 SetTemplate·Deactivate(이벤트 버퍼를 비움)나 액터 파괴를 할 수 있으므로
+	// 보낼 목록을 지역 복사본으로 옮기고, 콜백마다 이 컴포넌트가 아직 살아 있는지 확인한다
+	const TArray<FParticleEventSpawnData> Spawns = DispatchingSpawnEvents;
+	const TArray<FParticleEventDeathData> Deaths = DispatchingDeathEvents;
+	const TArray<FParticleEventCollisionData> Collisions = DispatchingCollisionEvents;
+	const TArray<FParticleEventBurstData> Bursts = DispatchingBurstEvents;
+
+	UParticleSystemComponent* Self = this;
+	auto IsAlive = [Self]()
+		{
+			uint32 UUID = 0;
+			return TryGetLiveObjectUUID(Self, nullptr, UUID);
+		};
+
+	for (const FParticleEventCollisionData& Event : Collisions)
+	{
+		OnParticleCollide.Broadcast(this, Event);
+		if (!IsAlive()) return;
+		// 소유 액터의 스크립트(Lua)에 OnParticleCollide(닿은 액터)로 넘긴다
+		if (AActor* Owner = GetOwner())
+		{
+			Owner->CallScripts("OnParticleCollide", Event.HitActor);
+			if (!IsAlive()) return;
+		}
+	}
+	for (const FParticleEventSpawnData& Event : Spawns)
+	{
+		OnParticleSpawn.Broadcast(this, Event);
+		if (!IsAlive()) return;
+	}
+	for (const FParticleEventDeathData& Event : Deaths)
+	{
+		OnParticleDeath.Broadcast(this, Event);
+		if (!IsAlive()) return;
+	}
+	for (const FParticleEventBurstData& Event : Bursts)
+	{
+		OnParticleBurst.Broadcast(this, Event);
+		if (!IsAlive()) return;
+	}
 }
 
 bool UParticleSystemComponent::bLogEvents = false;
@@ -217,6 +274,12 @@ int32 UParticleSystemComponent::GetEmitterIndex(const FParticleEmitterInstance* 
 
 int32 UParticleSystemComponent::DispatchEvents()
 {
+	// 지난 Tick에 배달한 목록이 이번 Tick의 델리게이트로 다시 나가지 않게 먼저 비운다
+	DispatchingSpawnEvents.Reset();
+	DispatchingDeathEvents.Reset();
+	DispatchingCollisionEvents.Reset();
+	DispatchingBurstEvents.Reset();
+
 	if (SpawnEvents.IsEmpty() && DeathEvents.IsEmpty() && CollisionEvents.IsEmpty() && BurstEvents.IsEmpty())
 		return 0;
 
@@ -231,7 +294,8 @@ int32 UParticleSystemComponent::DispatchEvents()
 	int32 Delivered = 0;
 	for (FParticleEmitterInstance* Instance : EmitterInstances)
 	{
-		if (!Instance || !Instance->CurrentLODLevel)
+		// 꺼진 LOD 레벨이면 이 에미터는 이벤트를 받지 않는다
+		if (!Instance || !Instance->CurrentLODLevel || !Instance->CurrentLODLevel->IsEnabled())
 			continue;
 
 		// 먼 LOD에서 Receiver를 끄면 그 에미터는 이벤트를 받지 않는다

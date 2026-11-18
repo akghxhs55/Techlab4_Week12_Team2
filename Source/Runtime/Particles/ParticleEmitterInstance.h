@@ -67,10 +67,17 @@ struct FParticleEmitterInstance
 	FVector SimulationToWorld(const FVector& SimulationPosition) const;
 	// 에미터 기준 방향/오프셋 → 시뮬레이션 공간 (회전·스케일만, 이동 제외)
 	FVector EmitterToSimulationVector(const FVector& EmitterVector) const;
+	// 월드 위치 → 시뮬레이션 공간 (SimulationToWorld의 반대)
+	FVector WorldToSimulation(const FVector& WorldPosition) const;
 	// 월드 방향 → 시뮬레이션 공간 (로컬 공간이면 컴포넌트 역변환, 이동 제외)
 	FVector WorldToSimulationVector(const FVector& WorldVector) const;
 	// 시뮬레이션 공간 방향 → 월드 (로컬 공간이면 컴포넌트 변환, 이동 제외)
 	FVector SimulationToWorldVector(const FVector& SimulationVector) const;
+
+	// 이벤트 Receiver용: 월드 위치를 기준점으로 Count개를 바로 생성한다. Spawn 모듈 값 위에 WorldVelocity를 더한다
+	void ForceSpawn(int32 Count, const FVector& WorldLocation, const FVector& WorldVelocity);
+	// 살아 있는 파티클을 모두 지운다 (Death 이벤트는 보내지 않는다)
+	void KillAllParticles();
 
 	// 현재 LOD에 켜진 EventGenerator가 이 종류를 내보내는지
 	bool WantsEvent(EParticleEventType Type) const;
@@ -88,6 +95,8 @@ protected:
 	virtual void ResetParticleParameters(float DeltaTime);
 	virtual void Spawn(float DeltaTime);                                        // 이번 프레임 개수 결정
 	virtual void SpawnParticles(int32 Count, float StartTime, float Increment); // 실제 N개 생성
+	// 기준 위치와 추가 속도(시뮬레이션 공간)를 정해 N개 생성. 위 함수는 에미터 원점·속도 0으로 이걸 부른다
+	void SpawnParticles(int32 Count, float StartTime, float Increment, const FVector& InitialLocation, const FVector& ExtraVelocity);
 	virtual void PreSpawn(FBaseParticle* Particle, const FVector& InitialLocation);
 	virtual void PostSpawn(FBaseParticle* Particle, float SpawnTime);
 	virtual void UpdateBoundingBox(float DeltaTime);
