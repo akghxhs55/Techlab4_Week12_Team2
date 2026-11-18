@@ -49,22 +49,8 @@ void AKurisuCharacter::Tick(float DeltaTime)
 
 	UKurisuAnimInstance* Anim = GetKurisuAnimInstance();
 	const APlayerController* PC = GetController();
-	const bool bShiftDown = PC && PC->IsKeyDown(static_cast<int32>(EKeyCode::Shift));
-	const bool bWalkDown = PC && PC->IsKeyDown(static_cast<int32>(EKeyCode::C));
-
-	// Shift: 짧게 눌렀다 떼면 구르기, 계속 누르고 있으면 Run
-	if (bShiftDown)
-	{
-		ShiftHeldTime += DeltaTime;
-	}
-	else if (bShiftWasDown)
-	{
-		if (ShiftHeldTime < RollTapTime)
-			Roll();
-		ShiftHeldTime = 0.0f;
-	}
-	bShiftWasDown = bShiftDown;
-	const bool bRunning = bShiftDown && ShiftHeldTime >= RollTapTime;
+	// Shift를 누르는 동안 Run, 아니면 Walk. 그 사이는 SpeedChangeRate로 올라가며 Slow Run을 거쳐 섞인다
+	const bool bRunning = PC && PC->IsKeyDown(static_cast<int32>(EKeyCode::Shift));
 
 	// 원하는 속도: 입력이 있으면 고른 단계의 클립 속도, 없으면 0. Blend Space가 이 값으로 클립을 섞는다
 	const FVector Input = CharacterMovementComponent->GetCurrentAcceleration();
@@ -72,7 +58,7 @@ void AKurisuCharacter::Tick(float DeltaTime)
 	float TargetSpeed = 0.0f;
 	if (bHasInput && Anim)
 	{
-		TargetSpeed = bRunning ? Anim->GetRunSpeed() : (bWalkDown ? Anim->GetWalkSpeed() : Anim->GetSlowRunSpeed());
+		TargetSpeed = bRunning ? Anim->GetMaxRunSpeed() : Anim->GetWalkSpeed();
 	}
 	const float MaxStep = SpeedChangeRate * DeltaTime;
 	DesiredGroundSpeed += std::clamp(TargetSpeed - DesiredGroundSpeed, -MaxStep, MaxStep);
@@ -148,6 +134,35 @@ void AKurisuCharacter::Slide()
 
 	FaceAccelerationDirection();
 	Anim->RequestSlide();
+}
+
+void AKurisuCharacter::Jab()
+{
+	UKurisuAnimInstance* Anim = GetKurisuAnimInstance();
+	if (!Anim || IsFalling())
+		return;
+
+	// 처음 치는 순간에만 입력 방향으로 돈다. 콤보 도중에 돌면 섞이는 포즈가 튄다
+	const bool bFirstHit = !Anim->IsInAction();
+	if (Anim->RequestJab() && bFirstHit)
+		FaceAccelerationDirection();
+}
+
+void AKurisuCharacter::Punch()
+{
+	UKurisuAnimInstance* Anim = GetKurisuAnimInstance();
+	if (!Anim || IsFalling())
+		return;
+
+	const bool bFirstHit = !Anim->IsInAction();
+	if (Anim->RequestPunch() && bFirstHit)
+		FaceAccelerationDirection();
+}
+
+bool AKurisuCharacter::HasMovementInput() const
+{
+	const FVector Input = CharacterMovementComponent->GetCurrentAcceleration();
+	return Input.X * Input.X + Input.Y * Input.Y > 1.0e-6f;
 }
 
 UKurisuAnimInstance* AKurisuCharacter::GetKurisuAnimInstance() const

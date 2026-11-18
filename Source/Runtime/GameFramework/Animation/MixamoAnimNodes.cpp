@@ -186,7 +186,13 @@ void FAnimNode_MixamoSequencePlayer::Update(const FAnimationUpdateContext& Conte
 	{
 		return;
 	}
-	const float Delta = MixamoRootMotion::GetTravelDelta(Sequence, PrevTime, CurrentTime - PrevTime, false);
+	// 상태가 섞이는 동안에는 그 상태의 가중치만큼만 움직인다 (안 그러면 전환 중에 두 상태의 이동이 더해져 튄다)
+	float Delta = MixamoRootMotion::GetTravelDelta(Sequence, PrevTime, CurrentTime - PrevTime, false)
+		* Context.GetFinalBlendWeight();
+	if (bForwardRootMotionOnly)
+	{
+		Delta = std::max(Delta, 0.0f);
+	}
 	AddTravelRootMotion(Context.GetAnimInstance<UAnimInstance>(), MixamoRootMotion::GetTravelDirection(Sequence), Delta);
 }
 
@@ -314,10 +320,12 @@ void FAnimNode_MixamoBlendSpacePlayer::Update(const FAnimationUpdateContext& Con
 		Process(SampleB.Animation, LengthB, WeightB, bMovingB);
 	}
 
-	const float Distance = Move.Size();
-	if (Distance > 0.0f)
+	// 상태 전환으로 섞이는 동안에는 이 상태의 가중치만큼만 움직인다
+	const float MoveSize = Move.Size();
+	const float Distance = MoveSize * Context.GetFinalBlendWeight();
+	if (MoveSize > 0.0f && Distance > 0.0f)
 	{
-		AddTravelRootMotion(AnimInstance, Move * (1.0f / Distance), Distance);
+		AddTravelRootMotion(AnimInstance, Move * (1.0f / MoveSize), Distance);
 	}
 }
 
