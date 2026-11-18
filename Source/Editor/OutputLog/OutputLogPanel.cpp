@@ -308,13 +308,26 @@ void FOutputLogPanel::RenderContents()
 	}
 
 	ImGui::SameLine();
-	if (bApplySuggestionCompletion)
+	RenderCommandInput("##OutputLogInput", InputBuf, IM_COUNTOF(InputBuf), -1.0f, true, true);
+
+	//////////////////////////////////////////////////////////
+}
+
+void FOutputLogPanel::RenderCommandInput(const char* InputId, char* Buffer, size_t BufferSize, float Width, bool bUseLogFont, bool bReclaimFocusOnSubmit)
+{
+	if (!InputId || !Buffer || BufferSize == 0)
+		return;
+
+	CurrentInputRenderId = InputId;
+	const bool bMatchesActiveInput = (ActiveSuggestionInputId == InputId);
+
+	if (bApplySuggestionCompletion && bMatchesActiveInput)
 	{
-		std::snprintf(InputBuf, sizeof(InputBuf), "%s", PendingSuggestionText.c_str());
+		std::snprintf(Buffer, BufferSize, "%s", PendingSuggestionText.c_str());
 		LastSuggestionQuery = PendingSuggestionText;
 		bApplySuggestionCompletion = false;
 	}
-	if (bReclaimInputFocusNextFrame)
+	if (bReclaimInputFocusNextFrame && bMatchesActiveInput)
 	{
 		ImGui::SetKeyboardFocusHere();
 		bReclaimInputFocusNextFrame = false;
@@ -328,32 +341,36 @@ void FOutputLogPanel::RenderContents()
 		ImGuiInputTextFlags_CallbackHistory |
 		ImGuiInputTextFlags_CallbackEdit |
 		ImGuiInputTextFlags_CallbackAlways;
-	ImGui::SetNextItemWidth(-1.0f);
+	ImGui::SetNextItemWidth(Width);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorColor::BgDeepest);
-	if (LogFont) ImGui::PushFont(LogFont, 0.0f);
-	if (ImGui::InputTextWithHint("##OutputLogInput", "Enter Console Command", InputBuf, IM_COUNTOF(InputBuf), input_text_flags, &TextEditCallbackStub, this))
+	if (bUseLogFont && LogFont) ImGui::PushFont(LogFont, 0.0f);
+	if (ImGui::InputTextWithHint(InputId, "Enter Console Command", Buffer, BufferSize, input_text_flags, &TextEditCallbackStub, this))
 	{
-		char* s = InputBuf;
-		if (s[0])
+		if (Buffer[0] != '\0')
 		{
-			ExecCommand(s);
+			ExecCommand(Buffer);
 		}
-		s[0] = 0;
+		Buffer[0] = '\0';
 		HistoryPos = -1;
 		FilteredSuggestionIndices.Reset();
 		SelectedSuggestion = 0;
 		bSuppressSuggestions = false;
 		LastSuggestionQuery.clear();
-		reclaim_focus = true;
+		reclaim_focus = bReclaimFocusOnSubmit;
 	}
-	if (LogFont) ImGui::PopFont();
+	if (bUseLogFont && LogFont) ImGui::PopFont();
 	ImGui::PopStyleColor();
 
 	const ImVec2 InputMin = ImGui::GetItemRectMin();
 	const ImVec2 InputMax = ImGui::GetItemRectMax();
 	const bool bInputActive = ImGui::IsItemActive();
 
-	if (InputBuf[0] == '\0')
+	if (bInputActive)
+	{
+		ActiveSuggestionInputId = InputId;
+	}
+
+	if ((bInputActive || bMatchesActiveInput) && Buffer[0] == '\0')
 	{
 		FilteredSuggestionIndices.Reset();
 		SelectedSuggestion = 0;
@@ -361,19 +378,27 @@ void FOutputLogPanel::RenderContents()
 		LastSuggestionQuery.clear();
 	}
 
-	ImGui::SetItemDefaultFocus();
+	if (bReclaimFocusOnSubmit)
+	{
+		ImGui::SetItemDefaultFocus();
+	}
 	if (reclaim_focus)
 		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
 
+	const bool bPopupTarget = (ActiveSuggestionInputId == InputId);
 	const bool bShowSuggestions =
-		(bInputActive || bSuggestionPopupHovered) &&
+		(bInputActive || (bSuggestionPopupHovered && bPopupTarget)) &&
 		!bSuppressSuggestions &&
 		!FilteredSuggestionIndices.IsEmpty();
-	bSuggestionPopupHovered = false;
+	if (bPopupTarget)
+	{
+		bSuggestionPopupHovered = false;
+	}
 	if (bShowSuggestions)
+	{
 		RenderAutocompletePopup(InputMin, InputMax);
-
-	//////////////////////////////////////////////////////////
+	}
+	CurrentInputRenderId.clear();
 }
 
 bool FOutputLogPanel::PassVerbosity(ELogVerbosity Verbosity) const
@@ -441,8 +466,9 @@ int FOutputLogPanel::TextEditCallback(ImGuiInputTextCallbackData* data)
 			data->SelectionEnd = data->BufTextLen;
 			bMoveCursorToEndOnFocus = false;
 		}
-		if (LastSuggestionQuery != data->Buf)
+		if (LastSuggestionQuery != data->Buf || ActiveSuggestionInputId != CurrentInputRenderId)
 		{
+			ActiveSuggestionInputId = CurrentInputRenderId;
 			bSuppressSuggestions = false;
 			HistoryPos = -1;
 			UpdateSuggestions(data->Buf);
@@ -451,6 +477,7 @@ int FOutputLogPanel::TextEditCallback(ImGuiInputTextCallbackData* data)
 	}
 	case ImGuiInputTextFlags_CallbackEdit:
 	{
+		ActiveSuggestionInputId = CurrentInputRenderId;
 		bSuppressSuggestions = false;
 		HistoryPos = -1;
 		UpdateSuggestions(data->Buf);

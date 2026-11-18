@@ -54,6 +54,7 @@ public:
 	//}
 
 	void ExecCommand(const FString& command_line);
+	void RenderCommandInput(const char* InputId, char* Buffer, size_t BufferSize, float Width, bool bUseLogFont = true, bool bReclaimFocusOnSubmit = true);
 
 	int TextEditCallback(ImGuiInputTextCallbackData* data);
 	void SetEditorSettings(FEditorSettings* InSettings) { EditorSettings = InSettings; }
@@ -81,6 +82,8 @@ private:
 	bool                  bMoveCursorToEndOnFocus = false;
 	FString               PendingSuggestionText;
 	FString               LastSuggestionQuery;
+	FString               ActiveSuggestionInputId;
+	FString               CurrentInputRenderId;
 	ImGuiTextFilter       Filter;
 	bool                  AutoScroll;
 	bool                  ScrollToBottom;

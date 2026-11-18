@@ -291,18 +291,7 @@ void FLevelEditorTab::DrawStatusBar(float Height, ImVec2& OutBarMin, ImVec2& Out
 			ImGui::SameLine();
 			const float InputWidth = std::clamp(ImGui::GetContentRegionAvail().x * 0.35f,
 				EditorStyle::Scale(140.0f), EditorStyle::Scale(280.0f));
-			ImGui::SetNextItemWidth(InputWidth);
-			ImGui::PushStyleColor(ImGuiCol_FrameBg, ImVec4(0.06f, 0.06f, 0.07f, 1.0f));
-			if (ImGui::InputTextWithHint("##StatusBarCmdInput", "Enter Console Command",
-				StatusCmdBuf, sizeof(StatusCmdBuf), ImGuiInputTextFlags_EnterReturnsTrue))
-			{
-				if (StatusCmdBuf[0] != '\0')
-				{
-					DrawerLogPanel->ExecCommand(StatusCmdBuf);
-					StatusCmdBuf[0] = '\0';
-				}
-			}
-			ImGui::PopStyleColor();
+			DrawerLogPanel->RenderCommandInput("##StatusBarCmdInput", StatusCmdBuf, sizeof(StatusCmdBuf), InputWidth, false, false);
 		}
 	}
 

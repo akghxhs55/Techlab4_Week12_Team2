@@ -17,6 +17,7 @@
 #include "GameFramework/Actor/AmbientLightActor.h"
 #include "GameFramework/Actor/DecalActor.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/Actor/GundamCharacter.h"
 #include "Core/StatOverlay.h"
 #include "Core/Stats/LightweightStats.h"
 #include <algorithm>
@@ -447,6 +448,7 @@ void FViewportsPanel::DrawSpawnMenu(FEditorViewportClient& Client)
     ImGui::SeparatorText("Basic");
     Spawn("Camera", ACameraActor::StaticClass());
     Spawn("Character", ACharacter::StaticClass());
+    Spawn("Gundam Character", AGundamCharacter::StaticClass());
     Spawn("Text", ATextRenderActor::StaticClass());
     ImGui::SeparatorText("Meshes");
     Spawn("Skeletal Mesh", ASkeletalMeshActor::StaticClass());
