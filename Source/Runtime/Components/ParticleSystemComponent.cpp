@@ -15,6 +15,7 @@
 #include "Particles/Module/ParticleModuleEventReceiverBase.h"
 #include "UObject/UObjectHash.h"
 #include "GameFramework/Actor.h"
+#include "Components/PrimitiveComponent.h"
 
 UParticleSystemComponent::UParticleSystemComponent()
 {
@@ -265,10 +266,34 @@ void UParticleSystemComponent::BroadcastGameEvents()
 			return TryGetLiveObjectUUID(Self, nullptr, UUID);
 		};
 
+	// 닿은 대상도 앞선 콜백이 파괴할 수 있다(파괴는 즉시 delete). 지금은 모두 살아 있으므로 UUID를 적어 두고,
+	// 콜백마다 같은 객체가 아직 살아 있는지 확인해 죽었으면 nullptr로 넘긴다. 같은 주소에 새 객체가 생겨도 UUID로 구분된다
+	struct FHitIds { uint32 Actor = 0; uint32 Component = 0; };
+	TArray<FHitIds> HitIds;
+	HitIds.Reserve(Collisions.Num());
 	for (const FParticleEventCollisionData& Event : Collisions)
 	{
+		FHitIds Ids;
+		if (!Event.HitActor || !TryGetLiveObjectUUID(Event.HitActor, nullptr, Ids.Actor)) Ids.Actor = 0;
+		if (!Event.HitComponent || !TryGetLiveObjectUUID(Event.HitComponent, nullptr, Ids.Component)) Ids.Component = 0;
+		HitIds.Add(Ids);
+	}
+	auto IsSameLive = [](const UObject* Object, uint32 ExpectedUUID)
+		{
+			uint32 UUID = 0;
+			return ExpectedUUID != 0 && TryGetLiveObjectUUID(Object, nullptr, UUID) && UUID == ExpectedUUID;
+		};
+
+	for (int32 i = 0; i < Collisions.Num(); ++i)
+	{
+		FParticleEventCollisionData Event = Collisions[i];
+		if (!IsSameLive(Event.HitActor, HitIds[i].Actor)) Event.HitActor = nullptr;
+		if (!IsSameLive(Event.HitComponent, HitIds[i].Component)) Event.HitComponent = nullptr;
+
 		OnParticleCollide.Broadcast(this, Event);
 		if (!IsAlive()) return;
+		// 델리게이트가 파괴했을 수 있으므로 Lua에 넘기기 직전에 한 번 더 확인한다
+		if (!IsSameLive(Event.HitActor, HitIds[i].Actor)) Event.HitActor = nullptr;
 		// 소유 액터의 스크립트(Lua)에 OnParticleCollide(닿은 액터)로 넘긴다
 		if (AActor* Owner = GetOwner())
 		{
