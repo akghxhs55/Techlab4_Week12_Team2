@@ -8,6 +8,8 @@ class UParticleModule;
 class UParticleEmitter;
 class UParticleLODLevel;
 class UParticleSystem;
+class UParticleModuleTypeDataBase;
+class UClass;
 
 class FParticleSystemEditor : public FAssetEditor
 {
@@ -30,7 +32,6 @@ public:
 	int32 GetCurrentLOD() const { return CurrentLOD; }
 	void SetCurrentLOD(int32 Index);
 	UParticleLODLevel* GetCurrentLODLevel(const UParticleEmitter* Emitter) const;
-	// Index 위치에 Index - 1 LOD의 복사본을 넣고 선택한다 (Index >= 1)
 	bool InsertLOD(int32 Index);
 	bool RemoveCurrentLOD();
 	void SetLODDistance(int32 Index, float Distance);
@@ -48,6 +49,16 @@ public:
 	void RemoveModule(const UParticleEmitter* Emitter, const UParticleModule* Module);
 	void MoveModule(const UParticleEmitter* Emitter, int32 From, int32 To);
 	void SetTypeData(const UParticleEmitter* Emitter, UClass* TypeDataClass);
+
+	static bool IsModuleClassCompatible(const UParticleModuleTypeDataBase* TypeData, const UClass* ModuleClass, const char** OutReason = nullptr);
+	bool IsModuleCompatible(const UParticleEmitter* Emitter, const UParticleModule* Module, const char** OutReason = nullptr) const;
+
+	bool IsOrbitPreviewEnabled() const { return bOrbitPreview; }
+	void SetOrbitPreviewEnabled(bool bEnabled);
+	float GetOrbitRadius() const { return OrbitRadius; }
+	void SetOrbitRadius(float InRadius) { OrbitRadius = (std::max)(InRadius, 0.0f); }
+	float GetOrbitSpeed() const { return OrbitSpeed; }
+	void SetOrbitSpeed(float InDegreesPerSecond) { OrbitSpeed = InDegreesPerSecond; }
 
 	void NotifyPropertyEdited();
 	void NotifyStructureChanged();
@@ -72,6 +83,7 @@ private:
 	void ResolveSelectedModule(int32 Slot);
 	void ClampCurrentLOD();
 	void ApplyPreviewLOD() const;
+	void UpdateOrbitPreview(float DeltaTime);
 
 	UParticleSystem* OriginalAsset = nullptr;
 	UParticleSystem* WorkingCopy = nullptr;
@@ -88,6 +100,11 @@ private:
 	uint32 ViewportHeight = 0;
 	bool bViewportVisible = false;
 	bool bInitialFocusPending = true;
+
+	bool bOrbitPreview = false;
+	float OrbitRadius = 100.0f;
+	float OrbitSpeed = 180.0f;
+	float OrbitAngle = 0.0f;
 
 	bool bUnsavedPromptRequested = false;
 	bool bCloseConfirmed = false;

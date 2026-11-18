@@ -17,7 +17,10 @@
 #include "Particles/Module/ParticleModuleLifetime.h"
 #include "Particles/Module/ParticleModuleSize.h"
 #include "Particles/Module/ParticleModuleTypeDataBase.h"
+#include "Particles/Module/ParticleModuleTypeDataBeam.h"
+#include "Particles/Module/ParticleModuleTypeDataRibbon.h"
 #include "Particles/Module/ParticleModuleVelocity.h"
+#include <cmath>
 
 FParticleSystemEditor::FParticleSystemEditor(UEditorEngine& InEditorEngine, FEditorManager& InEditorManager,
                                              const FString& InAssetPath, UParticleSystem& InAsset)
@@ -54,7 +57,75 @@ void FParticleSystemEditor::Tick(float DeltaTime)
 
 	CameraInput = {};
 
+	UpdateOrbitPreview(DeltaTime);
 	FAssetEditor::Tick(DeltaTime);
+}
+
+void FParticleSystemEditor::UpdateOrbitPreview(float DeltaTime)
+{
+	if (!bOrbitPreview || !PreviewComponent)
+	{
+		return;
+	}
+
+	OrbitAngle = std::fmod(OrbitAngle + OrbitSpeed * DeltaTime, 360.0f);
+	const float Radians = OrbitAngle * PI / 180.0f;
+	PreviewComponent->SetRelativeLocation(FVector(std::cos(Radians), std::sin(Radians), 0.0f) * OrbitRadius);
+}
+
+void FParticleSystemEditor::SetOrbitPreviewEnabled(bool bEnabled)
+{
+	if (bOrbitPreview == bEnabled)
+	{
+		return;
+	}
+
+	bOrbitPreview = bEnabled;
+	OrbitAngle = 0.0f;
+	if (PreviewComponent)
+	{
+		PreviewComponent->SetRelativeLocation(bEnabled ? FVector(OrbitRadius, 0.0f, 0.0f) : FVector::ZeroVector);
+	}
+	RestartSimulation();
+}
+
+bool FParticleSystemEditor::IsModuleClassCompatible(const UParticleModuleTypeDataBase* TypeData, const UClass* ModuleClass, const char** OutReason)
+{
+	if (!ModuleClass)
+	{
+		return true;
+	}
+
+	const UClass* TypeClass = TypeData ? TypeData->GetClass() : nullptr;
+	auto Require = [&](const UClass* Needed, const char* Reason)
+	{
+		if (TypeClass && TypeClass->IsChildOf(Needed))
+		{
+			return true;
+		}
+		if (OutReason)
+		{
+			*OutReason = Reason;
+		}
+		return false;
+	};
+
+	switch (ModuleClass->GetDefaultObject<UParticleModule>()->GetModuleType())
+	{
+	case EPMT_Beam: return Require(UParticleModuleTypeDataBeam::StaticClass(), "requires Beam TypeData");
+	case EPMT_Trail: return Require(UParticleModuleTypeDataRibbon::StaticClass(), "requires Ribbon TypeData");
+	default: return true;
+	}
+}
+
+bool FParticleSystemEditor::IsModuleCompatible(const UParticleEmitter* Emitter, const UParticleModule* Module, const char** OutReason) const
+{
+	const UParticleLODLevel* LODLevel = GetCurrentLODLevel(Emitter);
+	if (!LODLevel || !Module)
+	{
+		return true;
+	}
+	return IsModuleClassCompatible(LODLevel->GetTypeDataModule(), Module->GetClass(), OutReason);
 }
 
 void FParticleSystemEditor::OnRenderPreview()
@@ -115,7 +186,7 @@ void FParticleSystemEditor::FocusPreview() const
 	{
 		.Origin = (Box.Min + Box.Max) * 0.5f,
 		.BoxExtent = Extent,
-		.SphereRadius = FMath::Max(Extent.Size(), MinFocusRadius),
+		.SphereRadius = FMath::Max(Extent.Size() + (bOrbitPreview ? OrbitRadius : 0.0f), MinFocusRadius),
 	};
 
 	ViewportClient->FocusOnBounds(Bound);

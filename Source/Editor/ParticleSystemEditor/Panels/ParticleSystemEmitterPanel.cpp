@@ -27,6 +27,8 @@ namespace
 		case EPMT_Required: return IM_COL32(200, 190, 60, 255);
 		case EPMT_Spawn: return IM_COL32(200, 80, 60, 255);
 		case EPMT_TypeData: return IM_COL32(60, 160, 200, 255);
+		case EPMT_Beam: return IM_COL32(150, 90, 200, 255);
+		case EPMT_Trail: return IM_COL32(60, 180, 120, 255);
 		default: return IM_COL32(90, 90, 90, 255);
 		}
 	}
@@ -208,9 +210,14 @@ void FParticleSystemEmitterPanel::DrawModuleRow(UParticleEmitter* Emitter, UPart
 	const bool bListModule = ModuleIndex >= 0;
 	ImGui::PushID(Module);
 
+	const char* InvalidReason = nullptr;
+	const bool bCompatible = Editor.IsModuleCompatible(Emitter, Module, &InvalidReason);
+	constexpr ImU32 InvalidColor = IM_COL32(230, 70, 60, 255);
+
 	const ImVec2 Pos = ImGui::GetCursorScreenPos();
 	const float RowHeight = ImGui::GetFrameHeight();
-	ImGui::GetWindowDrawList()->AddRectFilled(Pos, ImVec2(Pos.x + 4.0f, Pos.y + RowHeight), GetModuleColor(Module));
+	ImGui::GetWindowDrawList()->AddRectFilled(Pos, ImVec2(Pos.x + 4.0f, Pos.y + RowHeight),
+		bCompatible ? GetModuleColor(Module) : InvalidColor);
 	ImGui::SetCursorScreenPos(ImVec2(Pos.x + 8.0f, Pos.y));
 
 	if (bListModule)
@@ -225,7 +232,12 @@ void FParticleSystemEmitterPanel::DrawModuleRow(UParticleEmitter* Emitter, UPart
 	}
 
 	const FString Name = GetModuleDisplayName(Module);
-	if (!Module->IsEnabled())
+	const bool bDimmed = !Module->IsEnabled();
+	if (!bCompatible)
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, InvalidColor);
+	}
+	else if (bDimmed)
 	{
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 	}
@@ -234,8 +246,12 @@ void FParticleSystemEmitterPanel::DrawModuleRow(UParticleEmitter* Emitter, UPart
 	{
 		Editor.SelectModule(Emitter, Module);
 	}
+	if (!bCompatible && ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("%s %s - this module has no effect", Name.c_str(), InvalidReason);
+	}
 
-	if (!Module->IsEnabled())
+	if (!bCompatible || bDimmed)
 	{
 		ImGui::PopStyleColor();
 	}
@@ -277,11 +293,20 @@ void FParticleSystemEmitterPanel::DrawModuleRow(UParticleEmitter* Emitter, UPart
 
 void FParticleSystemEmitterPanel::DrawAddModuleMenu(UParticleEmitter* Emitter)
 {
+	const UParticleLODLevel* LODLevel = Editor.GetCurrentLODLevel(Emitter);
+	const UParticleModuleTypeDataBase* TypeData = LODLevel ? LODLevel->GetTypeDataModule() : nullptr;
+
 	for (UClass* Class : GetAddableModuleClasses())
 	{
-		if (ImGui::MenuItem(Class->Name.c_str()))
+		const char* Reason = nullptr;
+		const bool bCompatible = FParticleSystemEditor::IsModuleClassCompatible(TypeData, Class, &Reason);
+		if (ImGui::MenuItem(Class->Name.c_str(), nullptr, false, bCompatible))
 		{
 			PendingAction = [this, Emitter, Class] { Editor.AddModule(Emitter, Class); };
+		}
+		if (!bCompatible && ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+		{
+			ImGui::SetTooltip("%s", Reason);
 		}
 	}
 }

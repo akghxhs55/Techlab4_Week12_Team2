@@ -101,7 +101,9 @@ void FParticleSystemEditorTab::DrawToolbar()
 
 	DrawLODTabs(*System);
 
-	DrawLODDistance(*System, LeftPadding);
+	DrawLODDistance(*System);
+
+	DrawOrbitControls(LeftPadding);
 
 	ImGui::Unindent(LeftPadding);
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (std::max)(VerticalPadding - Style.ItemSpacing.y, 0.0f));
@@ -109,7 +111,68 @@ void FParticleSystemEditorTab::DrawToolbar()
 	ImGui::Separator();
 }
 
-void FParticleSystemEditorTab::DrawLODDistance(const UParticleSystem& System, float RightPadding) const
+void FParticleSystemEditorTab::DrawOrbitControls(float RightPadding) const
+{
+	constexpr float FieldWidth = 80.0f;
+	const char* OrbitText = "Orbit Preview";
+
+	const ImGuiStyle& Style = ImGui::GetStyle();
+	const bool bOrbit = ParticleEditor.IsOrbitPreviewEnabled();
+
+	// 오른쪽 정렬
+	float GroupWidth = ImGui::GetFrameHeight() + Style.ItemInnerSpacing.x + ImGui::CalcTextSize(OrbitText).x;
+	if (bOrbit)
+	{
+		GroupWidth += 2.0f * (Style.ItemSpacing.x + FieldWidth);
+	}
+
+	ImGui::SameLine(0.0f, 24.0f);
+	const float TargetX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - GroupWidth - RightPadding;
+	if (TargetX > ImGui::GetCursorPosX())
+	{
+		ImGui::SetCursorPosX(TargetX);
+	}
+
+	bool bChecked = bOrbit;
+	if (ImGui::Checkbox(OrbitText, &bChecked))
+	{
+		ParticleEditor.SetOrbitPreviewEnabled(bChecked);
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Move the preview emitter in a circle (for Ribbon emitters)");
+	}
+	if (!bOrbit)
+	{
+		return;
+	}
+
+	ImGui::SameLine();
+	float Radius = ParticleEditor.GetOrbitRadius();
+	ImGui::SetNextItemWidth(FieldWidth);
+	if (ImGui::DragFloat("##OrbitRadius", &Radius, 1.0f, 0.0f, 10000.0f, "Radius %.0f"))
+	{
+		ParticleEditor.SetOrbitRadius(Radius);
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Orbit radius");
+	}
+
+	ImGui::SameLine();
+	float Speed = ParticleEditor.GetOrbitSpeed();
+	ImGui::SetNextItemWidth(FieldWidth);
+	if (ImGui::DragFloat("##OrbitSpeed", &Speed, 1.0f, -1080.0f, 1080.0f, "%.0f deg/s"))
+	{
+		ParticleEditor.SetOrbitSpeed(Speed);
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Orbit speed (negative = clockwise)");
+	}
+}
+
+void FParticleSystemEditorTab::DrawLODDistance(const UParticleSystem& System) const
 {
 	constexpr float SliderWidth = 160.0f;
 	const char* DistanceText = "Distance";
@@ -130,29 +193,7 @@ void FParticleSystemEditorTab::DrawLODDistance(const UParticleSystem& System, fl
 		snprintf(MaxLabel, sizeof(MaxLabel), "%.0f", MaxDistance);
 	}
 
-	// 오른쪽 정렬
-	const float Spacing = ImGui::GetStyle().ItemSpacing.x;
-	float GroupWidth = ImGui::CalcTextSize(DistanceText).x + Spacing;
-	if (bBase)
-	{
-		GroupWidth += ImGui::CalcTextSize(BaseText).x;
-	}
-	else
-	{
-		GroupWidth += ImGui::CalcTextSize(MinLabel).x + Spacing + SliderWidth;
-		if (!bLast)
-		{
-			GroupWidth += Spacing + ImGui::CalcTextSize(MaxLabel).x;
-		}
-	}
-
 	ImGui::SameLine(0.0f, 16.0f);
-	const float TargetX = ImGui::GetCursorPosX() + ImGui::GetContentRegionAvail().x - GroupWidth - RightPadding;
-	if (TargetX > ImGui::GetCursorPosX())
-	{
-		ImGui::SetCursorPosX(TargetX);
-	}
-
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted(DistanceText);
 	ImGui::SameLine();

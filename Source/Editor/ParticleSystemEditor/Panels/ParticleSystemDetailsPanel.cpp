@@ -2,6 +2,7 @@
 #include "ParticleSystemDetailsPanel.h"
 
 #include "Editor/Details/PropertyEditor.h"
+#include "Particles/ParticleModule.h"
 
 FParticleSystemDetailsPanel::FParticleSystemDetailsPanel(FParticleSystemEditor& InEditor)
 	: FParticleSystemEditorPanel(InEditor, "Details")
@@ -16,8 +17,27 @@ void FParticleSystemDetailsPanel::DrawContent()
 		ImGui::TextDisabled("Select an emitter or module.");
 		return;
 	}
+	UParticleModule* Module = Cast<UParticleModule>(Target);
+
+	const char* Reason = nullptr;
+	if (Module && !Editor.IsModuleCompatible(Editor.GetSelectedEmitter(), Module, &Reason))
+	{
+		ImGui::PushStyleColor(ImGuiCol_Text, IM_COL32(230, 80, 70, 255));
+		ImGui::TextWrapped("This module has no effect: %s", Reason);
+		ImGui::PopStyleColor();
+		ImGui::Separator();
+	}
+
+	const uint32 BytesBefore = Module ? Module->RequiredBytes() : 0;
 	if (FPropertyEditor::DrawObjectProperties(Target))
 	{
-		Editor.NotifyPropertyEdited();
+		if (Module && Module->RequiredBytes() != BytesBefore)
+		{
+			Editor.NotifyStructureChanged();
+		}
+		else
+		{
+			Editor.NotifyPropertyEdited();
+		}
 	}
 }
