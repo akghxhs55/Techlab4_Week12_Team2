@@ -47,6 +47,7 @@ public:
 	const TArray<FParticleEmitterInstance*>& GetEmitterInstances() const { return EmitterInstances; }
 	bool HasCompleted() const { return bWasCompleted; }
 	double GetSendRenderDataMs() const { return SendRenderDataMs; }
+	double GetEventDispatchMs() const { return EventDispatchMs; }
 
 	FPrimitiveSceneProxy* CreateSceneProxy() override;
 	FBox CalcBounds() const override;
@@ -122,6 +123,7 @@ private:
 	UParticleSystem* InitializedTemplate = nullptr;
 	bool bWasCompleted = false;
 	double SendRenderDataMs = 0.0;
+	double EventDispatchMs = 0.0;
 
 	int32 LODLevel = 0;
 	float LODCheckTimer = 0.0f;

@@ -228,7 +228,11 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	}
 
 	// 모든 에미터 Tick이 끝난 뒤에 배달한다. 순회 중인 파티클 배열을 Receiver가 건드리지 않게
+	// Receiver가 ForceSpawn으로 만드는 파티클 비용도 여기 포함된다.
+	// BroadcastGameEvents는 콜백이 이 컴포넌트를 파괴할 수 있어 재지 않는다
+	FScopeCycleCounter DispatchTimer{ TStatId{} };
 	const int32 Delivered = DispatchEvents();
+	EventDispatchMs = SmoothParticleStatMs(EventDispatchMs, DispatchTimer.Finish());
 	if (bLogEvents && Delivered > 0)
 	{
 		LoggedEventCounts["Delivered"] += Delivered;

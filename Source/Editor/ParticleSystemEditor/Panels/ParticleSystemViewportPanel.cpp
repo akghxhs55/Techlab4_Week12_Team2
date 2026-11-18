@@ -144,8 +144,9 @@ void FParticleSystemViewportPanel::DrawStatsOverlay(const ImVec2& ViewMin) const
 	TArray<FString> Summary;
 	Summary.Add(std::format("Particles {} / {}   Emitters {}   Memory {:.1f} KB",
 		TotalActive, TotalMax, Instances.Num(), static_cast<double>(TotalMemory) / 1024.0));
-	Summary.Add(std::format("CPU  Tick {:.3f} ms   Send {:.3f} ms   Build {:.3f} ms",
-		TotalTickMs, Component->GetSendRenderDataMs(), Proxy ? Proxy->GetBuildRenderDataMs() : 0.0));
+	Summary.Add(std::format("CPU  Tick {:.3f} ms   Event {:.3f} ms   Send {:.3f} ms   Build {:.3f} ms",
+		TotalTickMs, Component->GetEventDispatchMs(), Component->GetSendRenderDataMs(),
+		Proxy ? Proxy->GetBuildRenderDataMs() : 0.0));
 	Summary.Add(TotalActive > 0
 		? std::format("     Tick per particle {:.3f} us", TotalTickMs * 1000.0 / static_cast<double>(TotalActive))
 		: FString("     Tick per particle -"));

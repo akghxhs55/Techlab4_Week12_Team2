@@ -19,7 +19,7 @@ public:
 
 private:
 	// 이벤트 하나당 생성 수
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	FFloatDistribution SpawnCount;
 
 	// true면 이벤트 위치 대신 에미터 위치에 생성

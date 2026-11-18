@@ -48,37 +48,37 @@ public:
 
 private:
 	// 0 = 달라붙음, 1 = 같은 속도로 튐
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0, ClampMax=1, Delta=0.01))
 	FFloatDistribution Restitution;
 
 	// 0 = 계속 미끄러짐, 1 = 표면 방향 속도를 모두 잃음
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0, ClampMax=1, Delta=0.01))
 	FFloatDistribution Friction;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	FFloatDistribution RotationDamping;
 
 	// 생성 후 이 시간(초) 동안은 충돌하지 않는다 (생성 위치가 물체 안일 때)
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	FFloatDistribution DelayAmount;
 
 	// 0이면 제한 없음
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	int32 MaxCollisions = 3;
 
 	UPROPERTY(EditAnywhere)
 	EParticleCollisionComplete CompletionOption = EParticleCollisionComplete::Kill;
 
 	// 충돌 반지름 = max(Size.X, Size.Y) × RadiusScale. Size는 지름이라 0.5면 스프라이트 크기
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0, Delta=0.01))
 	float RadiusScale = 0.5f;
 
 	// 튕긴 뒤 법선 방향 속도가 이보다 작으면 0으로 (바닥에서 떨지 않고 미끄러지거나 멈춤)
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	float MinBounceSpeed = 20.0f;
 
 	// 충돌 지점에서 법선 방향으로 띄우는 거리 (다음 프레임에 시작부터 겹치지 않게)
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0, Delta=0.01))
 	float SurfaceOffset = 0.1f;
 
 	// 이펙트를 낸 액터와는 충돌하지 않는다 (총구 화염과 총)

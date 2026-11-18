@@ -21,7 +21,7 @@ struct FParticleEventGeneratorInfo
 	FString CustomName;
 
 	// N번째 사건마다 하나만 보낸다. 1 이하면 매번
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=1))
 	int32 Frequency = 1;
 
 	// Collision 전용: 그 파티클의 첫 충돌만 / 마지막 충돌(MaxCollisions 도달)만
