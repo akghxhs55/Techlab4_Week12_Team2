@@ -49,9 +49,7 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 
 	struct FRenderableOutlineTarget
 	{
-		FVertexBuffer* VertexBuffer = nullptr;
-		FIndexBuffer* IndexBuffer = nullptr;
-		const FStructuredBuffer* BoneBuffer = nullptr;
+		const FVertexFactory* VertexFactory = nullptr;
 		FMatrix World;
 		FMatrix NormalMatrix;
 	};
@@ -64,29 +62,21 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 			continue;
 		}
 
-		FVertexBuffer* VertexBuffer = nullptr;
-		FIndexBuffer* IndexBuffer = nullptr;
-		const FStructuredBuffer* BoneBuffer = nullptr;
+		const FVertexFactory* VertexFactory = nullptr;
 		if (UStaticMesh* StaticMesh = Target->GetRenderMesh())
 		{
-			VertexBuffer = StaticMesh->GetVertexBuffer();
-			IndexBuffer = StaticMesh->GetIndexBuffer();
+			VertexFactory = StaticMesh->GetVertexFactory();
 		}
 		else if (USkinnedMeshComponent* Skinned = Cast<USkinnedMeshComponent>(Target))
 		{
-			// CPU 경로는 현재 포즈가 들어 있는 인스턴스 VB, GPU 경로는 공유 VB와 본 버퍼로 그린다
 			if (FSkeletalMeshObject* MeshObject = Skinned->GetMeshObject())
-			{
-				VertexBuffer = MeshObject->GetVertexBuffer(0);
-				IndexBuffer = MeshObject->GetIndexBuffer(0);
-				BoneBuffer = MeshObject->GetBoneMatrixBuffer();
-			}
+				VertexFactory = MeshObject->GetVertexFactory(0);
 		}
 
-		if (VertexBuffer && IndexBuffer)
+		if (VertexFactory && VertexFactory->IsValid())
 		{
 			const FMatrix OriginalWorld = Target->GetWorldMatrix();
-			RenderTargets.Add({ VertexBuffer, IndexBuffer, BoneBuffer, OriginalWorld, OriginalWorld.Inverse().GetTransposed() });
+			RenderTargets.Add({ VertexFactory, OriginalWorld, OriginalWorld.Inverse().GetTransposed() });
 		}
 	}
 
@@ -99,28 +89,21 @@ void FOutlineRenderer::OnRender(const FOutline& InOutline, const FMatrix& InView
 	const FMatrix& ViewProj = InViewProj;
 	const float ViewportWidth = static_cast<float>(Viewport.Width);
 	const float ViewportHeight = static_cast<float>(Viewport.Height);
-	FShaderProgram* SkinnedShader = FRenderResourceManager::GetShaderProgram(Shader->Name + "#GPU_SKIN");
-
 	auto DrawPass = [&](const FPipelineState& BasePipeline, float ExpandPixels)
 	{
 		for (const FRenderableOutlineTarget& Item : RenderTargets)
 		{
 			FPipelineState Pipeline = BasePipeline;
-			if (Item.BoneBuffer)
-			{
-				if (!SkinnedShader) continue;
-				Pipeline.Shader = SkinnedShader;
-				RenderCommand::BindShaderResource(BoneMatrixBufferSlot, Item.BoneBuffer, EShaderBindFlagBits::Vertex);
-			}
+			Pipeline.Shader = FRenderResourceManager::ResolveShader(BasePipeline.Shader, Item.VertexFactory->GetType());
+			if (!Pipeline.Shader) continue;
 
-			RenderCommand::BindVertexBuffer(Item.VertexBuffer);
-			RenderCommand::BindIndexBuffer(Item.IndexBuffer);
+			Item.VertexFactory->Bind();
 			RenderCommand::BindConstantBuffer(0, ConstantBuffer.get(), EShaderBindFlagBits::Vertex);
 
 			FOutlineData ConstData = { Item.World, Item.NormalMatrix, ViewProj, FVector4(ViewportWidth, ViewportHeight, ExpandPixels, 0.0f) };
 			RenderCommand::BindPipelineState(Pipeline);
 			RenderCommand::UpdateBufferData(ConstantBuffer.get(), &ConstData, sizeof(ConstData));
-			RenderCommand::DrawIndexed(Item.IndexBuffer->GetIndexCount());
+			RenderCommand::DrawIndexed(Item.VertexFactory->GetIndexBuffer()->GetIndexCount());
 		}
 	};
 

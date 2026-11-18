@@ -56,6 +56,7 @@ bool FEditorSettingsManager::SaveSettings() const
 	File << "ShowVignette=" << Settings.bShowVignette << "\n";
 	File << "ShowCameraOverlay=" << Settings.bShowCameraOverlay << "\n";
 	File << "ShowSkeletalMesh=" << Settings.bShowSkeletalMesh << "\n";
+	File << "ShowParticles=" << Settings.bShowParticles << "\n";
 
 	File << "LightCullingMode=" << (Settings.LightCullingMode == ELightCullingMode::Off ? "Off" : "Tiled") << "\n";
 	File << "LightingModel=" << (Settings.LightingModel == ELightingModel::Gouraud ? "Gouraud" :
@@ -213,6 +214,7 @@ bool FEditorSettingsManager::LoadSettings()
 				else if (Key == "ShowVignette")      Settings.bShowVignette = std::stoi(ValueStr);
 				else if (Key == "ShowCameraOverlay") Settings.bShowCameraOverlay = std::stoi(ValueStr);
 				else if (Key == "ShowSkeletalMesh")  Settings.bShowSkeletalMesh = std::stoi(ValueStr);
+				else if (Key == "ShowParticles")     Settings.bShowParticles = std::stoi(ValueStr);
 
 				else if (Key == "LightCullingMode")
 				{

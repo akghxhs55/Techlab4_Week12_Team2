@@ -1551,21 +1551,26 @@ namespace
 
 	// UClass에 등록된 프로퍼티 한 줄. 구조체 멤버 하나가 바뀌어도 객체에는 바깥 프로퍼티(구조체)가 바뀌었다고 알린다.
 	// (UE는 FPropertyChangedEvent에 MemberProperty와 안쪽 Property를 따로 담는다)
-	void DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont)
+	bool DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont)
 	{
-		if (DrawPropertyRow(Object, Object, Property, CustomFont))
+		if (!DrawPropertyRow(Object, Object, Property, CustomFont))
 		{
-			Object->PostEditChangeProperty(Property);
+			return false;
 		}
+
+		Object->PostEditChangeProperty(Property);
+		return true;
 	}
 
 	// 클래스 계층을 따라 올라가며 각 단계의 프로퍼티를 표시
-	void DrawProperties(UObject* Object, ImFont* CustomFont)
+	bool DrawProperties(UObject* Object, ImFont* CustomFont)
 	{
 		if (!Object)
 		{
-			return;
+			return false;
 		}
+
+		bool bChanged = false;
 
 		TArray<UClass*> ClassChain;
 		for (UClass* Class = Object->GetClass(); Class; Class = Class->Super)
@@ -1605,12 +1610,14 @@ namespace
 
 					const bool bReadOnly = Property->HasAnyFlags(CPF_EditConst);
 					if (bReadOnly) ImGui::BeginDisabled();
-					DrawProperty(Object, *Property, CustomFont);
+					bChanged |= DrawProperty(Object, *Property, CustomFont);
 					if (bReadOnly) ImGui::EndDisabled();
 				}
 			}
 			ImGui::PopID();
 		}
+
+		return bChanged;
 	}
 
 	void DrawActorHeader(AActor* Actor, UActorComponent*& OutSelectedComponent, FEditorUndoHistory* UndoHistory)
@@ -2806,14 +2813,14 @@ namespace
 // 보조 함수들이 이 파일의 익명 네임스페이스에 있어 구현은 옮기지 않고 넘겨 준다.
 namespace FPropertyEditor
 {
-	void DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont)
+	bool DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont)
 	{
-		::DrawProperty(Object, Property, CustomFont);
+		return ::DrawProperty(Object, Property, CustomFont);
 	}
 
-	void DrawObjectProperties(UObject* Object, ImFont* CustomFont)
+	bool DrawObjectProperties(UObject* Object, ImFont* CustomFont)
 	{
-		DrawProperties(Object, CustomFont);
+		return DrawProperties(Object, CustomFont);
 	}
 
 	bool DrawVector3(const char* Label, float* Values, float ResetValue)

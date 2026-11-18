@@ -32,9 +32,8 @@ void FSkeletalMeshSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, const 
 	FSkeletalMeshObject* Object = Skinned->GetMeshObject();
 	if (!Object || !RenderState) return;
 
-	FVertexBuffer* VB = Object->GetVertexBuffer(0);
-	FIndexBuffer* IB = Object->GetIndexBuffer(0);
-	if (!VB || !IB) return;
+	const FVertexFactory* VertexFactory = Object->GetVertexFactory(0);
+	if (!VertexFactory || !VertexFactory->IsValid()) return;
 
 	const FVector Delta = GetBounds().Center - View.CameraPosition;
 	const float DistanceSq = Delta.Dot(Delta);
@@ -44,14 +43,11 @@ void FSkeletalMeshSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, const 
 		const FCachedMeshSection& Section = GetSection(i);
 		FRenderPacket& Packet = Queue.AddDefaulted_GetRef();
 		Packet.Proxy = this;
-		Packet.VertexBuffer = VB;
-		Packet.IndexBuffer = IB;
-		Packet.BoneBuffer = Object->GetBoneMatrixBuffer();
+		Packet.VertexFactory = VertexFactory;
 		Packet.Material = Section.Material;
 		Packet.StartIndex = Section.StartIndex;
 		Packet.IndexCount = Section.IndexCount;
 		Packet.CameraToParticleDistance = DistanceSq;
-		Packet.BoneBuffer = Object->GetBoneMatrixBuffer();
 		Packet.DebugWeightBone = Skinned->GetDebugWeightBone();
 	}
 }

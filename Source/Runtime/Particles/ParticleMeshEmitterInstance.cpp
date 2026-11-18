@@ -4,6 +4,8 @@
 #include "ParticleLODLevel.h"
 #include "ParticleTypes.h"
 #include "Module/ParticleModuleTypeDataMesh.h"
+#include "Render/Mesh.h"
+#include "Engine/ParticleSystemRender.h"
 
 void FParticleMeshEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleSystemComponent* InComponent)
 {
@@ -11,6 +13,18 @@ void FParticleMeshEmitterInstance::Init(UParticleEmitter* InTemplate, UParticleS
 	FParticleEmitterInstance::Init(InTemplate, InComponent);
 
 	MeshTypeData = CurrentLODLevel ? Cast<UParticleModuleTypeDataMesh>(CurrentLODLevel->GetTypeDataModule()) : nullptr;
+}
+
+void FParticleMeshEmitterInstance::UpdateDynamicData(TUniquePtr<FDynamicEmitterDataBase>& InOutData) const
+{
+	if (!InOutData || InOutData->GetType() != EDynamicEmitterType::Mesh)
+		InOutData = MakeUnique<FDynamicMeshEmitterData>();
+
+	FDynamicMeshEmitterReplayData& Source = static_cast<FDynamicMeshEmitterData&>(*InOutData).Source;
+	FillReplayData(Source);
+	Source.Mesh = MeshTypeData ? MeshTypeData->GetMesh() : nullptr;
+	Source.bOverrideMaterial = MeshTypeData && MeshTypeData->IsOverrideMaterial();
+	Source.MeshRotationPayloadOffset = InstancePayloadOffset;
 }
 
 FMeshRotationPayloadData& FParticleMeshEmitterInstance::GetMeshRotationPayload(FBaseParticle& Particle) const
@@ -63,5 +77,23 @@ void FParticleMeshEmitterInstance::UpdateBoundingBox(float DeltaTime)
 		Payload.Rotation += Payload.RotationRate * DeltaTime;
 	}
 
+	// 에디터에서 메시를 바꿀 수 있으므로 매번 다시 읽는다
+	MeshRadius = 0.0f;
+	if (const UStaticMesh* Mesh = MeshTypeData ? MeshTypeData->GetMesh() : nullptr)
+	{
+		const FBox& MeshBounds = Mesh->GetRenderBounds();
+		const FVector MaxCorner(
+			std::max(std::abs(MeshBounds.Min.X), std::abs(MeshBounds.Max.X)),
+			std::max(std::abs(MeshBounds.Min.Y), std::abs(MeshBounds.Max.Y)),
+			std::max(std::abs(MeshBounds.Min.Z), std::abs(MeshBounds.Max.Z)));
+		MeshRadius = MaxCorner.Length();
+	}
+
 	FParticleEmitterInstance::UpdateBoundingBox(DeltaTime);
+}
+
+float FParticleMeshEmitterInstance::GetParticleRadius(const FBaseParticle& Particle) const
+{
+	const float MaxSize = std::max(std::abs(Particle.Size.X), std::max(std::abs(Particle.Size.Y), std::abs(Particle.Size.Z)));
+	return MeshRadius * MaxSize;
 }

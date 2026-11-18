@@ -1,6 +1,7 @@
 #pragma once
 
 #include <d3d11_1.h>
+#include <span>
 #include "RenderStates.h"
 #include "Core/EngineString.h"
 
@@ -51,7 +52,8 @@ public:
 	TUniquePtr<FTexture2DArray> CreateTexture2DArray(const D3D11_TEXTURE2D_DESC& Desc, const void* InitialData);
 	TUniquePtr<FTexture2D> LoadDDSTexture(const FString& Path);
 
-	TUniquePtr<FVertexShader> CreateVertexShader(const FShaderByteCode& ByteCode);
+	TUniquePtr<FVertexShader> CreateVertexShader(const FShaderByteCode& ByteCode,
+		std::span<const D3D11_INPUT_ELEMENT_DESC> Elements = {});
 	TUniquePtr<FPixelShader> CreatePixelShader(const FShaderByteCode& ByteCode);
 	TUniquePtr<FComputeShader> CreateComputeShader(const FShaderByteCode& ByteCode);
 

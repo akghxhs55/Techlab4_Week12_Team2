@@ -230,9 +230,10 @@ TUniquePtr<FTexture2D> FRenderDevice::LoadDDSTexture(const FString& Path) {
 }
 
 
-TUniquePtr<FVertexShader> FRenderDevice::CreateVertexShader(const FShaderByteCode& ByteCode)
+TUniquePtr<FVertexShader> FRenderDevice::CreateVertexShader(const FShaderByteCode& ByteCode,
+	std::span<const D3D11_INPUT_ELEMENT_DESC> Elements)
 {
-	TUniquePtr<FVertexShader> VS = MakeUnique<FVertexShader>(Device.Get(), ByteCode);
+	TUniquePtr<FVertexShader> VS = MakeUnique<FVertexShader>(Device.Get(), ByteCode, Elements);
 
 	return VS;
 }
@@ -250,43 +251,6 @@ TUniquePtr<FComputeShader> FRenderDevice::CreateComputeShader(const FShaderByteC
 
 	return CS;
 }
-
-//TUniquePtr<FShaderProgram> FRenderDevice::CreateShader(const wchar_t* FileName, D3D11_INPUT_ELEMENT_DESC* InLayoutDesc, size_t InLayoutSize)
-//{
-	//TUniquePtr<FShaderProgram> Shader = MakeUnique<FShaderProgram>();
-
-	//ID3DBlob* VertexShaderCSO;
-	//ID3DBlob* ErrorBlob;
-	//HRESULT hr = D3DCompileFromFile(FileName, nullptr, nullptr, "mainVS", "vs_5_0", 0, 0, &VertexShaderCSO, &ErrorBlob);
-
-	//if (FAILED(hr))
-	//{
-	//	if (ErrorBlob)
-	//	{
-	//		OutputDebugStringA((char*)ErrorBlob->GetBufferPointer());
-	//		ErrorBlob->Release();
-	//	}
-	//	assert(false && "Vertex shader compile failed");
-	//	return nullptr; 
-	//}
-
-	//hr = Device->CreateVertexShader(VertexShaderCSO->GetBufferPointer(), VertexShaderCSO->GetBufferSize(), nullptr, Shader->VertexShader.GetAddressOf());
-
-	//ID3DBlob* PixelShaderCSO;
-	//D3DCompileFromFile(FileName, nullptr, nullptr, "mainPS", "ps_5_0", 0, 0, &PixelShaderCSO, nullptr);
-	//Device->CreatePixelShader(PixelShaderCSO->GetBufferPointer(), PixelShaderCSO->GetBufferSize(), nullptr, Shader->PixelShader.GetAddressOf());
-
-	//if (InLayoutSize > 0)
-	//{
-	//	hr = Device->CreateInputLayout(InLayoutDesc, InLayoutSize,
-	//		VertexShaderCSO->GetBufferPointer(), VertexShaderCSO->GetBufferSize(), &(Shader->InputLayout));
-	//}
-
-	//VertexShaderCSO->Release();
-	//PixelShaderCSO->Release();
-
-	//return Shader;
-//}
 
 void FRenderDevice::Shutdown()
 {
@@ -322,7 +286,7 @@ void FRenderDevice::CreateStates()
 		LightShadowDesc.CullMode = D3D11_CULL_BACK;
 		LightShadowDesc.FrontCounterClockwise = FALSE;
 		LightShadowDesc.DepthClipEnable = TRUE;
-		// 깊이 bias는 ShadowDepth.hlsl이 Caster 깊이에 더한다 (언리얼 UpdateShaderDepthBias). 하드웨어 bias는 쓰지 않는다.
+		// 깊이 bias는 ShadowDepth.hlsl이 Caster 깊이에 더한다. 하드웨어 bias는 쓰지 않는다.
 		LightShadowDesc.DepthBias = 0;
 		LightShadowDesc.SlopeScaledDepthBias = 0.0f;
 		LightShadowDesc.DepthBiasClamp = 0.0f;

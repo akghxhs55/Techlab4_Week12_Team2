@@ -355,6 +355,10 @@ namespace
 		{
 			return { "Blend Space", IM_COL32(138, 198, 72, 255), true };
 		}
+		if (ParticleSystemFile::IsParticleSystemPath(PathString))
+		{
+			return { "Particle System", IM_COL32(1, 202, 252, 255), true };
+		}
 		if (FFbxMeshBake::IsBakedPath(PathString))
 		{
 			const std::string LowerPath = ToLowerAscii(PathString);
@@ -1093,6 +1097,11 @@ void FContentDrawerPanel::RenderContents()
 						Thumbnail = FontAsset->AtlasTexture;
 					}
 
+					if (ParticleSystemFile::IsParticleSystemPath(PathString))
+					{
+						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(ParticleSystemIconPath);
+					}
+
 					if (MeshThumbId == ImTextureID_Invalid && Thumbnail == nullptr)
 					{
 						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(FileIconPath);
@@ -1205,7 +1214,7 @@ void FContentDrawerPanel::RenderContents()
 							OnOpenMesh(PathString);
 						}
 
-						else if ((BlendSpaceFile::IsBlendSpacePath(PathString) || AnimBlueprintFile::IsAnimBlueprintPath(PathString)) && OnOpenMesh)
+						else if ((BlendSpaceFile::IsBlendSpacePath(PathString) || AnimBlueprintFile::IsAnimBlueprintPath(PathString) ||	ParticleSystemFile::IsParticleSystemPath(PathString)) && OnOpenMesh)
 						{
 							OnOpenMesh(PathString);
 						}

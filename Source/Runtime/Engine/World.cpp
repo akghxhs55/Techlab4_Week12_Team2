@@ -297,6 +297,15 @@ void UWorld::PreviewWorldTick(float DeltaTime)
 		Comp->TickComponent(DeltaTime);
 	}
 
+	for (TObjectIterator<UParticleSystemComponent> Comp; Comp; ++Comp)
+	{
+		// 다른 월드(PIE, 프리뷰) 소속이거나 등록 안 된 컴포넌트는 제외 (PIE 컴포넌트 이중 Tick 방지)
+		if (!Comp || !Comp->IsRegistered() || Comp->GetWorld() != this)
+		{
+			continue;
+		}
+		Comp->TickComponent(DeltaTime);
+	}
 }
 
 void UWorld::ClearWorld()

@@ -1,5 +1,6 @@
 #pragma once
 #include <wrl/client.h>
+#include <span>
 #include "../Core/Types.h"
 
 #include "RenderEnums.h"
@@ -58,7 +59,9 @@ protected:
 class FVertexShader : public FShader
 {
 public:
-	FVertexShader(ID3D11Device* Device, const FShaderByteCode& ByteCode);
+	// Elements가 비어 있으면 셰이더 리플렉션으로 레이아웃을 만든다
+	FVertexShader(ID3D11Device* Device, const FShaderByteCode& ByteCode,
+		std::span<const D3D11_INPUT_ELEMENT_DESC> Elements = {});
 	virtual ~FVertexShader() = default;
 
 	ID3D11VertexShader* GetShader() const { return VertexShader.Get(); }
@@ -94,6 +97,7 @@ public:
 	FVertexShader* VertexShader;
 	FPixelShader* PixelShader;
 	FString Name; // ShaderProgramMap 키
+	bool bUsesVertexFactory = false; // VertexFactory.hlsli로 정점을 받아 정점 타입별 변형이 있다
 };
 
 class FComputeShader : public FShader

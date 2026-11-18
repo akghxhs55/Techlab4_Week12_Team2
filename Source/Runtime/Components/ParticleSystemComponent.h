@@ -48,6 +48,7 @@ public:
 	bool HasCompleted() const { return bWasCompleted; }
 
 	FPrimitiveSceneProxy* CreateSceneProxy() override;
+	FBox CalcBounds() const override;
 	FBox CalcLocalBounds() const override;
 
 	using Super::Serialize; // FArchive& 오버로드가 가려지지 않도록
@@ -104,6 +105,8 @@ public:
 	void SetPreviewLODOverride(int32 InLODLevel);
 
 private:
+	// 에미터마다 렌더 사본을 갱신해 프록시에 넘긴다
+	void SendRenderDynamicData();
 	// 에셋의 LODMethod에 따라 주기적으로 LOD를 다시 고른다
 	void UpdateLODLevel(float DeltaTime);
 	// 범위를 맞춰 저장하고 모든 인스턴스에 전달

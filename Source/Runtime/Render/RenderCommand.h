@@ -47,7 +47,8 @@ public:
 	static TUniquePtr<FTexture2DArray> CreateTexture2DArray(const FTextureDesc& Desc, const void* InitialData = nullptr);
 	// ArraySize는 면 개수(6)로 고정된다.
 
-	static TUniquePtr<FVertexShader> CreateVertexShader(const FShaderByteCode& ByteCode);
+	static TUniquePtr<FVertexShader> CreateVertexShader(const FShaderByteCode& ByteCode,
+		std::span<const D3D11_INPUT_ELEMENT_DESC> Elements = {});
 	static TUniquePtr<FPixelShader> CreatePixelShader(const FShaderByteCode& ByteCode);
 	static TUniquePtr<FComputeShader> CreateComputeShader(const FShaderByteCode& ByteCode);
 
