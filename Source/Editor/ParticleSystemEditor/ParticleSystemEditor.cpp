@@ -630,5 +630,7 @@ void FParticleSystemEditor::ShutdownResources()
 
 TUniquePtr<IEditorTab> FParticleSystemEditor::CreateTab()
 {
-	return MakeUnique<FParticleSystemEditorTab>(*this);
+	TUniquePtr<FParticleSystemEditorTab> NewTab = MakeUnique<FParticleSystemEditorTab>(*this);
+	NewTab->SetBottomDrawerPanels(EditorEngine.GetContentDrawerPanel(), EditorEngine.GetOutputLogPanel());
+	return NewTab;
 }

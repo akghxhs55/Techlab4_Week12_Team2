@@ -3,6 +3,7 @@
 #include "AssetEditorTab.h"
 #include "AssetEditorPanel.h"
 #include "Containers/Array.h"
+#include "Editor/EditorUI/BottomDrawerBar.h"
 
 class FDockedAssetEditorTab : public FAssetEditorTab
 {
@@ -10,8 +11,10 @@ public:
     FDockedAssetEditorTab(FAssetEditor& InEditor, const char* DockSpaceName, const char* PanelClassName);
 
     void DrawMenuBar() override;
-    bool HasFocusedSubWindow() const override { return EditorDock::HasFocusedPanel(Panels); }
+    bool HasFocusedSubWindow() const override { return BottomBar.IsFocused() || EditorDock::HasFocusedPanel(Panels); }
     void OnRender(bool bActive) override;
+
+    void SetBottomDrawerPanels(FContentDrawerPanel* InContentDrawer, FOutputLogPanel* InOutputLog);
 
 protected:
     void RegisterPanel(TUniquePtr<FAssetEditorPanelBase> Panel);
@@ -31,5 +34,6 @@ private:
     FAssetEditor& Editor;
     ImGuiID DockSpaceId = 0;
     ImGuiID PanelClassId = 0;
+    FBottomDrawerBar BottomBar;
     bool bLayoutInitialized = false;
 };

@@ -1,6 +1,7 @@
 #include "EnginePCH.h"
 #include "DockedAssetEditorTab.h"
 #include "AssetEditor.h"
+#include <algorithm>
 
 FDockedAssetEditorTab::FDockedAssetEditorTab(FAssetEditor& InEditor, const char* DockSpaceName, const char* PanelClassName)
     : FAssetEditorTab(InEditor)
@@ -39,6 +40,12 @@ void FDockedAssetEditorTab::DrawMenuBar()
     EditorDock::DrawWindowMenu(Panels);
 }
 
+void FDockedAssetEditorTab::SetBottomDrawerPanels(FContentDrawerPanel* InContentDrawer, FOutputLogPanel* InOutputLog)
+{
+    BottomBar.SetPanels(InContentDrawer, InOutputLog);
+    BottomBar.SetAllowDocking(false);
+}
+
 void FDockedAssetEditorTab::OnRender(bool bActive)
 {
     BeforeRender();
@@ -47,14 +54,26 @@ void FDockedAssetEditorTab::OnRender(bool bActive)
         return;
     }
 
+    const bool bShowBottomBar = BottomBar.HasPanels();
+    if (bShowBottomBar)
+    {
+        BottomBar.BeginFrame(bActive);
+    }
+
     if (bActive)
     {
         DrawToolbar();
     }
 
+    const ImVec2 TabWinPos = ImGui::GetWindowPos();
+
     if (ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_DockingEnable)
     {
-        const ImVec2 Size = ImGui::GetContentRegionAvail();
+        ImVec2 Size = ImGui::GetContentRegionAvail();
+        if (bShowBottomBar)
+        {
+            Size.y = std::max(1.0f, Size.y - FBottomDrawerBar::GetHeight() - ImGui::GetStyle().ItemSpacing.y);
+        }
         if (bActive && Size.x > 0.0f && Size.y > 0.0f &&
             (!bLayoutInitialized || !ImGui::DockBuilderGetNode(DockSpaceId)))
         {
@@ -67,7 +86,8 @@ void FDockedAssetEditorTab::OnRender(bool bActive)
         const ImGuiDockNodeFlags Flags = bActive ? ImGuiDockNodeFlags_None : ImGuiDockNodeFlags_KeepAliveOnly;
         if (bActive || ImGui::DockBuilderGetNode(DockSpaceId))
         {
-            ImGui::DockSpace(DockSpaceId, ImVec2(0.0f, 0.0f), Flags, &WindowClass);
+            const float DockHeight = (bActive && bShowBottomBar) ? Size.y : 0.0f;
+            ImGui::DockSpace(DockSpaceId, ImVec2(0.0f, DockHeight), Flags, &WindowClass);
         }
     }
 
@@ -77,5 +97,10 @@ void FDockedAssetEditorTab::OnRender(bool bActive)
         {
             Panel->OnRender();
         }
+    }
+
+    if (bActive && bShowBottomBar)
+    {
+        BottomBar.Draw(TabWinPos);
     }
 }

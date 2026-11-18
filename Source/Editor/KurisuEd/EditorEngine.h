@@ -112,6 +112,9 @@ public:
 	FGizmo* GetGizmo() const { return Gizmo.get(); }
 	// 지금 선택된 메시의 외곽선
 	FOutline* GetOutline() const { return Outline.get(); }
+	// 레벨 에디터가 소유한 하단 드로어 패널
+	FContentDrawerPanel* GetContentDrawerPanel() const { return ContentDrawerPanel; }
+	FOutputLogPanel* GetOutputLogPanel() const { return OutputLogPanel; }
 
 	// 에디터 월드가 들어 있는 월드 컨텍스트. UE에서도 public이라 GEditor->GetEditorWorldContext().World()로 에디터 월드를 얻는다.
 	FWorldContext& GetEditorWorldContext();
