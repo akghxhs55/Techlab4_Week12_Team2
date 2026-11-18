@@ -20,11 +20,37 @@ namespace
 		else if (bMaxEdited) Min = Max;
 	}
 
+	// Curve 모드로 막 바꿨는데 키가 없으면 현재 상수값으로 평평한 키 두 개를 넣는다.
+	void SeedCurve(TArray<FFloatCurveKey>& Keys, float Value)
+	{
+		if (!Keys.IsEmpty())
+		{
+			return;
+		}
+
+		FFloatCurveKey First;
+		First.KeyId = 0;
+		First.Time = 0.0f;
+		First.Value = Value;
+		Keys.Add(First);
+
+		FFloatCurveKey Last;
+		Last.KeyId = 1;
+		Last.Time = 1.0f;
+		Last.Value = Value;
+		Keys.Add(Last);
+	}
+
 	bool DrawFloatDistribution(UObject* Owner, void* StructPtr, const UScriptStruct& Struct, const FPropertyMeta& OuterMeta, ImFont* CustomFont)
 	{
 		FFloatDistribution& Distribution = *static_cast<FFloatDistribution*>(StructPtr);
 
+		const EDistributionMode OldMode = Distribution.Mode;
 		bool bChanged = FPropertyEditor::DrawStructMember(Owner, StructPtr, Struct, "Mode", CustomFont);
+		if (OldMode != Distribution.Mode && Distribution.Mode == EDistributionMode::Curve)
+		{
+			SeedCurve(Distribution.CurveKeys, Distribution.Constant);
+		}
 
 		switch (Distribution.Mode)
 		{
@@ -51,7 +77,14 @@ namespace
 	{
 		FVectorDistribution& Distribution = *static_cast<FVectorDistribution*>(StructPtr);
 
+		const EDistributionMode OldMode = Distribution.Mode;
 		bool bChanged = FPropertyEditor::DrawStructMember(Owner, StructPtr, Struct, "Mode", CustomFont);
+		if (OldMode != Distribution.Mode && Distribution.Mode == EDistributionMode::Curve)
+		{
+			SeedCurve(Distribution.CurveKeysX, Distribution.Constant.X);
+			SeedCurve(Distribution.CurveKeysY, Distribution.Constant.Y);
+			SeedCurve(Distribution.CurveKeysZ, Distribution.Constant.Z);
+		}
 
 		switch (Distribution.Mode)
 		{
