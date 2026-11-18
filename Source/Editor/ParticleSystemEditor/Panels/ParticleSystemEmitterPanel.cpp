@@ -33,18 +33,42 @@ namespace
 		}
 	}
 
+	FString StripPrefix(const FString& Name, const char* Prefix)
+	{
+		const size_t Len = strlen(Prefix);
+		if (Name.compare(0, Len, Prefix) == 0 && Name.size() > Len)
+		{
+			return Name.substr(Len);
+		}
+		return Name;
+	}
+
 	FString GetModuleDisplayName(const UParticleModule* Module)
 	{
 		FString Name = Module->GetClass()->Name;
 		for (const char* Prefix : { "UParticleModule", "ParticleModule" })
 		{
-			const size_t Len = strlen(Prefix);
-			if (Name.compare(0, Len, Prefix) == 0 && Name.size() > Len)
+			const FString Stripped = StripPrefix(Name, Prefix);
+			if (Stripped.size() != Name.size())
 			{
-				return Name.substr(Len);
+				Name = Stripped;
+				break;
 			}
 		}
+
+		// TypeData 모듈은 에미터 종류 이름(Mesh, Beam, Ribbon ...)으로 표시. Base는 스프라이트
+		if (Module->GetModuleType() == EPMT_TypeData)
+		{
+			const FString TypeName = StripPrefix(Name, "TypeData");
+			return TypeName == "Base" ? FString("Sprite") : TypeName;
+		}
 		return Name;
+	}
+
+	// 오른쪽 끝에 Enabled 체크박스를 둘 때 이름 Selectable이 쓸 수 있는 폭
+	float GetWidthBeforeRightCheckbox()
+	{
+		return (std::max)(ImGui::GetContentRegionAvail().x - ImGui::GetFrameHeight() - ImGui::GetStyle().ItemSpacing.x, 1.0f);
 	}
 }
 
@@ -134,18 +158,11 @@ void FParticleSystemEmitterPanel::DrawEmitterColumn(int32 EmitterIndex, UParticl
 
 void FParticleSystemEmitterPanel::DrawEmitterHeader(int32 EmitterIndex, UParticleEmitter* Emitter, UParticleLODLevel* LODLevel)
 {
-	bool bEnabled = LODLevel->IsEnabled();
-	if (ImGui::Checkbox("Enabled", &bEnabled))
-	{
-		LODLevel->SetEnabled(bEnabled);
-		Editor.NotifyPropertyEdited();
-	}
-	ImGui::SameLine();
-
 	char Label[32];
 	snprintf(Label, sizeof(Label), "Emitter %d", EmitterIndex);
 	const bool bSelected = Editor.GetSelectedEmitter() == Emitter && !Editor.IsModuleSelected();
-	if (ImGui::Selectable(Label, bSelected))
+	ImGui::AlignTextToFramePadding();
+	if (ImGui::Selectable(Label, bSelected, ImGuiSelectableFlags_None, ImVec2(GetWidthBeforeRightCheckbox(), 0)))
 	{
 		Editor.SelectEmitter(Emitter);
 	}
@@ -167,6 +184,15 @@ void FParticleSystemEmitterPanel::DrawEmitterHeader(int32 EmitterIndex, UParticl
 			}
 		}
 		ImGui::EndDragDropTarget();
+	}
+
+	// 드래그/드롭이 Selectable에 붙도록 체크박스는 그 뒤에 그린다
+	ImGui::SameLine();
+	bool bEnabled = LODLevel->IsEnabled();
+	if (ImGui::Checkbox("##Enabled", &bEnabled))
+	{
+		LODLevel->SetEnabled(bEnabled);
+		Editor.NotifyPropertyEdited();
 	}
 
 	if (ImGui::BeginPopupContextWindow("##EmitterMenu"))
@@ -219,17 +245,7 @@ void FParticleSystemEmitterPanel::DrawModuleRow(UParticleEmitter* Emitter, UPart
 	ImGui::GetWindowDrawList()->AddRectFilled(Pos, ImVec2(Pos.x + 4.0f, Pos.y + RowHeight),
 		bCompatible ? GetModuleColor(Module) : InvalidColor);
 	ImGui::SetCursorScreenPos(ImVec2(Pos.x + 8.0f, Pos.y));
-
-	if (bListModule)
-	{
-		bool bEnabled = Module->IsEnabled();
-		if (ImGui::Checkbox("##On", &bEnabled))
-		{
-			Module->SetEnabled(bEnabled);
-			Editor.NotifyPropertyEdited();
-		}
-		ImGui::SameLine();
-	}
+	ImGui::AlignTextToFramePadding();
 
 	const FString Name = GetModuleDisplayName(Module);
 	const bool bDimmed = !Module->IsEnabled();
@@ -242,7 +258,8 @@ void FParticleSystemEmitterPanel::DrawModuleRow(UParticleEmitter* Emitter, UPart
 		ImGui::PushStyleColor(ImGuiCol_Text, ImGui::GetStyleColorVec4(ImGuiCol_TextDisabled));
 	}
 
-	if (ImGui::Selectable(Name.c_str(), Editor.GetSelectedModule() == Module, ImGuiSelectableFlags_None, ImVec2(0, RowHeight)))
+	const float NameWidth = bListModule ? GetWidthBeforeRightCheckbox() : 0.0f;
+	if (ImGui::Selectable(Name.c_str(), Editor.GetSelectedModule() == Module, ImGuiSelectableFlags_None, ImVec2(NameWidth, 0)))
 	{
 		Editor.SelectModule(Emitter, Module);
 	}
@@ -285,6 +302,15 @@ void FParticleSystemEmitterPanel::DrawModuleRow(UParticleEmitter* Emitter, UPart
 				PendingAction = [this, Emitter, Module] { Editor.RemoveModule(Emitter, Module); };
 			}
 			ImGui::EndPopup();
+		}
+
+		// 드래그/드롭과 컨텍스트 메뉴가 Selectable에 붙도록 체크박스는 마지막에 그린다
+		ImGui::SameLine();
+		bool bEnabled = Module->IsEnabled();
+		if (ImGui::Checkbox("##On", &bEnabled))
+		{
+			Module->SetEnabled(bEnabled);
+			Editor.NotifyPropertyEdited();
 		}
 	}
 

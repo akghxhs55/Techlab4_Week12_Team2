@@ -29,6 +29,7 @@ class UParticleModuleSpawn : public UParticleModule
 public:
 	UParticleModuleSpawn();
 
+	EModuleType GetModuleType() const override { return EPMT_Spawn; }
 	void BakeDistributions() override;
 
 	float GetSpawnRate(float EmitterTime, FRandomStream& Random) const;

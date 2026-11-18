@@ -32,6 +32,8 @@ class UParticleModuleRequired : public UParticleModule
 {
 	GENERATED_BODY()
 public:
+	EModuleType GetModuleType() const override { return EPMT_Required; }
+
 	float GetEmitterDuration() const { return EmitterDuration; }
 	int32 GetEmitterLoops() const { return EmitterLoops; }
 	float GetEmitterDelay() const { return EmitterDelay; }
