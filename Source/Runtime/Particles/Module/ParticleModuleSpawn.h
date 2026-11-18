@@ -42,9 +42,9 @@ public:
 	void ClearBursts() { BurstList.Empty(); }
 
 private:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	FFloatDistribution Rate;        // 초당 생성 수
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	FFloatDistribution RateScale;   // Rate에 곱하는 배율
 	UPROPERTY(EditAnywhere)
 	TArray<FParticleBurst> BurstList;

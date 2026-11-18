@@ -21,7 +21,7 @@ public:
 private:
 	UPROPERTY(EditAnywhere)
 	FVectorDistribution StartColor;   // RGB
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0, ClampMax=1, Delta=0.01))
 	FFloatDistribution  StartAlpha;   // A
 
 	UPROPERTY(EditAnywhere)

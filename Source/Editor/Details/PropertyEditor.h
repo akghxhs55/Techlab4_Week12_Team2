@@ -5,16 +5,18 @@ class UObject;
 class FProperty;
 struct FRotator;
 class UScriptStruct;
+struct FPropertyMeta;
 
 namespace FPropertyEditor
 {
 	// USTRUCT 하나를 그리는 함수
-	using FStructDrawer = bool(*)(UObject* Owner, void* StructPtr, const UScriptStruct& Struct, ImFont* CustomFont);
+	using FStructDrawer = bool(*)(UObject* Owner, void* StructPtr, const UScriptStruct& Struct, const FPropertyMeta& OuterMeta, ImFont* CustomFont);
 
 	// 이 구조체를 그릴 때 기본 멤버 나열 대신 Drawer를 쓴다. 같은 구조체를 다시 등록하면 덮어쓴다.
 	void RegisterStructDrawer(const UScriptStruct* Struct, FStructDrawer Drawer);
 	// 구조체 멤버 하나를 기본 위젯(라벨 | 값)으로 그린다. 커스텀 Drawer 안에서 쓴다. 값이 바뀌면 true.
-	bool DrawStructMember(UObject* Owner, void* StructPtr, const UScriptStruct& Struct, const char* MemberName, ImFont* CustomFont = nullptr);
+	bool DrawStructMember(UObject* Owner, void* StructPtr, const UScriptStruct& Struct, const char* MemberName,
+		ImFont* CustomFont = nullptr, const FPropertyMeta* MetaOverride = nullptr);
 
 	// DetailsPanel.cpp의 DrawProperty를 그대로 옮긴다 (값이 바뀌면 PostEditChangeProperty 호출).
 	bool DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont = nullptr);
