@@ -33,11 +33,25 @@ workspace "Kurisu"
 
 	multiprocessorcompile "On"
 
-	-- 엔진 Debug lib가 수백 MB라 32비트 링커/Lib.exe가 읽다가 간헐적으로
-	-- LNK1236(COFF 섹션 손상)을 낸다. 64비트 호스트 툴체인을 쓴다
+	-- 엔진 Debug lib·pdb가 수백 MB라 64비트 호스트 툴체인(컴파일러·링커)을 쓴다
 	preferredtoolarchitecture "x86_64"
 
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
+
+-- 엔진을 참조하는 exe는 KurisuEngine.lib 대신 엔진의 .obj를 직접 링크한다 (VS "라이브러리 종속성 입력 사용").
+-- .obj를 직접 넘기면 링커가 하나도 버리지 않으므로 /WHOLEARCHIVE 없이도 UClass 정적 등록이 남는다.
+-- /WHOLEARCHIVE + 증분 링크 조합은 바뀐 obj를 다시 링크할 때 간헐적으로 LNK1236(COFF 섹션 손상)이 나고
+-- 다시 빌드하면 성공하는 MSVC 링커 문제가 있어 피한다.
+local vstudio = require("vstudio")
+premake.override(vstudio.vc2010.elements, "projectReferences", function(base, prj, ref)
+	local calls = base(prj, ref)
+	if prj.kind ~= "StaticLib" and ref.name == "KurisuEngine" then
+		table.insert(calls, function()
+			vstudio.vc2010.element("UseLibraryDependencyInputs", nil, "true")
+		end)
+	end
+	return calls
+end)
 
 -- 에디터 FBX 임포터는 저장소에 포함한 Windows x64 동적 링크 SDK를 사용한다.
 local FbxSdkRoot = path.join(ProjectRoot, "Source/ThirdParty/FBX")
@@ -177,7 +191,7 @@ project "KurisuEngine"
 	filter {}
 
 	-- d3d11·dxgi 등 시스템 라이브러리는 여기서 링크하지 않는다. exe 프로젝트들이 링크한다.
-	-- 정적 라이브러리가 임포트 라이브러리를 품고 있으면 exe의 /WHOLEARCHIVE가 그것까지 끌어와
+	-- 정적 라이브러리가 임포트 라이브러리를 품고 있으면 exe가 엔진 산출물을 통째로 링크할 때 그것까지 끌어와
 	-- __NULL_IMPORT_DESCRIPTOR 중복 정의(LNK2005)가 난다.
 
 	filter "files:**/DDSLoader/**.cpp"
@@ -234,8 +248,8 @@ project "KurisuEditor"
 	filter {}
 
 	-- UClass는 헤더의 정적 객체가 등록하므로, exe가 직접 참조하지 않는 클래스의 .obj를 링커가 버리면
-	-- 그 클래스가 등록되지 않아 씬 로드 때 액터가 사라진다. 엔진 .obj를 전부 링크해 막는다.
-	linkoptions { "/WHOLEARCHIVE:KurisuEngine" }
+	-- 그 클래스가 등록되지 않아 씬 로드 때 액터가 사라진다. 엔진 .obj를 lib가 아닌 obj로 전부 링크해 막는다
+	-- (위 projectReferences 재정의의 UseLibraryDependencyInputs).
 
 	files
 	{
@@ -299,8 +313,7 @@ function ConfigureGameRuntime()
 
 	links { "KurisuEngine" }
 
-	-- 에디터와 같은 이유. 게임 코드는 라이트 액터 등을 직접 참조하지 않아 특히 빠지기 쉽다.
-	linkoptions { "/WHOLEARCHIVE:KurisuEngine" }
+	-- 에디터와 같은 이유로 엔진 .obj를 직접 링크한다. 게임 코드는 라이트 액터 등을 직접 참조하지 않아 특히 빠지기 쉽다.
 
 	files
 	{
