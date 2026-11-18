@@ -4,8 +4,9 @@
 #include "Containers/Containers.h"
 #include "Math/EngineMath.h"
 #include "Curves/CurveFloat.h"
+#include "Distributions.generated.h"
 
-
+UENUM()
 enum class EDistributionMode : uint8
 {
 	Constant,
@@ -115,30 +116,40 @@ struct FDistributionLookupTable
 
 struct FRandomStream;
 
+USTRUCT()
 struct FFloatDistribution
 {
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere)
 	EDistributionMode Mode = EDistributionMode::Constant;
+	UPROPERTY(EditAnywhere)
 	float MinValue = 0.0f;
+	UPROPERTY(EditAnywhere)
 	float MaxValue = 0.0f;
+	UPROPERTY(EditAnywhere)
 	float Constant = 0.0f;
-	TArray<FFloatCurveKey> CurveKeys;
+	UPROPERTY()  TArray<FFloatCurveKey> CurveKeys;
 	FDistributionLookupTable LookupTable;
 
 	void Bake();
 	float GetFloatValue(float InTime, FRandomStream& InRandom) const;
 };
 
+USTRUCT()
 struct FVectorDistribution
 {
-	EDistributionMode Mode = EDistributionMode::Constant;
-	FVector MinValue;
-	FVector MaxValue;
-	FVector Constant;
-	TArray<FFloatCurveKey> CurveKeysX;
-	TArray<FFloatCurveKey> CurveKeysY;
-	TArray<FFloatCurveKey> CurveKeysZ;
+	GENERATED_BODY()
+
+	UPROPERTY(EditAnywhere) EDistributionMode Mode = EDistributionMode::Constant;
+	UPROPERTY(EditAnywhere) FVector MinValue;
+	UPROPERTY(EditAnywhere) FVector MaxValue;
+	UPROPERTY(EditAnywhere) FVector Constant;
+	UPROPERTY() TArray<FFloatCurveKey> CurveKeysX;
+	UPROPERTY() TArray<FFloatCurveKey> CurveKeysY;
+	UPROPERTY() TArray<FFloatCurveKey> CurveKeysZ;
 	FDistributionLookupTable LookupTable;
-	bool bLockAxes = false;
+	UPROPERTY(EditAnywhere) bool bLockAxes = false;
 	void Bake();
 	FVector GetVectorValue(float InTime, FRandomStream& InRandom) const;
 };

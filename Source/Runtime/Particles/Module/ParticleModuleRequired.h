@@ -1,10 +1,9 @@
 #pragma once
 
 #include "Core/Types.h"
+#include "Render/Material.h"
 #include "Particles/ParticleModule.h"
 #include "ParticleModuleRequired.generated.h"
-
-class UMaterial;
 
 UENUM()
 enum class EParticleSubUVInterpMethod : uint8
@@ -33,11 +32,15 @@ class UParticleModuleRequired : public UParticleModule
 {
 	GENERATED_BODY()
 public:
+	EModuleType GetModuleType() const override { return EPMT_Required; }
+
 	float GetEmitterDuration() const { return EmitterDuration; }
 	int32 GetEmitterLoops() const { return EmitterLoops; }
 	float GetEmitterDelay() const { return EmitterDelay; }
 	bool  IsDelayFirstLoopOnly() const { return bDelayFirstLoopOnly; }
 	bool  IsUseLocalSpace() const { return bUseLocalSpace; }
+	// 동시에 살아 있을 수 있는 최대 파티클 수. 0이면 제한 없음
+	int32 GetMaxActiveParticles() const { return MaxActiveParticles; }
 
 	// 이번 루프에 적용할 지연
 	float GetDelayForLoop(int32 LoopIndex) const
@@ -98,8 +101,14 @@ private:
 	UPROPERTY(EditAnywhere)
 	float RandomImageTime = 0.0f;
 
+	UPROPERTY(EditAnywhere)
 	UMaterial* Material = nullptr;
 
 	UPROPERTY(EditAnywhere)
 	EParticleSortMode SortMode = EParticleSortMode::None;
+
+	// 동시에 살아 있을 수 있는 최대 파티클 수. 0이면 제한 없음 (메모리 한도 65535까지).
+	// LOD 레벨마다 Required가 따로 있으므로 LOD별 상한이 된다. 상한에 닿으면 새 파티클을 버린다
+	UPROPERTY(EditAnywhere)
+	int32 MaxActiveParticles = 0;
 };

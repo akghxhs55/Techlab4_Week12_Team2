@@ -15,6 +15,8 @@
 #include "Animation/AnimBlueprintFile.h"
 #include "Core/Misc/Paths.h"
 #include "Editor/AnimBlueprintEditor/AnimBlueprintEditor.h"
+#include "Editor/ParticleSystemEditor/ParticleSystemEditor.h"
+#include "Particles/ParticleSystemFile.h"
 
 #include <filesystem>
 #include <commdlg.h>
@@ -35,6 +37,7 @@ namespace
 		{ "Animation Blueprint Editor...", L"Open Animation Blueprint Editor", L"Animation Blueprint (*.animblueprint)\0*.animblueprint\0" },
 		{ "Blend Space Editor...", L"Open Blend Space Editor", L"Blend Space (*.blendspace)\0*.blendspace\0" },
 		{ "UI Editor...", L"Open UI Editor", L"Widget (*.widget)\0*.widget\0" },
+		{ "Particle System Editor...", L"Open Particle System Editor", L"Particle System (*.particle)\0*.particle\0" },
 	};
 }
 
@@ -172,6 +175,26 @@ void FEditorManager::CreateEditor(const FString& AssetPath)
         Editors.Add(std::move(Editor));
         return;
     }
+
+	if (ParticleSystemFile::IsParticleSystemPath(AssetPath))
+	{
+		UParticleSystem* System = UAssetManager::LoadParticleSystem(AssetPath);
+		if (!System)
+		{
+			return;
+		}
+
+		TUniquePtr<FAssetEditor> Editor = MakeUnique<FParticleSystemEditor>(EditorEngine, *this, AssetPath, *System);
+		if (!Editor->Initialize())
+		{
+			Editor->Shutdown();
+			KRS_LOG(Warning, "Particle system editor initialization failed: {}", AssetPath.c_str());
+			return;
+		}
+
+		Editors.Add(std::move(Editor));
+		return;
+	}
 
 	// 애니메이션 시퀀스는 렌더 에셋이 아니므로 먼저 분기한다
 	if (AnimSequenceFile::IsAnimSequencePath(AssetPath))

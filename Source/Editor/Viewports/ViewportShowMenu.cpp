@@ -19,12 +19,12 @@ void FViewportsPanel::DrawShowMenu()
         const FEditorSettings Defaults{};
         Settings.bDrawPrimitives = Defaults.bDrawPrimitives;
         Settings.bShowSkeletalMesh = Defaults.bShowSkeletalMesh;
+        Settings.bShowParticles = Defaults.bShowParticles;
         Settings.bDrawDecals = Defaults.bDrawDecals;
         Settings.bDrawBatchLine = Defaults.bDrawBatchLine;
         Settings.bDrawBoundingBox = Defaults.bDrawBoundingBox;
         Settings.bShowUUID = Defaults.bShowUUID;
         Settings.bDrawCascadeBounds = Defaults.bDrawCascadeBounds;
-        Settings.bShowCollision = Defaults.bShowCollision;
         Settings.bShowRootDebug = Defaults.bShowRootDebug;
         Settings.bShowVignette = Defaults.bShowVignette;
         Settings.bShowCameraOverlay = Defaults.bShowCameraOverlay;
@@ -41,6 +41,7 @@ void FViewportsPanel::DrawShowMenu()
             { "Light", "stat light", EStatFlags::Light },
             { "Decal", "stat decal", EStatFlags::Decal },
             { "Skinning", "stat skinning", EStatFlags::Skinning },
+            { "Particle", "stat particle", EStatFlags::Particle },
         };
         FString Message;
         if (IconMenuItem(nullptr, "Hide All", false, EIndicator::None))
@@ -68,13 +69,13 @@ void FViewportsPanel::DrawShowMenu()
     Flag("Bounds", "Bounding Boxes", Settings.bDrawBoundingBox);
     Flag("Decals", "Decals", Settings.bDrawDecals);
     Flag("Grid", "Grid", Settings.bDrawBatchLine);
+    Flag("Particles", "Particles", Settings.bShowParticles);
     Flag("SkeletalMesh", "Skeletal Meshes", Settings.bShowSkeletalMesh);
     Flag("StaticMesh", "Static Meshes", Settings.bDrawPrimitives);
     SectionHeader("Developer");
     Flag("Cascade", "Cascade Bounds", Settings.bDrawCascadeBounds);
     Flag("Pivot", "Object UUID", Settings.bShowUUID);
     SectionHeader("PIE");
-    Flag("Collision", "Collision", Settings.bShowCollision);
     Flag("SkeletalMesh", "Root Bone", Settings.bShowRootDebug);
     Flag("Lighting", "Vignette", Settings.bShowVignette);
     Flag("Camera", "Camera Fade / Letterbox", Settings.bShowCameraOverlay);

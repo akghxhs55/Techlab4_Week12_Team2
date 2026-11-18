@@ -100,7 +100,8 @@ void FShader::BindingReflection(const FShaderByteCode& ByteCode)
 	}
 }
 
-FVertexShader::FVertexShader(ID3D11Device* Device, const FShaderByteCode& ByteCode)
+FVertexShader::FVertexShader(ID3D11Device* Device, const FShaderByteCode& ByteCode,
+	std::span<const D3D11_INPUT_ELEMENT_DESC> Elements)
 {
 	Type = EShaderType::Vertex;
 	if (!ByteCode.IsValid()) return;
@@ -111,7 +112,14 @@ FVertexShader::FVertexShader(ID3D11Device* Device, const FShaderByteCode& ByteCo
 	}
 
 	BindingReflection(ByteCode);
-	InputLayoutReflection(Device, ByteCode);
+	if (Elements.empty())
+	{
+		InputLayoutReflection(Device, ByteCode);
+		return;
+	}
+	if (FAILED(Device->CreateInputLayout(Elements.data(), static_cast<UINT>(Elements.size()),
+		ByteCode.GetData(), ByteCode.GetSize(), InputLayout.GetAddressOf())))
+		KRS_LOG(Error, "[Shader] VS input does not match vertex factory layout");
 }
 
 void FVertexShader::InputLayoutReflection(ID3D11Device* Device, const FShaderByteCode& ByteCode)

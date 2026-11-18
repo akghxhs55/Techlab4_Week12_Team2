@@ -1,5 +1,18 @@
 local ProjectRoot = path.getabsolute("../..", _SCRIPT_DIR)
 
+-- Build events run in Build/Projects. Keep their paths relative: cmd.exe
+-- misreads the line after one that holds a non-ASCII (e.g. Korean) path,
+-- which breaks multi-line build events when the engine lives in such a folder.
+-- path.getrelative is not used because it returns absolute paths when the
+-- engine root is a drive root (GenerateProjects.ps1 maps non-ASCII roots to one).
+local function ProjectRelative(Path)
+	local Prefix = ProjectRoot .. "/"
+	if Path:sub(1, #Prefix):lower() ~= Prefix:lower() then
+		error("Build event path is outside the engine folder: " .. Path)
+	end
+	return path.translate("../../" .. Path:sub(#Prefix + 1), "\\")
+end
+
 -- ImGui는 다른 외부 라이브러리처럼 소스에 포함한다.
 if _ACTION and not os.isfile(ProjectRoot .. "/Source/ThirdParty/ImGui/imgui.h") then
 	error("Bundled ImGui sources are missing. Restore Source/ThirdParty/ImGui from this repository.")
@@ -20,7 +33,25 @@ workspace "Kurisu"
 
 	multiprocessorcompile "On"
 
+	-- 엔진 Debug lib·pdb가 수백 MB라 64비트 호스트 툴체인(컴파일러·링커)을 쓴다
+	preferredtoolarchitecture "x86_64"
+
 outputdir = "%{cfg.buildcfg}-%{cfg.system}-%{cfg.architecture}"
+
+-- 엔진을 참조하는 exe는 KurisuEngine.lib 대신 엔진의 .obj를 직접 링크한다 (VS "라이브러리 종속성 입력 사용").
+-- .obj를 직접 넘기면 링커가 하나도 버리지 않으므로 /WHOLEARCHIVE 없이도 UClass 정적 등록이 남는다.
+-- /WHOLEARCHIVE + 증분 링크 조합은 바뀐 obj를 다시 링크할 때 간헐적으로 LNK1236(COFF 섹션 손상)이 나고
+-- 다시 빌드하면 성공하는 MSVC 링커 문제가 있어 피한다.
+local vstudio = require("vstudio")
+premake.override(vstudio.vc2010.elements, "projectReferences", function(base, prj, ref)
+	local calls = base(prj, ref)
+	if prj.kind ~= "StaticLib" and ref.name == "KurisuEngine" then
+		table.insert(calls, function()
+			vstudio.vc2010.element("UseLibraryDependencyInputs", nil, "true")
+		end)
+	end
+	return calls
+end)
 
 -- 에디터 FBX 임포터는 저장소에 포함한 Windows x64 동적 링크 SDK를 사용한다.
 local FbxSdkRoot = path.join(ProjectRoot, "Source/ThirdParty/FBX")
@@ -97,7 +128,7 @@ end
 
 local function ConfigureSourceLink()
 	-- 크래시 분석 도구 폴더의 스크립트를 빌드 전에 실행해 소스 매핑을 만든다.
-	local Script = ProjectRoot .. "/Setup/CrashDump/GenerateSourceLink.ps1"
+	local Script = ProjectRelative(ProjectRoot .. "/Setup/CrashDump/GenerateSourceLink.ps1")
 	local Json = "$(IntDir)sourcelink.json"
 
 	-- 프로젝트와 빌드 구성별로 JSON을 만든 뒤 최종 EXE의 PDB에 매핑을 넣는다.
@@ -170,7 +201,7 @@ project "KurisuEngine"
 	filter {}
 
 	-- d3d11·dxgi 등 시스템 라이브러리는 여기서 링크하지 않는다. exe 프로젝트들이 링크한다.
-	-- 정적 라이브러리가 임포트 라이브러리를 품고 있으면 exe의 /WHOLEARCHIVE가 그것까지 끌어와
+	-- 정적 라이브러리가 임포트 라이브러리를 품고 있으면 exe가 엔진 산출물을 통째로 링크할 때 그것까지 끌어와
 	-- __NULL_IMPORT_DESCRIPTOR 중복 정의(LNK2005)가 난다.
 
 	filter "files:**/DDSLoader/**.cpp"
@@ -197,7 +228,7 @@ project "KurisuEditor"
 		local SdkLibDir = path.join(FbxSdkRoot, "lib/x64", SdkConfig)
 		filter ("configurations:" .. Config)
 			libdirs { SdkLibDir }
-			postbuildcommands { '{COPYFILE} "' .. path.join(SdkLibDir, "libfbxsdk.dll") .. '" "%{cfg.targetdir}"' }
+			postbuildcommands { '{COPYFILE} "' .. ProjectRelative(path.join(SdkLibDir, "libfbxsdk.dll")) .. '" "%{cfg.targetdir}"' }
 	end
 	filter {}
 
@@ -227,8 +258,8 @@ project "KurisuEditor"
 	filter {}
 
 	-- UClass는 헤더의 정적 객체가 등록하므로, exe가 직접 참조하지 않는 클래스의 .obj를 링커가 버리면
-	-- 그 클래스가 등록되지 않아 씬 로드 때 액터가 사라진다. 엔진 .obj를 전부 링크해 막는다.
-	linkoptions { "/WHOLEARCHIVE:KurisuEngine" }
+	-- 그 클래스가 등록되지 않아 씬 로드 때 액터가 사라진다. 엔진 .obj를 lib가 아닌 obj로 전부 링크해 막는다
+	-- (위 projectReferences 재정의의 UseLibraryDependencyInputs).
 	ConfigureSourceLink()
 
 	files
@@ -241,7 +272,10 @@ project "KurisuEditor"
 	}
 
 
-	dependson { "KurisuHeaderTool" }
+	-- Release builds package KurisuGame.exe into the editor distribution, so the
+	-- game must finish first. Solution dependencies cannot be per-configuration,
+	-- so Debug editor builds also build the (small) game launcher.
+	dependson { "KurisuHeaderTool", "KurisuGame" }
 	prebuildcommands { HeaderTool .. ' Editor "' .. GeneratedDir .. '/Editor" "' .. ProjectRoot .. '/Source/Editor"' }
 
 	includedirs
@@ -272,21 +306,25 @@ project "KurisuEditor"
 
 	filter {}
 
--- 패키징용 게임 실행 파일. 에디터 소스와 ImGui를 링크하지 않는다.
--- 에셋과 셰이더는 실행 중에 읽으므로 배포 시 Package.bat으로 콘텐츠를 함께 복사한다.
-project "KurisuGame"
+-- Release editor builds also produce a source-free portable distribution.
+filter "configurations:Release"
+	postbuildcommands {
+		'powershell.exe -NoProfile -ExecutionPolicy Bypass -File "' .. ProjectRelative(ProjectRoot .. "/Setup/Packaging/PackageEditor.ps1") .. '" -Configuration Release -VCToolsInstallDir "$(VCToolsInstallDir)."'
+	}
+filter {}
+
+-- Game launcher settings. Release editor distributions reuse this executable.
+function ConfigureGameRuntime()
 	location (ProjectRoot .. "/Build/Projects")
 	kind     "WindowedApp"
 	CommonSettings()
-	targetname "KurisuGame"
 
 	pchheader "EnginePCH.h"
 	pchsource (ProjectRoot .. "/Source/Game/GamePCH.cpp")
 
 	links { "KurisuEngine" }
 
-	-- 에디터와 같은 이유. 게임 코드는 라이트 액터 등을 직접 참조하지 않아 특히 빠지기 쉽다.
-	linkoptions { "/WHOLEARCHIVE:KurisuEngine" }
+	-- 에디터와 같은 이유로 엔진 .obj를 직접 링크한다. 게임 코드는 라이트 액터 등을 직접 참조하지 않아 특히 빠지기 쉽다.
 	ConfigureSourceLink()
 
 	files
@@ -315,7 +353,17 @@ project "KurisuGame"
 		"dxguid.lib",
 		"d3dcompiler.lib",
 	}
+end
 
+-- The launcher is built from engine sources only, so it is an engine artifact.
+-- Game packaging and the editor distribution both copy this one executable.
+project "KurisuGame"
+	ConfigureGameRuntime()
+	targetname "KurisuGame"
+	targetdir (ProjectRoot .. "/Build/Bin/" .. outputdir)
+	objdir (ProjectRoot .. "/Build/Intermediate/" .. outputdir .. "/KurisuGame")
+	debugdir (ProjectRoot .. "/DefaultProject")
+	debugargs { "DefaultProject.kproject" }
 
 -- 셰이더를 VS에서 편집하기 위한 보기 전용 프로젝트 (언리얼의 Shaders와 같은 역할).
 -- 에셋(Assets)은 에디터 Content Drawer에서 다루므로 솔루션에 넣지 않는다.

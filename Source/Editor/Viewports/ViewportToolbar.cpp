@@ -17,6 +17,8 @@
 #include "GameFramework/Actor/AmbientLightActor.h"
 #include "GameFramework/Actor/DecalActor.h"
 #include "GameFramework/Character.h"
+#include "GameFramework/Actor/GundamCharacter.h"
+#include "GameFramework/Actor/SonicCharacter.h"
 #include "Core/StatOverlay.h"
 #include "Core/Stats/LightweightStats.h"
 #include <algorithm>
@@ -348,7 +350,8 @@ void FViewportsPanel::DrawCameraSpeedMenu()
     auto& Settings = EditorSettings->GetMutableSettings();
     SectionHeader("Camera Speed");
     ImGui::SetNextItemWidth(-FLT_MIN);
-    ImGui::SliderFloat("##Speed", &Settings.CameraSpeed, 0.1f, 10.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp);
+    // 0.1~100은 범위가 넓어 로그 스케일로 해야 낮은 속도도 조절할 수 있다
+    ImGui::SliderFloat("##Speed", &Settings.CameraSpeed, 0.1f, 100.0f, "%.2f", ImGuiSliderFlags_AlwaysClamp | ImGuiSliderFlags_Logarithmic);
     ImGui::PushTextWrapPos(ImGui::GetCursorPosX() + EditorStyle::Scale(280.0f));
     ImGui::TextDisabled("Hold the right mouse button and scroll to change the speed quickly.");
     ImGui::PopTextWrapPos();
@@ -446,6 +449,8 @@ void FViewportsPanel::DrawSpawnMenu(FEditorViewportClient& Client)
     ImGui::SeparatorText("Basic");
     Spawn("Camera", ACameraActor::StaticClass());
     Spawn("Character", ACharacter::StaticClass());
+    Spawn("Gundam Character", AGundamCharacter::StaticClass());
+    Spawn("Sonic Character", ASonicCharacter::StaticClass());
     Spawn("Text", ATextRenderActor::StaticClass());
     ImGui::SeparatorText("Meshes");
     Spawn("Skeletal Mesh", ASkeletalMeshActor::StaticClass());

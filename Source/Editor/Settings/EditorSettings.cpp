@@ -39,7 +39,6 @@ bool FEditorSettingsManager::SaveSettings() const
 	File << "PcfMode=" << static_cast<uint32_t>(Settings.PcfMode) << "\n";
 	File << "DrawBoundingBox=" << Settings.bDrawBoundingBox << "\n";
 	File << "ShowUUID=" << Settings.bShowUUID << "\n";
-	File << "ShowCollision=" << Settings.bShowCollision << "\n";
 	File << "ShowRootDebug=" << Settings.bShowRootDebug << "\n";
 	File << "DrawDecals=" << Settings.bDrawDecals << "\n";
 	File << "DecalCulling=" << Settings.bDecalCulling << "\n";
@@ -56,6 +55,7 @@ bool FEditorSettingsManager::SaveSettings() const
 	File << "ShowVignette=" << Settings.bShowVignette << "\n";
 	File << "ShowCameraOverlay=" << Settings.bShowCameraOverlay << "\n";
 	File << "ShowSkeletalMesh=" << Settings.bShowSkeletalMesh << "\n";
+	File << "ShowParticles=" << Settings.bShowParticles << "\n";
 
 	File << "LightCullingMode=" << (Settings.LightCullingMode == ELightCullingMode::Off ? "Off" : "Tiled") << "\n";
 	File << "LightingModel=" << (Settings.LightingModel == ELightingModel::Gouraud ? "Gouraud" :
@@ -196,7 +196,6 @@ bool FEditorSettingsManager::LoadSettings()
 				}
 				else if (Key == "DrawBoundingBox") Settings.bDrawBoundingBox = std::stoi(ValueStr);
 				else if (Key == "ShowUUID") Settings.bShowUUID = std::stoi(ValueStr);
-				else if (Key == "ShowCollision") Settings.bShowCollision = std::stoi(ValueStr);
 				else if (Key == "ShowRootDebug") Settings.bShowRootDebug = std::stoi(ValueStr);
 				else if (Key == "DrawDecals") Settings.bDrawDecals = std::stoi(ValueStr);
 				else if (Key == "DecalCulling") Settings.bDecalCulling = std::stoi(ValueStr);
@@ -213,6 +212,7 @@ bool FEditorSettingsManager::LoadSettings()
 				else if (Key == "ShowVignette")      Settings.bShowVignette = std::stoi(ValueStr);
 				else if (Key == "ShowCameraOverlay") Settings.bShowCameraOverlay = std::stoi(ValueStr);
 				else if (Key == "ShowSkeletalMesh")  Settings.bShowSkeletalMesh = std::stoi(ValueStr);
+				else if (Key == "ShowParticles")     Settings.bShowParticles = std::stoi(ValueStr);
 
 				else if (Key == "LightCullingMode")
 				{

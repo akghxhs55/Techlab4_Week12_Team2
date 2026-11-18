@@ -178,6 +178,10 @@ void FSceneRenderer::InitViews(FRenderer* Renderer, const FSceneRenderOptions& O
 	}
 
 	CachedViewContext.bShowSkeletalMesh = Options.bShowSkeletalMesh;
+	CachedViewContext.bShowParticles = Options.bShowParticles;
+
+	// 게임 쪽(파티클 LOD 등)이 다음 Tick에서 카메라 거리를 알 수 있게 남긴다
+	World->AddRenderedViewLocation(View.ViewLocation);
 
 	// 월드 프리미티브 수집 및 절두체 컬링
 	GatherRenderPackets(World->GetScene(), RenderData, CachedViewContext, &View.Frustum, Renderer);
@@ -321,7 +325,7 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 
 	// 스카이 배경을 물체보다 먼저 HDR 타깃에 깐다. 이 패스가 LightingHDR을 Clear하고, 포워드 패스는 Load로 그 위에 그린다.
 	FSkyboxRenderer* Skybox = Renderer->GetSkybox();
-	// UE처럼 직교 뷰(Top/Front/Side 등)에서는 스카이를 그리지 않는다.
+	// 직교 뷰에서는 스카이를 그리지 않는다.
 	const bool bDrawSkybox = Skybox && Skybox->IsValid() && View.bIsPerspective;
 	if (bDrawSkybox)
 	{
@@ -337,7 +341,7 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 			})) return false;
 	}
 
-	// 언리얼 RenderShadowDepthMaps: 할당된 그림자 맵마다 Caster 깊이를 아틀라스에 그린다.
+	// 할당된 그림자 맵마다 Caster 깊이를 아틀라스에 그린다.
 	FTexture2D* ShadowDepthAtlas = RenderData.ViewLightResources.GetShadowDepthAtlas();
 	const bool bAnyShadowAllocated = std::any_of(RenderData.ProjectedShadows.begin(), RenderData.ProjectedShadows.end(),
 		[](const TUniquePtr<FProjectedShadowInfo>& Shadow) { return Shadow->bAllocated; });
@@ -400,13 +404,15 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 					if (ForwardBatches.IsEmpty()) return;
 
 					// 실제 메시 패스와 같은 VS를 사용해 깊이 계산을 일치시킨다.
-					FShaderProgram DepthProgram(nullptr, DepthPipeline->Shader->PixelShader);
-					FShaderProgram SkinnedDepthProgram(nullptr, DepthPipeline->Shader->PixelShader);
+					// 같은 객체를 공유하면 마지막 VS로 덮어써지므로 정점 타입마다 프로그램을 나눈다
+					TArray<FShaderProgram> DepthPrograms;
+					DepthPrograms.Reserve(static_cast<int32>(EVertexFactoryType::Count));
+					for (int32 Index = 0; Index < static_cast<int32>(EVertexFactoryType::Count); ++Index)
+						DepthPrograms.Add(FShaderProgram(nullptr, DepthPipeline->Shader->PixelShader));
 					TArray<FMeshDrawBatch> DepthBatches = ForwardBatches;
 					for (FMeshDrawBatch& Batch : DepthBatches)
 					{
-						// GPU 스킨 배치는 VS가 달라서 프로그램을 나눈다
-						FShaderProgram& Program = Batch.BoneBuffer ? SkinnedDepthProgram : DepthProgram;
+						FShaderProgram& Program = DepthPrograms[static_cast<int32>(Batch.VertexFactory->GetType())];
 						Program.VertexShader = Batch.Pipeline.Shader->VertexShader;
 						Batch.Pipeline = *DepthPipeline;
 						Batch.Pipeline.Shader = &Program;
@@ -525,6 +531,9 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 						Header.Items.Reset();
 						Header.Sampler = ESamplerState::LinearClamp;
 
+						// 데칼 셰이더에 이 정점 타입 변형이 없으면 받지 않는다. 헤더는 인덱스를 맞추려고 남긴다
+						if (!FRenderResourceManager::ResolveShader(DecalPipeline->Shader, Src.VertexFactory->GetType())) continue;
+
 						for (uint32 ItemIndex = 0; ItemIndex < static_cast<uint32>(Src.Items.Num()); ItemIndex++)
 						{
 							const FMeshDrawBatch::FItem& Item = Src.Items[ItemIndex];
@@ -615,6 +624,7 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 						for (uint32 BatchIndex : TouchedBatches) {
 							FMeshDrawBatch& Header = DecalHeaders[BatchIndex];
 							Header.Pipeline = Decal->IsAdditive() ? *DecalAdditivePipeline : *DecalPipeline;
+							Header.Pipeline.Shader = FRenderResourceManager::ResolveShader(Header.Pipeline.Shader, Header.VertexFactory->GetType());
 							Header.Textures = { { Decal->GetDecalTexture(), EShaderBindFlagBits::Pixel } };
 							ReceiverItems += Header.Items.Num();
 							DecalBatches.Add(std::move(Header));

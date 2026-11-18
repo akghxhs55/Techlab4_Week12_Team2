@@ -48,7 +48,8 @@ constexpr FPipelineTableEntry PipelineTable[] =
 	{ EPSOType::Decal,			"EngineResources/Shaders/DecalShader.hlsl",			EPrimitiveTopology::TriangleList,		ERasterizerState::SolidBack, EBlendState::AlphaBlend, EDepthStencilState::ReadOnly },
 	{ EPSOType::DecalAdditive,	"EngineResources/Shaders/DecalShader.hlsl",			EPrimitiveTopology::TriangleList,		ERasterizerState::SolidBack, EBlendState::Additive, EDepthStencilState::ReadOnly },
 	{ EPSOType::Particle_AlphaBlend,     "EngineResources/Shaders/ParticleSpriteShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::AlphaBlend,   EDepthStencilState::ReadOnly },
-	{ EPSOType::Particle_Additive,       "EngineResources/Shaders/ParticleSpriteShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::Additive,     EDepthStencilState::ReadOnly },
+	{ EPSOType::Particle_Additive,       "EngineResources/Shaders/ParticleSpriteShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidNone, EBlendState::ParticleAdditive, EDepthStencilState::ReadOnly },
+	{ EPSOType::StaticMesh_Additive,     "EngineResources/Shaders/StaticMeshTranslucentShader.hlsl", EPrimitiveTopology::TriangleList, ERasterizerState::SolidBack, EBlendState::ParticleAdditive, EDepthStencilState::ReadOnly },
 };
 
 static_assert(sizeof(PipelineTable) / sizeof(PipelineTable[0]) == static_cast<size_t>(EPSOType::Count));
@@ -72,34 +73,11 @@ void FRenderResourceManager::InitPipelineStates()
 	const char* Names[] = { "LIGHTING_MODEL_GOURAUD", "LIGHTING_MODEL_LAMBERT", "LIGHTING_MODEL_PHONG", "LIGHTING_MODEL_UNLIT", "VIEW_MODE_WORLD_NORMAL" };
 	for (const char* Name : Names)
 	{
-		const D3D_SHADER_MACRO Defines[] = { { Name, "1" }, { nullptr, nullptr } };
 		const FString Path = "EngineResources/Shaders/UberLit.hlsl";
-		// 변형도 .cso 캐시를 쓴다(매크로 이름이 캐시 파일 이름에 들어간다). 매번 컴파일하면 Release에서 시작이 크게 늦어진다.
-		FString VSCSOPath;
-		FString PSCSOPath;
-		FShaderByteCode VSCode = RenderUtil::GetOrCompile(Path, "mainVS", EShaderType::Vertex, VSCSOPath, Defines);
-		FShaderByteCode PSCode = RenderUtil::GetOrCompile(Path, "mainPS", EShaderType::Pixel, PSCSOPath, Defines);
-		if (!VSCode.IsValid() || !PSCode.IsValid())
-		{
-			KRS_LOG(Error, "[Shader] UberShader variant compile failed: {}", Name);
-			continue;
-		}
-		auto VS = RenderCommand::CreateVertexShader(VSCode);
-		auto PS = RenderCommand::CreatePixelShader(PSCode);
-		if (!VS || !VS->IsValid() || !PS || !PS->IsValid())
-		{
-			continue;
-		}
-		FVertexShader* VSRaw = VS.get();
-		FPixelShader* PSRaw = PS.get();
 		const FString Key = Path + "#" + Name;
-		VertexShaderMap[Key + "#VS"] = std::move(VS);
-		PixelShaderMap[Key + "#PS"] = std::move(PS);
-		ShaderProgramMap[Key] = MakeUnique<FShaderProgram>(VSRaw, PSRaw);
-		ShaderProgramMap[Key]->Name = Key;
-		CreateSkinnedVariant(Path, Name, *ShaderProgramMap[Key]);
+		CompileVertexFactoryVariants(Path, Key, Name);
 		if (std::strcmp(Name, "VIEW_MODE_WORLD_NORMAL") == 0)
-			PipelineStateMap[EPSOType::StaticMesh_WorldNormal]->Shader = ShaderProgramMap[Key].get();
+			PipelineStateMap[EPSOType::StaticMesh_WorldNormal]->Shader = FindShaderProgram(Key);
 	}
 }
 
@@ -150,14 +128,13 @@ void FRenderResourceManager::ScanShaders(const fs::path& ShaderRoot)
 		if (Source.find("mainVS(") == std::string::npos ||
 			Source.find("mainPS(") == std::string::npos) continue;
 
-		// 키는 지금까지처럼 엔진 상대 경로("EngineResources/Shaders/X.hlsl")로 둔다.
+		// 키는 지금까지처럼 엔진 상대 경로로 둔다.
 		FString Path = FPaths::ToUtf8(Entry.path().lexically_relative(FPaths::EngineDir()));
-		LoadOrCompileShader(Path);
-		if (Source.find("GPU_SKIN_VS_INPUT") != std::string::npos)
-		{
-			if (TUniquePtr<FShaderProgram>* Base = ShaderProgramMap.Find(Path))
-				CreateSkinnedVariant(Path, nullptr, **Base);
-		}
+		// 메시를 그리는 셰이더는 VertexFactory.hlsli를 통해 정점을 받으므로 정점 타입마다 변형을 만든다
+		if (Source.find("VertexFactory.hlsli") != std::string::npos)
+			CompileVertexFactoryVariants(Path, Path, nullptr);
+		else
+			LoadOrCompileShader(Path);
 	}
 }
 
@@ -179,6 +156,13 @@ FShaderProgram* FRenderResourceManager::GetShaderProgram(const FString& InPath)
 		Get().ShaderProgramMap.Find("EngineResources/Shaders/DefaultShader.hlsl"))
 		return Fallback->get();
 
+	return nullptr;
+}
+
+FShaderProgram* FRenderResourceManager::FindShaderProgram(const FString& InPath)
+{
+	if (TUniquePtr<FShaderProgram>* Found = Get().ShaderProgramMap.Find(InPath))
+		return Found->get();
 	return nullptr;
 }
 
@@ -218,29 +202,73 @@ void FRenderResourceManager::LoadOrCompileShader(const FString& Path)
 
 }
 
-// UberLit 조명 변형처럼 매크로로 VS를 컴파일하고 이름으로 등록한다. PS는 기존 것을 함께 쓴다
-void FRenderResourceManager::CreateSkinnedVariant(const FString& Path, const char* LightingMacro, const FShaderProgram& Base)
+FString FRenderResourceManager::MakeVFKey(const FString& BaseKey, EVertexFactoryType VF)
 {
-	const D3D_SHADER_MACRO SkinOnly[] = { { "GPU_SKIN", "1" }, { nullptr, nullptr } };
-	const D3D_SHADER_MACRO LitSkin[] = { { LightingMacro, "1" }, { "GPU_SKIN", "1" }, { nullptr, nullptr } };
+	// Local은 기존 키를 그대로 써서 PSO 테이블과 GetForwardShaderProgram이 Local 변형을 가리키게 한다
+	if (VF == EVertexFactoryType::Local) return BaseKey;
+	return BaseKey + "#" + GetVertexFactoryTypeInfo(VF).Name;
+}
 
-	FString CSOPath;
-	FShaderByteCode Code = RenderUtil::GetOrCompile(Path, "mainVS", EShaderType::Vertex, CSOPath, LightingMacro ? LitSkin : SkinOnly);
-	if (!Code.IsValid())
+// 정점 타입마다 VS/PS를 같은 매크로로 컴파일하고, VS 입력 레이아웃은 정점 타입이 정한 것으로 만든다
+void FRenderResourceManager::CompileVertexFactoryVariants(const FString& Path, const FString& BaseKey, const char* ExtraMacro)
+{
+	for (uint8 Index = 0; Index < static_cast<uint8>(EVertexFactoryType::Count); ++Index)
 	{
-		KRS_LOG(Error, "[Shader] GPU skin variant compile failed: {}", Base.Name);
-		return;
-	}
-	TUniquePtr<FVertexShader> VS = RenderCommand::CreateVertexShader(Code);
-	if (!VS || !VS->IsValid())
-	{
-		KRS_LOG(Error, "[Shader] GPU skin variant create failed: {}", Base.Name);
-		return;
-	}
+		const EVertexFactoryType VF = static_cast<EVertexFactoryType>(Index);
+		const FVertexFactoryTypeInfo& Info = GetVertexFactoryTypeInfo(VF);
+		if (Info.Elements.empty()) continue;
 
-	FVertexShader* VSRaw = VS.get();
-	VertexShaderMap[CSOPath] = std::move(VS);
-	const FString Key = Base.Name + "#GPU_SKIN";
-	ShaderProgramMap[Key] = MakeUnique<FShaderProgram>(VSRaw, Base.PixelShader);
-	ShaderProgramMap[Key]->Name = Key;
+		D3D_SHADER_MACRO Defines[3] = {};
+		int32 Count = 0;
+		if (ExtraMacro) Defines[Count++] = { ExtraMacro, "1" };
+		Defines[Count++] = { Info.Define, "1" };
+
+		// .cso 캐시 파일 이름에 매크로가 들어가므로 변형마다 따로 캐시된다
+		FString VSCSOPath;
+		FString PSCSOPath;
+		FShaderByteCode VSCode = RenderUtil::GetOrCompile(Path, "mainVS", EShaderType::Vertex, VSCSOPath, Defines);
+		FShaderByteCode PSCode = RenderUtil::GetOrCompile(Path, "mainPS", EShaderType::Pixel, PSCSOPath, Defines);
+		if (!VSCode.IsValid() || !PSCode.IsValid())
+		{
+			KRS_LOG(Error, "[Shader] {} variant compile failed: {}", Info.Name, BaseKey);
+			continue;
+		}
+
+		TUniquePtr<FVertexShader> VS = RenderCommand::CreateVertexShader(VSCode, Info.Elements);
+		TUniquePtr<FPixelShader> PS = RenderCommand::CreatePixelShader(PSCode);
+		if (!VS || !VS->IsValid() || !VS->GetLayout() || !PS || !PS->IsValid())
+		{
+			KRS_LOG(Error, "[Shader] {} variant create failed: {}", Info.Name, BaseKey);
+			continue;
+		}
+
+		FVertexShader* VSRaw = VS.get();
+		FPixelShader* PSRaw = PS.get();
+		VertexShaderMap[VSCSOPath] = std::move(VS);
+		PixelShaderMap[PSCSOPath] = std::move(PS);
+		const FString Key = MakeVFKey(BaseKey, VF);
+		ShaderProgramMap[Key] = MakeUnique<FShaderProgram>(VSRaw, PSRaw);
+		ShaderProgramMap[Key]->Name = Key;
+		ShaderProgramMap[Key]->bUsesVertexFactory = true;
+	}
+	KRS_LOG(Info, "[Shader] loaded: {}", BaseKey);
+}
+
+FShaderProgram* FRenderResourceManager::ResolveShader(FShaderProgram* Base, EVertexFactoryType VF)
+{
+	if (!Base) return nullptr;
+	// 빔, 리본: 파티클 머티리얼의 블렌드와 깊이 설정은 PSO 그대로 두고 셰이더만 정점 형식에 맞는 것으로 바꾼다
+	if (VF == EVertexFactoryType::Trail)
+	{
+		return Base->Name == "EngineResources/Shaders/ParticleSpriteShader.hlsl"
+			? FindShaderProgram("EngineResources/Shaders/ParticleTrailShader.hlsl")
+			: nullptr;
+	}
+	// 전용 셰이더는 자기 입력 하나만 받는다
+	const bool bDedicatedVF = GetVertexFactoryTypeInfo(VF).Elements.empty();
+	if (!Base->bUsesVertexFactory)
+		return VF == EVertexFactoryType::Local || bDedicatedVF ? Base : nullptr;
+	if (bDedicatedVF) return nullptr;
+	if (VF == EVertexFactoryType::Local) return Base;
+	return FindShaderProgram(MakeVFKey(Base->Name, VF));
 }

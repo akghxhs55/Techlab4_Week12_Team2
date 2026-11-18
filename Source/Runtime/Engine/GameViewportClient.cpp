@@ -42,11 +42,6 @@ bool FGameViewportClient::InputKey(FViewport* Viewport, int32 Key, bool bDown)
 {
 	if (HandleUIKey(Key, bDown))
 		return true;
-	if (bDown && Key == static_cast<int32>(EKeyCode::Escape))
-	{
-		bExitRequested = true;
-		return true;
-	}
 
 	if (World)
 	{
@@ -134,7 +129,6 @@ void FGameViewportClient::SetWorld(UWorld* InWorld)
 	LostFocus();
 	RenderData.ResetScene();
 	CameraComponent = nullptr;
-	bExitRequested = false;
 	World = InWorld;
 }
 
@@ -296,7 +290,6 @@ void FGameViewportClient::Reset()
 
 	RenderData.ResetScene();
 	LostFocus();
-	bExitRequested = false;
 	World = nullptr;
 	GameInstance = nullptr;
 	Engine = nullptr;

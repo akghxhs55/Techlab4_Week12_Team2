@@ -45,11 +45,7 @@ void FRenderer::BindBatch(const FMeshDrawBatch& Batch)
 	if (Batch.bForceWireframe)
 		RenderCommand::SetRasterizerState(ERasterizerState::Wireframe);
 	
-	RenderCommand::BindVertexBuffer(Batch.VertexBuffer);
-	RenderCommand::BindIndexBuffer(Batch.IndexBuffer);
-	RenderCommand::BindInstanceBuffer(Batch.InstanceBuffer);
-	if (Batch.BoneBuffer)
-		RenderCommand::BindShaderResource(BoneMatrixBufferSlot, Batch.BoneBuffer, EShaderBindFlagBits::Vertex);
+	Batch.VertexFactory->Bind();
 
 	if (Batch.bBindViewConstants)
 		RenderCommand::BindConstantBuffer(0, ViewCB.get(), EShaderBindFlagBits::Vertex);

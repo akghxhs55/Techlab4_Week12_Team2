@@ -32,11 +32,9 @@ public:
 	// FStructuredArchive (UE: UStruct::SerializeTaggedProperties)
 	void SerializeTaggedProperties(FStructuredArchive::FSlot Slot, void* Data) const;
 
-	// KHT가 만드는 코드: InClass->AddProperty<decltype(ThisClass::Speed)>("Speed", offsetof(ThisClass, Speed), CPF_Edit);
-	// 프로퍼티 클래스는 멤버 타입으로 고른다(TPropertyTypeFor). UPROPERTY(Type=LinearColor)면 KHT가 두 번째 인자로 직접 넘긴다.
-	// 만든 프로퍼티를 돌려주므로 KHT는 meta를 ->Meta = ...로 이어서 넣는다.
+	// 프로퍼티 객체를 만들기만 하고 목록에는 넣지 않는다. FArrayProperty의 Inner도 이걸로 만든다.
 	template <typename T, typename TPropertyClass = typename TPropertyTypeFor<T>::Type>
-	TPropertyClass* AddProperty(const FString& InName, uint32 InOffset, uint32 InFlags = CPF_Default)
+	TPropertyClass* CreateProperty(const FString& InName, uint32 InOffset, uint32 InFlags)
 	{
 		if constexpr (std::is_void_v<TPropertyClass>)
 		{
@@ -75,10 +73,33 @@ public:
 				Property->Struct = T::StaticStruct();
 				Property->ElementSize = sizeof(T);
 			}
+			else if constexpr (std::is_same_v<TPropertyClass, FArrayProperty>)
+			{
+				using ElementType = typename T::ElementType;
 
-			Properties.Add(Property);
+				Property->Inner = CreateProperty<ElementType>(InName, 0, InFlags);
+				Property->Inner->ElementSize = sizeof(ElementType);
+				Property->ElementSize = sizeof(T);
+
+				Property->GetNumFn = [](const void* A) -> int32 { return static_cast<const T*>(A)->Num(); };
+				Property->SetNumFn = [](void* A, int32 N) { static_cast<T*>(A)->SetNum(N); };
+				Property->GetDataFn = [](void* A) -> void* { return static_cast<T*>(A)->GetData(); };
+			}
+
 			return Property;
 		}
+	}
+
+	// KHT가 만드는 코드: InClass->AddProperty<decltype(ThisClass::Speed)>("Speed", offsetof(ThisClass, Speed), CPF_Edit);
+	// 프로퍼티 클래스는 멤버 타입으로 고른다(TPropertyTypeFor). UPROPERTY(Type=LinearColor)면 KHT가 두 번째 인자로 직접 넘긴다.
+	// 만든 프로퍼티를 돌려주므로 KHT는 meta를 ->Meta = ...로 이어서 넣는다.
+	template <typename T, typename TPropertyClass = typename TPropertyTypeFor<T>::Type>
+	TPropertyClass* AddProperty(const FString& InName, uint32 InOffset, uint32 InFlags = CPF_Default)
+	{
+		TPropertyClass* Property = CreateProperty<T, TPropertyClass>(InName, InOffset, InFlags);
+		if (Property)
+			Properties.Add(Property);
+		return Property;
 	}
 };
 

@@ -1,0 +1,608 @@
+{
+    "Emitters": [
+        {
+            "LODLevels": [
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": {
+                                "Properties": {
+                                    "Lifetime": {
+                                        "Constant": 4.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": {
+                                "Properties": {
+                                    "StartLocation": {
+                                        "Constant": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 20.0,
+                                            "Y": 20.0,
+                                            "Z": 0.0
+                                        },
+                                        "MinValue": {
+                                            "X": -20.0,
+                                            "Y": -20.0,
+                                            "Z": 0.0
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleVelocity",
+                            "Data": {
+                                "Properties": {
+                                    "StartVelocity": {
+                                        "Constant": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 80.0,
+                                            "Y": 80.0,
+                                            "Z": 400.0
+                                        },
+                                        "MinValue": {
+                                            "X": -80.0,
+                                            "Y": -80.0,
+                                            "Z": 300.0
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "StartVelocityRadial": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleAcceleration",
+                            "Data": {
+                                "Properties": {
+                                    "Acceleration": {
+                                        "Constant": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": -980.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "MinValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "bAlwaysInWorldSpace": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": {
+                                "Properties": {
+                                    "StartSize": {
+                                        "Constant": {
+                                            "X": 10.0,
+                                            "Y": 10.0,
+                                            "Z": 10.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "MinValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": true
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColor",
+                            "Data": {
+                                "Properties": {
+                                    "StartAlpha": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "StartColor": {
+                                        "Constant": {
+                                            "X": 1.0,
+                                            "Y": 1.0,
+                                            "Z": 1.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "MinValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSubUV",
+                            "Data": {
+                                "Properties": {
+                                    "SubImageIndex": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 3.0
+                                            }
+                                        ],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Curve"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleCollision",
+                            "Data": {
+                                "Properties": {
+                                    "Restitution": {
+                                        "Constant": 0.5,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "Friction": {
+                                        "Constant": 0.2,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "RotationDamping": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "DelayAmount": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "MaxCollisions": 1,
+                                    "CompletionOption": "Kill",
+                                    "RadiusScale": 0.5,
+                                    "MinBounceSpeed": 20.0,
+                                    "SurfaceOffset": 0.1,
+                                    "bIgnoreSourceActor": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleEventGenerator",
+                            "Data": {
+                                "Properties": {
+                                    "Events": [
+                                        {
+                                            "Type": "Collision",
+                                            "CustomName": "RainHit",
+                                            "Frequency": 1,
+                                            "bFirstTimeOnly": false,
+                                            "bLastTimeOnly": false,
+                                            "CustomData": 0
+                                        }
+                                    ],
+                                    "bEnabled": true
+                                }
+                            }
+                        }
+                    ],
+                    "Properties": {
+                        "bEnabled": true
+                    },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "Random",
+                            "Material": null,
+                            "RandomImageTime": 1.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 8,
+                            "SubImages_Vertical": 8,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": false
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": {
+                                "Constant": 20.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "RateScale": {
+                                "Constant": 1.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "bEnabled": true
+                        }
+                    }
+                }
+            ],
+            "Properties": {}
+        },
+        {
+            "LODLevels": [
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": {
+                                "Properties": {
+                                    "Lifetime": {
+                                        "Constant": 0.6,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": {
+                                "Properties": {
+                                    "StartLocation": {
+                                        "Constant": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 3.0,
+                                            "Y": 3.0,
+                                            "Z": 0.0
+                                        },
+                                        "MinValue": {
+                                            "X": -3.0,
+                                            "Y": -3.0,
+                                            "Z": 0.0
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleVelocity",
+                            "Data": {
+                                "Properties": {
+                                    "StartVelocity": {
+                                        "Constant": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 80.0,
+                                            "Y": 80.0,
+                                            "Z": 200.0
+                                        },
+                                        "MinValue": {
+                                            "X": -80.0,
+                                            "Y": -80.0,
+                                            "Z": 100.0
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "StartVelocityRadial": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleAcceleration",
+                            "Data": {
+                                "Properties": {
+                                    "Acceleration": {
+                                        "Constant": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": -980.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "MinValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "bAlwaysInWorldSpace": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": {
+                                "Properties": {
+                                    "StartSize": {
+                                        "Constant": {
+                                            "X": 5.0,
+                                            "Y": 5.0,
+                                            "Z": 5.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "MinValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": true
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColor",
+                            "Data": {
+                                "Properties": {
+                                    "StartAlpha": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "StartColor": {
+                                        "Constant": {
+                                            "X": 1.0,
+                                            "Y": 1.0,
+                                            "Z": 1.0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "MinValue": {
+                                            "X": 0.0,
+                                            "Y": 0.0,
+                                            "Z": 0.0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSubUV",
+                            "Data": {
+                                "Properties": {
+                                    "SubImageIndex": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 3.0
+                                            }
+                                        ],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Curve"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleEventReceiverSpawn",
+                            "Data": {
+                                "Properties": {
+                                    "EventGeneratorType": "Collision",
+                                    "EventName": "RainHit",
+                                    "SpawnCount": {
+                                        "Constant": 6.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bUseEmitterLocation": false,
+                                    "bInheritVelocity": false,
+                                    "InheritVelocityScale": 1.0,
+                                    "bEnabled": true
+                                }
+                            }
+                        }
+                    ],
+                    "Properties": {
+                        "bEnabled": true
+                    },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "Random",
+                            "Material": null,
+                            "RandomImageTime": 1.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 8,
+                            "SubImages_Vertical": 8,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": false
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": {
+                                "Constant": 0.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "RateScale": {
+                                "Constant": 1.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "bEnabled": true
+                        }
+                    }
+                }
+            ],
+            "Properties": {}
+        }
+    ],
+    "Properties": {},
+    "Version": 1
+}

@@ -9,7 +9,8 @@ void DispatchGameKeyboardInput(TReceiver&& Receive)
 {
 	constexpr EKeyCode Keys[] = {
 		EKeyCode::W, EKeyCode::A, EKeyCode::S, EKeyCode::D,
-		EKeyCode::Q, EKeyCode::E, EKeyCode::Space, EKeyCode::Shift
+		EKeyCode::Q, EKeyCode::E, EKeyCode::Space, EKeyCode::Shift,
+		EKeyCode::C, EKeyCode::R
 	};
 	for (EKeyCode Key : Keys)
 	{

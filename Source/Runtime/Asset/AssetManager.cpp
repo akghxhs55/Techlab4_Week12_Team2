@@ -22,6 +22,8 @@
 #include "Animation/AnimSequenceFile.h"
 #include "Animation/BlendSpace1D.h"
 #include "Animation/BlendSpaceFile.h"
+#include "Particles/ParticleSystem.h"
+#include "Particles/ParticleSystemFile.h"
 #include "Asset/AssetUtils.h"
 
 #include "Render/ImageLoader.h"
@@ -375,6 +377,9 @@ void UAssetManager::CreateDefaultMeshes()
 	FStaticMeshData* RingMeshData = FGeometryGenerator::GetMeshData("Ring");
 	RegisterAsset("Ring", CreateStaticMesh(RingMeshData));
 
+	FStaticMeshData* TorusData = FGeometryGenerator::GetMeshData("Torus");
+	RegisterAsset("Torus", CreateStaticMesh(TorusData));
+
 	FStaticMeshData* ScaleBarData = FGeometryGenerator::GetMeshData("ScaleBar");
 	RegisterAsset("ScaleBar", CreateStaticMesh(ScaleBarData));
 
@@ -457,8 +462,36 @@ void UAssetManager::CreateParticleMaterial()
 			Mat->SamplerState = ESamplerState::LinearClamp;
 			RegisterAsset(Name, Mat);
 		};
-	MakeSpriteMaterial(EPSOType::Particle_Additive, EBlendState::Additive, "ParticleSpriteAdditive");
+	MakeSpriteMaterial(EPSOType::Particle_Additive, EBlendState::ParticleAdditive, "ParticleSpriteAdditive");
 	MakeSpriteMaterial(EPSOType::Particle_AlphaBlend, EBlendState::AlphaBlend, "ParticleSpriteAlphaBlend");
+
+	// 빔, 리본용. U(길이 방향)는 반복, V(폭 방향)는 가장자리가 번지지 않게 Clamp
+	// 셰이더는 스프라이트 것을 두어야 Trail 정점 타입일 때 Trail 셰이더로 바뀐다
+	UMaterial* BeamMat = NewObject<UMaterial>();
+	BeamMat->PSOType = EPSOType::Particle_Additive;
+	BeamMat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/ParticleSpriteShader.hlsl");
+	BeamMat->Textures.Add(GetAssetByPath<UTexture2D>("Engine/Textures/BeamGlow.png"));
+	BeamMat->BlendState = EBlendState::ParticleAdditive;
+	BeamMat->DepthStencilState = EDepthStencilState::ReadOnly;
+	BeamMat->SamplerState = ESamplerState::LinearWrapUClampV;
+	RegisterAsset("ParticleBeamAdditive", BeamMat);
+
+	// 메시 에미터의 머티리얼 오버라이드용. 스프라이트 셰이더는 메시 파티클 정점을 받지 못한다
+	auto MakeMeshMaterial = [this](EPSOType PSOType, EBlendState Blend, const char* Name)
+		{
+			UMaterial* Mat = NewObject<UMaterial>();
+			Mat->PSOType = PSOType;
+			Mat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/StaticMeshTranslucentShader.hlsl");
+			Mat->Textures.Add(GetAssetByPath<UTexture2D>("WhiteTexture"));
+			Mat->BlendState = Blend;
+			Mat->DepthStencilState = EDepthStencilState::ReadOnly;
+			Mat->SamplerState = ESamplerState::LinearClamp;
+			Mat->ParamLayout = EMaterialParamLayout::StaticMesh;
+			Mat->ParamBuffer = RenderCommand::CreateConstantBuffer(sizeof(FStaticMeshMaterialParams));
+			RegisterAsset(Name, Mat);
+		};
+	MakeMeshMaterial(EPSOType::StaticMesh_Translucent, EBlendState::AlphaBlend, "ParticleMeshTranslucent");
+	MakeMeshMaterial(EPSOType::StaticMesh_Additive, EBlendState::ParticleAdditive, "ParticleMeshAdditive");
 }
 
 void UAssetManager::CreateEditorArrowMaterial() {
@@ -474,6 +507,11 @@ void UAssetManager::Shutdown()
 	Get().SoundMap.Empty();
 	Get().AnimSequenceMap.Empty();
 	Get().BlendSpaceMap.Empty();
+	for (auto& Pair : Get().ParticleSystemMap)
+	{
+		delete Pair.second;
+	}
+	Get().ParticleSystemMap.Empty();
 }
 
 
@@ -706,6 +744,8 @@ namespace
 				return false;
 			}
 			Material->BaseColor = Slot.BaseColor;
+			// 임포트 메쉬의 UV는 0~1 밖의 타일을 쓰는 경우가 많아 반복 샘플링을 기본으로 한다.
+			Material->SamplerState = ESamplerState::LinearWrap;
 			if (Material->BaseColor.W < 1.0f)
 			{
 				Material->BlendState = EBlendState::AlphaBlend;
@@ -768,4 +808,27 @@ UBlendSpace1D* UAssetManager::LoadBlendSpace(const FString& Path)
 
 	Get().BlendSpaceMap[Key] = BlendSpace;
 	return BlendSpace;
+}
+
+UParticleSystem* UAssetManager::LoadParticleSystem(const FString& Path)
+{
+	const FString Key = FAssetUtils::GetAssetKey(Path);
+	if (UParticleSystem** Found = Get().ParticleSystemMap.Find(Key))
+	{
+		return *Found;
+	}
+
+	const FString FilePath = FAssetUtils::ResolveAssetFilePath(Path);
+	UParticleSystem* ParticleSystem = NewObject<UParticleSystem>();
+
+	FString Error;
+	if (!ParticleSystemFile::Read(std::filesystem::path(FilePath.empty() ? Path : FilePath), *ParticleSystem, Error))
+	{
+		KRS_LOG(Warning, "Failed to load ParticleSystem: {} ({})", Path, Error);
+		delete ParticleSystem;
+		return nullptr;
+	}
+
+	Get().ParticleSystemMap[Key] = ParticleSystem;
+	return ParticleSystem;
 }

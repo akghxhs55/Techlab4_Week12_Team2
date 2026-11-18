@@ -1,0 +1,242 @@
+{
+    "Emitters": [
+        {
+            "LODLevels": [
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": { "Properties": { "Lifetime": { "Constant": 0.07, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" }, "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": { "Properties": {
+                                "StartLocation": { "Constant": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [],
+                                    "MaxValue": { "X": 0.0, "Y": 0.10, "Z": 0.02 },
+                                    "MinValue": { "X": 0.0, "Y": -0.10, "Z": -0.02 },
+                                    "Mode": "Uniform", "bLockAxes": false },
+                                "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.14, "Y": 0.14, "Z": 0.14 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": true }, "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": { "Properties": {
+                                "ColorOverLife": { "Constant": { "X": 0.88, "Y": 0.98, "Z": 1.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": false },
+                                "AlphaOverLife": { "Constant": 1.0, "CurveKeys": [
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.85 },
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.55 }
+                                ], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Curve" },
+                                "bClampAlpha": true, "bEnabled": true } }
+                        }
+                    ],
+                    "Properties": { "bEnabled": true },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "None",
+                            "Material": "GundamThrusterGlow",
+                            "RandomImageTime": 0.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 1,
+                            "SubImages_Vertical": 1,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": true
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": { "Constant": 30.0, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" },
+                            "RateScale": { "Constant": 1.0, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" },
+                            "bEnabled": true
+                        }
+                    }
+                }
+            ],
+            "Properties": {}
+        },
+        {
+            "LODLevels": [
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": { "Properties": { "Lifetime": { "Constant": 0.14, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" }, "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": { "Properties": {
+                                "StartLocation": { "Constant": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [],
+                                    "MaxValue": { "X": 0.02, "Y": 0.11, "Z": 0.02 },
+                                    "MinValue": { "X": -0.02, "Y": -0.11, "Z": -0.02 },
+                                    "Mode": "Uniform", "bLockAxes": false },
+                                "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.48, "Y": 0.48, "Z": 0.48 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.56, "Y": 0.56, "Z": 0.56 }, "MinValue": { "X": 0.34, "Y": 0.34, "Z": 0.34 }, "Mode": "Uniform", "bLockAxes": true }, "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleSizeMultiplyLife",
+                            "Data": { "Properties": {
+                                "LifeMultiplier": { "Constant": { "X": 1.0, "Y": 1.0, "Z": 1.0 },
+                                    "CurveKeysX": [
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.45 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.4, "Value": 1.15 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.85 }
+                                    ],
+                                    "CurveKeysY": [
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.45 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.4, "Value": 1.15 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.85 }
+                                    ],
+                                    "CurveKeysZ": [
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.45 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.4, "Value": 1.15 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.85 }
+                                    ],
+                                    "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Curve", "bLockAxes": true },
+                                "bMultiplyX": true, "bMultiplyY": true, "bMultiplyZ": true, "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": { "Properties": {
+                                "ColorOverLife": { "Constant": { "X": 0.14, "Y": 0.56, "Z": 1.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": false },
+                                "AlphaOverLife": { "Constant": 1.0, "CurveKeys": [
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.68 },
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.45, "Value": 0.50 },
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.0 }
+                                ], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Curve" },
+                                "bClampAlpha": true, "bEnabled": true } }
+                        }
+                    ],
+                    "Properties": { "bEnabled": true },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "None",
+                            "Material": "GundamThrusterConeAdditive",
+                            "RandomImageTime": 0.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 1,
+                            "SubImages_Vertical": 1,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": true
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": { "Constant": 360.0, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" },
+                            "RateScale": { "Constant": 1.0, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" },
+                            "bEnabled": true
+                        }
+                    },
+                    "TypeDataModule": {
+                        "Class": "UParticleModuleTypeDataMesh",
+                        "Data": { "Properties": { "Mesh": "Meshes/ThrusterStreak/ThrusterStreak.obj", "RollPitchYaw": { "Constant": { "X": 0.0, "Y": 156.0, "Z": 0.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 178.0, "Z": 26.0 }, "MinValue": { "X": 0.0, "Y": 134.0, "Z": -26.0 }, "Mode": "Uniform", "bLockAxes": false }, "bCastShadows": false, "bOverrideMaterial": true, "bEnabled": true } }
+                    }
+                }
+            ],
+            "Properties": {}
+        },
+        {
+            "LODLevels": [
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": { "Properties": { "Lifetime": { "Constant": 0.11, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" }, "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": { "Properties": {
+                                "StartLocation": { "Constant": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [],
+                                    "MaxValue": { "X": 0.01, "Y": 0.09, "Z": 0.01 },
+                                    "MinValue": { "X": -0.01, "Y": -0.09, "Z": -0.01 },
+                                    "Mode": "Uniform", "bLockAxes": false },
+                                "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.30, "Y": 0.30, "Z": 0.30 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.36, "Y": 0.36, "Z": 0.36 }, "MinValue": { "X": 0.22, "Y": 0.22, "Z": 0.22 }, "Mode": "Uniform", "bLockAxes": true }, "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleSizeMultiplyLife",
+                            "Data": { "Properties": {
+                                "LifeMultiplier": { "Constant": { "X": 1.0, "Y": 1.0, "Z": 1.0 },
+                                    "CurveKeysX": [
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.55 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.4, "Value": 1.15 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.80 }
+                                    ],
+                                    "CurveKeysY": [
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.55 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.4, "Value": 1.15 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.80 }
+                                    ],
+                                    "CurveKeysZ": [
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.55 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.4, "Value": 1.15 },
+                                        { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.80 }
+                                    ],
+                                    "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Curve", "bLockAxes": true },
+                                "bMultiplyX": true, "bMultiplyY": true, "bMultiplyZ": true, "bEnabled": true } }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": { "Properties": {
+                                "ColorOverLife": { "Constant": { "X": 0.85, "Y": 0.97, "Z": 1.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": false },
+                                "AlphaOverLife": { "Constant": 1.0, "CurveKeys": [
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.78 },
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.0 }
+                                ], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Curve" },
+                                "bClampAlpha": true, "bEnabled": true } }
+                        }
+                    ],
+                    "Properties": { "bEnabled": true },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "None",
+                            "Material": "GundamThrusterConeAdditive",
+                            "RandomImageTime": 0.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 1,
+                            "SubImages_Vertical": 1,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": true
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": { "Constant": 240.0, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" },
+                            "RateScale": { "Constant": 1.0, "CurveKeys": [], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Constant" },
+                            "bEnabled": true
+                        }
+                    },
+                    "TypeDataModule": {
+                        "Class": "UParticleModuleTypeDataMesh",
+                        "Data": { "Properties": { "Mesh": "Meshes/ThrusterStreak/ThrusterStreak.obj", "RollPitchYaw": { "Constant": { "X": 0.0, "Y": 156.0, "Z": 0.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 168.0, "Z": 14.0 }, "MinValue": { "X": 0.0, "Y": 144.0, "Z": -14.0 }, "Mode": "Uniform", "bLockAxes": false }, "bCastShadows": false, "bOverrideMaterial": true, "bEnabled": true } }
+                    }
+                }
+            ],
+            "Properties": {}
+        }
+    ],
+    "Properties": {},
+    "Version": 1
+}

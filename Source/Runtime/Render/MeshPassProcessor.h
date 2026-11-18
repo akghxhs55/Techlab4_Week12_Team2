@@ -42,10 +42,7 @@ struct FMeshDrawBatch
 
 	FPipelineState Pipeline;
 
-	FVertexBuffer* VertexBuffer = nullptr;
-	FIndexBuffer* IndexBuffer = nullptr;
-	const FStructuredBuffer* BoneBuffer = nullptr;
-	FVertexBuffer* InstanceBuffer = nullptr;
+	const FVertexFactory* VertexFactory = nullptr;
 
 	TArray<FTextureBinding> Textures;
 	ESamplerState Sampler = ESamplerState::LinearClamp;
@@ -79,7 +76,7 @@ public:
 		const FSceneRenderData* SceneData, EMeshPassType Pass,
 		TArray<FMeshDrawBatch>& Out, ELightingModel LightingModel = ELightingModel::Gouraud) const;
 
-	// PreTranslation: 그림자 원점 기준으로 옮길 때 World 이동에 더하는 값 (언리얼 PreShadowTranslation). 큰 좌표끼리의 뺄셈을 GPU가 아니라 CPU에서 한다.
+	// PreTranslation: 그림자 원점 기준으로 옮길 때 World 이동에 더하는 값. 큰 좌표끼리의 뺄셈을 GPU가 아니라 CPU에서 한다.
 	bool Build(const TArray<FPrimitiveSceneProxy*>& ShadowMeshes, EPSOType PSOType, TArray<FMeshDrawBatch>& OutBatches,
 		const FVector& PreTranslation = FVector::ZeroVector);
 };

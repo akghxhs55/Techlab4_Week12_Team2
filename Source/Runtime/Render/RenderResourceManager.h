@@ -2,6 +2,7 @@
 
 #include "Shader.h"
 #include "PipelineState.h"
+#include "VertexFactory.h"
 
 // 렌더링에 사용할 파이프라인 종류 정의
 enum class EPSOType : uint8
@@ -33,6 +34,7 @@ enum class EPSOType : uint8
 	// 기존 씬의 PSOType 번호가 밀리지 않도록 끝에 추가
 	Particle_AlphaBlend,
 	Particle_Additive,
+	StaticMesh_Additive,     // 메시 파티클 가산 블렌드
 	Count
 };
 
@@ -54,13 +56,18 @@ public:
 	void ScanShaders(const fs::path& ShaderRoot);
 	static void Shutdown();
 	static FShaderProgram* GetShaderProgram(const FString& InPath);
+	// 변형이 있는지 확인할 때 쓴다. 없으면 로그와 기본 셰이더 대체 없이 nullptr
+	static FShaderProgram* FindShaderProgram(const FString& InPath);
 
 	static FPipelineState* GetPSO(const EPSOType& InType);
 	static FShaderProgram* GetForwardShaderProgram(ELightingModel Model);
+	// Local 변형인 Base를 정점 타입에 맞는 변형으로 바꾼다. 변형이 없으면 nullptr
+	static FShaderProgram* ResolveShader(FShaderProgram* Base, EVertexFactoryType VF);
 private:
-	
+
+	static FString MakeVFKey(const FString& BaseKey, EVertexFactoryType VF);
 	void LoadOrCompileShader(const FString& Path);
-	void CreateSkinnedVariant(const FString& Path, const char* LightingMacro, const FShaderProgram& Base);
+	void CompileVertexFactoryVariants(const FString& Path, const FString& BaseKey, const char* ExtraMacro);
 	void InitPipelineStates();
 
 	TMap<FString, TUniquePtr<FVertexShader>> VertexShaderMap;

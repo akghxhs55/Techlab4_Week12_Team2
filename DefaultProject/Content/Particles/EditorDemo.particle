@@ -1,0 +1,2598 @@
+{
+    "Emitters": [
+        {
+            "LODLevels": [
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": {
+                                "Properties": {
+                                    "Lifetime": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 1.2,
+                                        "MinValue": 0.8,
+                                        "Mode": "Uniform"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": {
+                                "Properties": {
+                                    "StartLocation": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 4,
+                                            "Y": 4,
+                                            "Z": 4
+                                        },
+                                        "MinValue": {
+                                            "X": -4,
+                                            "Y": -4,
+                                            "Z": -4
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleVelocity",
+                            "Data": {
+                                "Properties": {
+                                    "StartVelocity": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 8,
+                                            "Y": 8,
+                                            "Z": 20
+                                        },
+                                        "MinValue": {
+                                            "X": -8,
+                                            "Y": -8,
+                                            "Z": 5
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "StartVelocityRadial": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": {
+                                "Properties": {
+                                    "StartSize": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 70,
+                                            "Y": 70,
+                                            "Z": 70
+                                        },
+                                        "MinValue": {
+                                            "X": 50,
+                                            "Y": 50,
+                                            "Z": 50
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": true
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColor",
+                            "Data": {
+                                "Properties": {
+                                    "StartColor": {
+                                        "Constant": {
+                                            "X": 1.0,
+                                            "Y": 0.85,
+                                            "Z": 0.6
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "StartAlpha": {
+                                        "Constant": 0.8,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": {
+                                "Properties": {
+                                    "ColorOverLife": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "AlphaOverLife": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.25,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Curve"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSizeMultiplyLife",
+                            "Data": {
+                                "Properties": {
+                                    "LifeMultiplier": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": true
+                                    },
+                                    "bMultiplyX": true,
+                                    "bMultiplyY": true,
+                                    "bMultiplyZ": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        }
+                    ],
+                    "Properties": {
+                        "bEnabled": true
+                    },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "None",
+                            "Material": {
+                                "Base": "ParticleSpriteAdditive",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "W": 1.0,
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    },
+                                    "BlendState": "Opaque",
+                                    "FlipNormalY": false,
+                                    "PSOType": 25,
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    },
+                                    "Textures": [
+                                        "Engine/Textures/SpotLightWarm.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ]
+                                }
+                            },
+                            "RandomImageTime": 0.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 1,
+                            "SubImages_Vertical": 1,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 0
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": {
+                                "Constant": 20.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "RateScale": {
+                                "Constant": 1.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "bEnabled": true
+                        }
+                    }
+                },
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": {
+                                "Properties": {
+                                    "Lifetime": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 1.2,
+                                        "MinValue": 0.8,
+                                        "Mode": "Uniform"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": {
+                                "Properties": {
+                                    "StartLocation": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 4,
+                                            "Y": 4,
+                                            "Z": 4
+                                        },
+                                        "MinValue": {
+                                            "X": -4,
+                                            "Y": -4,
+                                            "Z": -4
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleVelocity",
+                            "Data": {
+                                "Properties": {
+                                    "StartVelocity": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 8,
+                                            "Y": 8,
+                                            "Z": 20
+                                        },
+                                        "MinValue": {
+                                            "X": -8,
+                                            "Y": -8,
+                                            "Z": 5
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "StartVelocityRadial": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": {
+                                "Properties": {
+                                    "StartSize": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 70,
+                                            "Y": 70,
+                                            "Z": 70
+                                        },
+                                        "MinValue": {
+                                            "X": 50,
+                                            "Y": 50,
+                                            "Z": 50
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": true
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColor",
+                            "Data": {
+                                "Properties": {
+                                    "StartColor": {
+                                        "Constant": {
+                                            "X": 1.0,
+                                            "Y": 0.85,
+                                            "Z": 0.6
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "StartAlpha": {
+                                        "Constant": 0.8,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": {
+                                "Properties": {
+                                    "ColorOverLife": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "AlphaOverLife": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.25,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Curve"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSizeMultiplyLife",
+                            "Data": {
+                                "Properties": {
+                                    "LifeMultiplier": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": true
+                                    },
+                                    "bMultiplyX": true,
+                                    "bMultiplyY": true,
+                                    "bMultiplyZ": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        }
+                    ],
+                    "Properties": {
+                        "bEnabled": true
+                    },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "None",
+                            "Material": {
+                                "Base": "ParticleSpriteAdditive",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "W": 1.0,
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    },
+                                    "BlendState": "Opaque",
+                                    "FlipNormalY": false,
+                                    "PSOType": 25,
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    },
+                                    "Textures": [
+                                        "Engine/Textures/SpotLightWarm.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ]
+                                }
+                            },
+                            "RandomImageTime": 0.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 1,
+                            "SubImages_Vertical": 1,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 0
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": {
+                                "Constant": 10.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "RateScale": {
+                                "Constant": 1.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "bEnabled": true
+                        }
+                    }
+                },
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": {
+                                "Properties": {
+                                    "Lifetime": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 1.2,
+                                        "MinValue": 0.8,
+                                        "Mode": "Uniform"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": {
+                                "Properties": {
+                                    "StartLocation": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 4,
+                                            "Y": 4,
+                                            "Z": 4
+                                        },
+                                        "MinValue": {
+                                            "X": -4,
+                                            "Y": -4,
+                                            "Z": -4
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleVelocity",
+                            "Data": {
+                                "Properties": {
+                                    "StartVelocity": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 8,
+                                            "Y": 8,
+                                            "Z": 20
+                                        },
+                                        "MinValue": {
+                                            "X": -8,
+                                            "Y": -8,
+                                            "Z": 5
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "StartVelocityRadial": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": {
+                                "Properties": {
+                                    "StartSize": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 70,
+                                            "Y": 70,
+                                            "Z": 70
+                                        },
+                                        "MinValue": {
+                                            "X": 50,
+                                            "Y": 50,
+                                            "Z": 50
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": true
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColor",
+                            "Data": {
+                                "Properties": {
+                                    "StartColor": {
+                                        "Constant": {
+                                            "X": 1.0,
+                                            "Y": 0.85,
+                                            "Z": 0.6
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "StartAlpha": {
+                                        "Constant": 0.8,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": {
+                                "Properties": {
+                                    "ColorOverLife": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "AlphaOverLife": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.25,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Curve"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSizeMultiplyLife",
+                            "Data": {
+                                "Properties": {
+                                    "LifeMultiplier": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.6
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Linear",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 1.3
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": true
+                                    },
+                                    "bMultiplyX": true,
+                                    "bMultiplyY": true,
+                                    "bMultiplyZ": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        }
+                    ],
+                    "Properties": {
+                        "bEnabled": false
+                    },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "None",
+                            "Material": {
+                                "Base": "ParticleSpriteAdditive",
+                                "Instance": {
+                                    "BaseColor": {
+                                        "W": 1.0,
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    },
+                                    "BlendState": "Opaque",
+                                    "FlipNormalY": false,
+                                    "PSOType": 25,
+                                    "Properties": {},
+                                    "SamplerState": "LinearClamp",
+                                    "Shininess": 32.0,
+                                    "SpecularColor": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    },
+                                    "Textures": [
+                                        "Engine/Textures/SpotLightWarm.png"
+                                    ],
+                                    "UVScrollSpeed": [
+                                        0.0,
+                                        0.0
+                                    ]
+                                }
+                            },
+                            "RandomImageTime": 0.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 1,
+                            "SubImages_Vertical": 1,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 0
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": {
+                                "Constant": 10.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "RateScale": {
+                                "Constant": 1.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "bEnabled": true
+                        }
+                    }
+                }
+            ],
+            "Properties": {}
+        },
+        {
+            "LODLevels": [
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": {
+                                "Properties": {
+                                    "Lifetime": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 1.6,
+                                        "MinValue": 1.2,
+                                        "Mode": "Uniform"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": {
+                                "Properties": {
+                                    "StartLocation": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 8,
+                                            "Y": 8,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": -8,
+                                            "Y": -8,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleVelocity",
+                            "Data": {
+                                "Properties": {
+                                    "StartVelocity": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 50,
+                                            "Y": 50,
+                                            "Z": 260
+                                        },
+                                        "MinValue": {
+                                            "X": -50,
+                                            "Y": -50,
+                                            "Z": 180
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "StartVelocityRadial": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": {
+                                "Properties": {
+                                    "StartSize": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 14,
+                                            "Y": 14,
+                                            "Z": 14
+                                        },
+                                        "MinValue": {
+                                            "X": 8,
+                                            "Y": 8,
+                                            "Z": 8
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": true
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColor",
+                            "Data": {
+                                "Properties": {
+                                    "StartColor": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "StartAlpha": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": {
+                                "Properties": {
+                                    "ColorOverLife": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.9
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 0.55
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.15
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.8
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 0.1
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.05
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": false
+                                    },
+                                    "AlphaOverLife": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.1,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.6,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Curve"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSizeMultiplyLife",
+                            "Data": {
+                                "Properties": {
+                                    "LifeMultiplier": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": true
+                                    },
+                                    "bMultiplyX": true,
+                                    "bMultiplyY": true,
+                                    "bMultiplyZ": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSubUV",
+                            "Data": {
+                                "Properties": {
+                                    "SubImageIndex": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        }
+                    ],
+                    "Properties": {
+                        "bEnabled": true
+                    },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "Random",
+                            "Material": {
+                                "Asset": "ParticleSpriteAdditive"
+                            },
+                            "RandomImageTime": 1.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 8,
+                            "SubImages_Vertical": 8,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 0
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": {
+                                "Constant": 120.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "RateScale": {
+                                "Constant": 1.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "bEnabled": true
+                        }
+                    }
+                },
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": {
+                                "Properties": {
+                                    "Lifetime": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 1.6,
+                                        "MinValue": 1.2,
+                                        "Mode": "Uniform"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": {
+                                "Properties": {
+                                    "StartLocation": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 8,
+                                            "Y": 8,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": -8,
+                                            "Y": -8,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleVelocity",
+                            "Data": {
+                                "Properties": {
+                                    "StartVelocity": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 50,
+                                            "Y": 50,
+                                            "Z": 260
+                                        },
+                                        "MinValue": {
+                                            "X": -50,
+                                            "Y": -50,
+                                            "Z": 180
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "StartVelocityRadial": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": {
+                                "Properties": {
+                                    "StartSize": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 18,
+                                            "Y": 18,
+                                            "Z": 18
+                                        },
+                                        "MinValue": {
+                                            "X": 10,
+                                            "Y": 10,
+                                            "Z": 10
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": true
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColor",
+                            "Data": {
+                                "Properties": {
+                                    "StartColor": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "StartAlpha": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": {
+                                "Properties": {
+                                    "ColorOverLife": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.9
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 0.55
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.15
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.8
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 0.1
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.05
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": false
+                                    },
+                                    "AlphaOverLife": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.1,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.6,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Curve"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSizeMultiplyLife",
+                            "Data": {
+                                "Properties": {
+                                    "LifeMultiplier": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": true
+                                    },
+                                    "bMultiplyX": true,
+                                    "bMultiplyY": true,
+                                    "bMultiplyZ": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSubUV",
+                            "Data": {
+                                "Properties": {
+                                    "SubImageIndex": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        }
+                    ],
+                    "Properties": {
+                        "bEnabled": true
+                    },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "Random",
+                            "Material": {
+                                "Asset": "ParticleSpriteAdditive"
+                            },
+                            "RandomImageTime": 1.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 8,
+                            "SubImages_Vertical": 8,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 60
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": {
+                                "Constant": 40.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "RateScale": {
+                                "Constant": 1.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "bEnabled": true
+                        }
+                    }
+                },
+                {
+                    "Modules": [
+                        {
+                            "Class": "UParticleModuleLifetime",
+                            "Data": {
+                                "Properties": {
+                                    "Lifetime": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 1.6,
+                                        "MinValue": 1.2,
+                                        "Mode": "Uniform"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleLocation",
+                            "Data": {
+                                "Properties": {
+                                    "StartLocation": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 8,
+                                            "Y": 8,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": -8,
+                                            "Y": -8,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleVelocity",
+                            "Data": {
+                                "Properties": {
+                                    "StartVelocity": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 50,
+                                            "Y": 50,
+                                            "Z": 260
+                                        },
+                                        "MinValue": {
+                                            "X": -50,
+                                            "Y": -50,
+                                            "Z": 180
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": false
+                                    },
+                                    "StartVelocityRadial": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSize",
+                            "Data": {
+                                "Properties": {
+                                    "StartSize": {
+                                        "Constant": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 22,
+                                            "Y": 22,
+                                            "Z": 22
+                                        },
+                                        "MinValue": {
+                                            "X": 14,
+                                            "Y": 14,
+                                            "Z": 14
+                                        },
+                                        "Mode": "Uniform",
+                                        "bLockAxes": true
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColor",
+                            "Data": {
+                                "Properties": {
+                                    "StartColor": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [],
+                                        "CurveKeysY": [],
+                                        "CurveKeysZ": [],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Constant",
+                                        "bLockAxes": false
+                                    },
+                                    "StartAlpha": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleColorOverLife",
+                            "Data": {
+                                "Properties": {
+                                    "ColorOverLife": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.9
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 0.55
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.15
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.8
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.4,
+                                                "Value": 0.1
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.05
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": false
+                                    },
+                                    "AlphaOverLife": {
+                                        "Constant": 1.0,
+                                        "CurveKeys": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.1,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.6,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Curve"
+                                    },
+                                    "bClampAlpha": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSizeMultiplyLife",
+                            "Data": {
+                                "Properties": {
+                                    "LifeMultiplier": {
+                                        "Constant": {
+                                            "X": 1,
+                                            "Y": 1,
+                                            "Z": 1
+                                        },
+                                        "CurveKeysX": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "CurveKeysY": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "CurveKeysZ": [
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.0,
+                                                "Value": 0.3
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.2,
+                                                "Value": 1.4
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 0.5,
+                                                "Value": 1.0
+                                            },
+                                            {
+                                                "ArriveTangent": 0.0,
+                                                "InterpMode": "Cubic",
+                                                "KeyId": -1,
+                                                "LeaveTangent": 0.0,
+                                                "Time": 1.0,
+                                                "Value": 0.0
+                                            }
+                                        ],
+                                        "MaxValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "MinValue": {
+                                            "X": 0,
+                                            "Y": 0,
+                                            "Z": 0
+                                        },
+                                        "Mode": "Curve",
+                                        "bLockAxes": true
+                                    },
+                                    "bMultiplyX": true,
+                                    "bMultiplyY": true,
+                                    "bMultiplyZ": true,
+                                    "bEnabled": true
+                                }
+                            }
+                        },
+                        {
+                            "Class": "UParticleModuleSubUV",
+                            "Data": {
+                                "Properties": {
+                                    "SubImageIndex": {
+                                        "Constant": 0.0,
+                                        "CurveKeys": [],
+                                        "MaxValue": 0.0,
+                                        "MinValue": 0.0,
+                                        "Mode": "Constant"
+                                    },
+                                    "bEnabled": true
+                                }
+                            }
+                        }
+                    ],
+                    "Properties": {
+                        "bEnabled": true
+                    },
+                    "RequiredModule": {
+                        "Properties": {
+                            "EmitterDelay": 0.0,
+                            "EmitterDuration": 1.0,
+                            "EmitterLoops": 0,
+                            "InterpolationMethod": "Random",
+                            "Material": {
+                                "Asset": "ParticleSpriteAdditive"
+                            },
+                            "RandomImageTime": 1.0,
+                            "SortMode": "None",
+                            "SubImages_Horizontal": 8,
+                            "SubImages_Vertical": 8,
+                            "bDelayFirstLoopOnly": false,
+                            "bEnabled": true,
+                            "bUseLocalSpace": false,
+                            "MaxActiveParticles": 20
+                        }
+                    },
+                    "SpawnModule": {
+                        "Properties": {
+                            "BurstList": [],
+                            "Rate": {
+                                "Constant": 12.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "RateScale": {
+                                "Constant": 1.0,
+                                "CurveKeys": [],
+                                "MaxValue": 0.0,
+                                "MinValue": 0.0,
+                                "Mode": "Constant"
+                            },
+                            "bEnabled": true
+                        }
+                    }
+                }
+            ],
+            "Properties": {}
+        }
+    ],
+    "Properties": {
+        "LODDistances": [
+            0.0,
+            600.0,
+            1500.0
+        ],
+        "LODMethod": "Automatic",
+        "LODDistanceCheckTime": 0.25
+    },
+    "Version": 1
+}

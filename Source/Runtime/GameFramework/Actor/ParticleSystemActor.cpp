@@ -7,6 +7,9 @@ AParticleSystemActor::AParticleSystemActor()
 	ParticleSystemComponent = CreateDefaultSubobject<UParticleSystemComponent>("UParticleSystemComponent");
 	SetRootComponent(ParticleSystemComponent);
 
+	UParticleSystem* DefaultTemplate = UAssetManager::LoadParticleSystem("Particles/DefaultTest.particle");
+	ParticleSystemComponent->InitializeSystem(DefaultTemplate);
+
 	BillboardComponent = CreateDefaultSubobject<UBillboardComponent>("UBillboardComponent");
 	BillboardComponent->SetEditorIcon(true);
 	BillboardComponent->SetIconSize(2.0f);
@@ -15,7 +18,7 @@ AParticleSystemActor::AParticleSystemActor()
 	BillboardComponent->SetHiddenInDetails(true);
 
 	UMaterial* Base = UAssetManager::GetAssetByPath<UMaterial>("BillboardMaterial");
-	UTexture2D* Icon = UAssetManager::Get().LoadTexture("Engine/Icons/Viewport/Cascade.png");
+	UTexture2D* Icon = UAssetManager::Get().LoadTexture("Engine/Icons/Emitter.png");
 	if (Base && Icon)
 	{
 		UMaterial* IconMat = UMaterial::CreateInstance(Base);

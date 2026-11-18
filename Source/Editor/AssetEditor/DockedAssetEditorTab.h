@@ -3,6 +3,7 @@
 #include "AssetEditorTab.h"
 #include "AssetEditorPanel.h"
 #include "Containers/Array.h"
+#include "Editor/EditorUI/BottomDrawerBar.h"
 
 class FDockedAssetEditorTab : public FAssetEditorTab
 {
@@ -10,14 +11,17 @@ public:
     FDockedAssetEditorTab(FAssetEditor& InEditor, const char* DockSpaceName, const char* PanelClassName);
 
     void DrawMenuBar() override;
-    bool HasFocusedSubWindow() const override { return EditorDock::HasFocusedPanel(Panels); }
+    bool HasFocusedSubWindow() const override { return BottomBar.IsFocused() || EditorDock::HasFocusedPanel(Panels); }
     void OnRender(bool bActive) override;
+
+    void SetBottomDrawerPanels(FContentDrawerPanel* InContentDrawer, FOutputLogPanel* InOutputLog);
 
 protected:
     void RegisterPanel(TUniquePtr<FAssetEditorPanelBase> Panel);
     virtual void BeforeRender()
     {
     }
+    virtual void DrawToolbar() {}
     virtual void BuildDefaultLayout(ImGuiID InDockSpaceId, const ImVec2& Size) = 0;
     // File 메뉴의 Close Editor 위에 들어갈 항목(Save 등). 항목을 그렸으면 true를 돌려 구분선을 넣는다.
     virtual bool DrawFileMenuItems() { return false; }
@@ -30,5 +34,6 @@ private:
     FAssetEditor& Editor;
     ImGuiID DockSpaceId = 0;
     ImGuiID PanelClassId = 0;
+    FBottomDrawerBar BottomBar;
     bool bLayoutInitialized = false;
 };

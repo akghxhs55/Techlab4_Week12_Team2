@@ -11,6 +11,9 @@ namespace EditorDragDrop
 	// 페이로드 내용: UFont* 한 개
 	inline constexpr const char* Font = "ASSET_FONT";
 
+	// 페이로드 내용: 에셋 경로 문자열
+	inline constexpr const char* ParticleSystem = "ASSET_PARTICLE_SYSTEM";
+
 	inline constexpr const char* Component = "COMPONENT";
 	inline constexpr const char* Actor = "SCENE_ACTOR";
 }

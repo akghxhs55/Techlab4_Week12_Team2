@@ -87,10 +87,11 @@ TUniquePtr<FTexture2D> RenderCommand::CreateTexture2D(const FTextureDesc& Desc, 
 }
 
 
-TUniquePtr<FVertexShader> RenderCommand::CreateVertexShader(const FShaderByteCode& ByteCode)
+TUniquePtr<FVertexShader> RenderCommand::CreateVertexShader(const FShaderByteCode& ByteCode,
+	std::span<const D3D11_INPUT_ELEMENT_DESC> Elements)
 {
 	assert(RenderDevice);
-	return RenderDevice->CreateVertexShader(ByteCode);
+	return RenderDevice->CreateVertexShader(ByteCode, Elements);
 }
 
 TUniquePtr<FPixelShader> RenderCommand::CreatePixelShader(const FShaderByteCode& ByteCode)

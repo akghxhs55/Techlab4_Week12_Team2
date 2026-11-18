@@ -4,6 +4,7 @@
 #include "UObject/Class.h"
 
 #include "CameraComponent.h"
+#include "Components/BillboardComponent.h"
 #include "CameraActor.generated.h"
 
 //class UCameraComponent;
@@ -18,7 +19,9 @@ public:
 	ACameraActor();
 
 	UCameraComponent* GetCameraComponent() const { return CameraComponent; };
+	UBillboardComponent* GetBillboardComponent() const { return BillboardComponent; }
 
 private:
 	UCameraComponent* CameraComponent;
+	UBillboardComponent* BillboardComponent = nullptr;   // 에디터에서 카메라 위치 표시·클릭 선택용
 };

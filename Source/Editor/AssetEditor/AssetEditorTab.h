@@ -27,6 +27,7 @@ public:
 	const char* GetTabName() const override;
 	bool CanClose() const override { return true; }
 	bool ConfirmClose() override;
+	bool HasUnsavedChanges() const override;
 
 private:
 	FAssetEditor& Editor;
@@ -34,5 +35,4 @@ private:
 	// GetTabName이 경로가 바뀌었을 때 다시 만든다
 	mutable FString NamedPath;
 	mutable FString TabName;
-	mutable FString DirtyTabName;
 };

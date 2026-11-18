@@ -505,6 +505,49 @@ void UEditorEngine::InitPanels()
 
 	DetailsPanel->SetWorld(GetActiveWorld());
 
+	UWorld::SetOnActorDestroyedCallback(
+		[this](UWorld* /*DestroyedInWorld*/, AActor* DestroyedActor)
+		{
+			if (!DestroyedActor)
+			{
+				return;
+			}
+
+			if (Gizmo && Gizmo->GetTarget() && Gizmo->GetTarget()->GetOwner() == DestroyedActor)
+			{
+				Gizmo->SetTarget(nullptr, false);
+			}
+			if (Outline)
+			{
+				const TArray<UPrimitiveComponent*>& CurTargets = Outline->GetTargets();
+				bool bHadTarget = false;
+				TArray<UPrimitiveComponent*> Remaining;
+				for (UPrimitiveComponent* Prim : CurTargets)
+				{
+					if (Prim && Prim->GetOwner() == DestroyedActor)
+					{
+						bHadTarget = true;
+					}
+					else if (Prim)
+					{
+						Remaining.Add(Prim);
+					}
+				}
+				if (bHadTarget)
+				{
+					Outline->SetTargets(Remaining);
+				}
+			}
+			if (DetailsPanel)
+			{
+				DetailsPanel->OnActorDestroyed(DestroyedActor);
+			}
+			if (OutlinerPanel)
+			{
+				OutlinerPanel->OnActorDestroyed(DestroyedActor);
+			}
+		});
+
 	ViewportsPanel->SetWorld(EditorWorld);
 	ViewportsPanel->SetIsPlayingQuery([this]() { return IsPlaying(); });
 	ViewportsPanel->SetGizmo(Gizmo.get());
@@ -706,12 +749,27 @@ void UEditorEngine::Tick(const float DeltaTime)
 		}
 		ViewportsPanel->SetSplitRatio(ViewportSplitRatio);
 
+		bool bSlotActives[4]{};
 		for (int32 i = 0; i < 4; ++i)
 		{
 			const bool bSlotActive = (ViewportLayoutMode == ELayoutMode::Single)
 				? (i == SingleViewportIndex)
 				: i < GetLayoutPaneCount(ViewportLayoutMode);
+			bSlotActives[i] = bSlotActive;
 			ViewportsPanel->SetView(i, ViewRects[i], bSlotActive);
+		}
+
+		const int32 CurrentActiveViewIndex = ViewportsPanel->GetActiveViewIndex();
+		if (CurrentActiveViewIndex < 0 || CurrentActiveViewIndex >= 4 || !bSlotActives[CurrentActiveViewIndex])
+		{
+			for (int32 i = 0; i < 4; ++i)
+			{
+				if (bSlotActives[i])
+				{
+					ViewportsPanel->SetActiveViewIndex(i);
+					break;
+				}
+			}
 		}
 
 		// 마우스 호버 감지
@@ -803,7 +861,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 		if (CapturedViewportIndex != -1 && WheelDelta != 0)
 		{
 			auto& Settings = EditorSettings->GetMutableSettings();
-			Settings.CameraSpeed = FMath::Clamp(Settings.CameraSpeed * powf(1.2f, WheelDelta / 120.0f), 0.1f, 10.0f);
+			Settings.CameraSpeed = FMath::Clamp(Settings.CameraSpeed * powf(1.2f, WheelDelta / 120.0f), 0.1f, 100.0f);
 			WheelDelta = 0;
 		}
 		const float MoveSpeed = 10.0f * EditorSettings->GetSettings().CameraSpeed;
@@ -1026,6 +1084,7 @@ void UEditorEngine::Tick(const float DeltaTime)
 					ShowFlags.bShowVignette = S.bShowVignette;
 					ShowFlags.bShowCameraOverlay = S.bShowCameraOverlay;
 					ShowFlags.bShowSkeletalMesh = S.bShowSkeletalMesh;
+					ShowFlags.bShowParticles = S.bShowParticles;
 				}
 			}
 		}
@@ -1538,6 +1597,7 @@ void UEditorEngine::FinishGizmoDragUndo()
 // ImGui를 정리한다. UObject 일괄 삭제와 공용 자원·Device 정리는 FEngineLoop가 이어서 한다.
 void UEditorEngine::PreExit()
 {
+	UWorld::SetOnActorDestroyedCallback(nullptr);
 	EndViewportNavCapture();
 	bTrackingGizmoDrag = false;
 	UndoHistory.Clear();
@@ -2046,11 +2106,8 @@ void UEditorEngine::DrawPIEDebug(UWorld* World, const FMatrix& ViewProjection)
 	const FEditorSettings& Settings = EditorSettings->GetSettings();
 	GShowSkeletalRootDebug = Settings.bShowRootDebug;  // 런타임 "root" 라벨 표시용
 
+	// 충돌 도형·스프링 암 같은 배치 라인은 에디터 뷰와 SIE에서만 그린다. 게임 화면에는 올리지 않는다.
 	FLineBatcher* LineBatcher = World->LineBatcher.get();
-	LineBatcher->BeginFrame();
-	if (Settings.bShowCollision)
-		DrawCollisionShapes(World, LineBatcher, nullptr);
-	LineBatcher->OnRender(ViewProjection);
 
 	// root는 바닥 높이라 가려지기 쉬우므로 깊이 테스트 없이 따로 그린다 (항상 위에 보임)
 	if (Settings.bShowRootDebug)

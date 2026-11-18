@@ -46,6 +46,8 @@
 
 namespace
 {
+	UWorld::FOnWorldActorDestroyed GWorldActorDestroyedCallback;
+
 	inline void WritePerObjectConstants(uint8* Dest, const FMatrix& LocalToWorld, const FMatrix& WorldToLocal, bool bReceiveShadow)
 	{
 		FPerObjectConstants Constants{};
@@ -155,6 +157,7 @@ void UWorld::Tick(float RealDeltaTime)
 
 	const float DeltaTime = RealDeltaTime * GetEffectiveTimeDilation();
 	RealTimeSeconds += RealDeltaTime;
+	++TickCount;
 
 	// World 시간 흐름
 	if (!bIsPaused)
@@ -187,6 +190,20 @@ void UWorld::Tick(float RealDeltaTime)
 	{
 		SCOPE_CYCLE_COUNTER(STAT_UpdateAllTransforms);
 		Scene.UpdateAllTransforms();
+	}
+}
+
+void UWorld::AddRenderedViewLocation(const FVector& ViewLocation)
+{
+	// 새 Tick 뒤 첫 기록이면 직전 프레임 목록을 버리고 이번 프레임 것으로 다시 모은다
+	if (ViewLocationsTickCount != TickCount)
+	{
+		ViewLocationsRenderedLastFrame.Empty();
+		ViewLocationsTickCount = TickCount;
+	}
+	if (ViewLocationsRenderedLastFrame.Num() < MaxRenderedViewLocations)
+	{
+		ViewLocationsRenderedLastFrame.Add(ViewLocation);
 	}
 }
 
@@ -282,6 +299,15 @@ void UWorld::PreviewWorldTick(float DeltaTime)
 		Comp->TickComponent(DeltaTime);
 	}
 
+	for (TObjectIterator<UParticleSystemComponent> Comp; Comp; ++Comp)
+	{
+		// 다른 월드(PIE, 프리뷰) 소속이거나 등록 안 된 컴포넌트는 제외 (PIE 컴포넌트 이중 Tick 방지)
+		if (!Comp || !Comp->IsRegistered() || Comp->GetWorld() != this)
+		{
+			continue;
+		}
+		Comp->TickComponent(DeltaTime);
+	}
 }
 
 void UWorld::ClearWorld()
@@ -360,6 +386,11 @@ int32 UWorld::GetActorNum()
 	return PersistentLevel->GetActorNum();
 }
 
+void UWorld::SetOnActorDestroyedCallback(FOnWorldActorDestroyed InCallback)
+{
+	GWorldActorDestroyedCallback = std::move(InCallback);
+}
+
 bool UWorld::DestroyActor(AActor* Actor)
 {
 	if (!Actor)
@@ -406,6 +437,12 @@ bool UWorld::DestroyActor(AActor* Actor)
 	Actor->UnregisterAllComponents();
 
 	Actor->RegisterAllActorTickFunctions(false);
+
+	// 에디터 등 외부 구독자가 댕글링 포인터를 남기지 않도록 실제 메모리 해제 직전에 통지
+	if (GWorldActorDestroyedCallback)
+	{
+		GWorldActorDestroyedCallback(this, Actor);
+	}
 
 	// 4. Actor 삭제
 	delete Actor;
@@ -535,6 +572,83 @@ bool UWorld::SweepSingle(const FRay& WorldRay, float MaxDistance, float Radius, 
 			InOutNearestT = T;
 			return true;
 		}, NearestT);
+	return OutHit.bBlockingHit;
+}
+
+void UWorld::GatherSweepCandidates(const FBox& Bounds, const AActor* IgnoreActor, TArray<FPrimitiveSceneProxy*>& OutCandidates)
+{
+	OutCandidates.Reset();
+	// 이번 프레임 한 번만. 파티클마다 부르지 않는다
+	Scene.UpdateAllTransforms();
+
+	Scene.BVH.Query(
+		[&Bounds](const FBox& NodeBounds)
+		{
+			return NodeBounds.Min.X <= Bounds.Max.X && NodeBounds.Max.X >= Bounds.Min.X &&
+				NodeBounds.Min.Y <= Bounds.Max.Y && NodeBounds.Max.Y >= Bounds.Min.Y &&
+				NodeBounds.Min.Z <= Bounds.Max.Z && NodeBounds.Max.Z >= Bounds.Min.Z;
+		},
+		[&](FPrimitiveSceneProxy* Proxy)
+		{
+			// SweepSingle의 메시 경로와 같은 조건. 메시가 없는 프록시(파티클, 빌보드)는 제외
+			UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
+			if (!Component || !Proxy->GetMesh() || !Component->IsShown(true))
+				return;
+			const AActor* Owner = Component->GetOwner();
+			if (!Owner || Owner == IgnoreActor || !Owner->GetActorEnableCollision() || Owner->GetWorld() != this)
+				return;
+			OutCandidates.Add(Proxy);
+		});
+}
+
+bool UWorld::SweepAgainstCandidates(const TArray<FPrimitiveSceneProxy*>& Candidates, const FRay& WorldRay,
+	float MaxDistance, float Radius, FHitResult& OutHit)
+{
+	OutHit = FHitResult(1.0f);
+	if (Candidates.IsEmpty() || MaxDistance <= 0.0f)
+		return false;
+
+	const FVector Extent(Radius, Radius, Radius);
+	float NearestT = MaxDistance;
+	for (FPrimitiveSceneProxy* Proxy : Candidates)
+	{
+		FAABB Bounds = Proxy->GetBounds();
+		Bounds.Extent += Extent;
+		const FVector Min = Bounds.Center - Bounds.Extent;
+		const FVector Max = Bounds.Center + Bounds.Extent;
+
+		float T = NearestT;
+		if (!RayIntersectsAABB(WorldRay, Min, Max, T) || T > NearestT)
+			continue;
+
+		// 시작점이 이미 박스 안 → 법선을 믿을 수 없으므로 호출자가 건너뛰게 표시
+		const FVector& O = WorldRay.Origin;
+		const bool bInside = O.X > Min.X && O.X < Max.X && O.Y > Min.Y && O.Y < Max.Y && O.Z > Min.Z && O.Z < Max.Z;
+
+		const FVector Point = WorldRay.Origin + WorldRay.Direction * T;
+		const FVector Offset = Point - Bounds.Center;
+		const float X = Bounds.Extent.X > 0.0f ? Offset.X / Bounds.Extent.X : 0.0f;
+		const float Y = Bounds.Extent.Y > 0.0f ? Offset.Y / Bounds.Extent.Y : 0.0f;
+		const float Z = Bounds.Extent.Z > 0.0f ? Offset.Z / Bounds.Extent.Z : 0.0f;
+		const float AX = std::abs(X), AY = std::abs(Y), AZ = std::abs(Z);
+		const FVector Normal = AX >= AY && AX >= AZ ? FVector(X >= 0.0f ? 1.0f : -1.0f, 0.0f, 0.0f)
+			: AY >= AZ ? FVector(0.0f, Y >= 0.0f ? 1.0f : -1.0f, 0.0f)
+			: FVector(0.0f, 0.0f, Z >= 0.0f ? 1.0f : -1.0f);
+		// 면에서 멀어지는 방향이면 이미 빠져나가는 중
+		if (!bInside && Normal.Dot(WorldRay.Direction) > 0.0f)
+			continue;
+
+		NearestT = T;
+		OutHit.bBlockingHit = true;
+		OutHit.bStartPentrating = bInside;
+		OutHit.HitComponent = Proxy->GetComponent();
+		OutHit.Distance = T;
+		OutHit.Time = T / MaxDistance;
+		OutHit.ImpactPoint = Point;
+		OutHit.Location = Point;
+		OutHit.ImpactNormal = Normal;
+		OutHit.Normal = Normal;
+	}
 	return OutHit.bBlockingHit;
 }
 

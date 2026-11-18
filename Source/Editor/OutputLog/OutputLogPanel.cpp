@@ -9,6 +9,15 @@
 #include "Editor/Viewports/ViewportToolbarWidgets.h"
 
 #include "Components/SkinnedMeshComponent.h"
+#include "Components/ParticleSystemComponent.h"
+#include "Particles/ParticleEmitterInstance.h"
+#include "Particles/ParticleTypes.h"
+#include "UObject/UObjectIterator.h"
+#include "Engine/World.h"
+#include "GameFramework/Actor.h"
+#include <format>
+#include <memory>
+#include <utility>
 
 #include <algorithm>
 #include <cctype>
@@ -303,13 +312,26 @@ void FOutputLogPanel::RenderContents()
 	}
 
 	ImGui::SameLine();
-	if (bApplySuggestionCompletion)
+	RenderCommandInput("##OutputLogInput", InputBuf, IM_COUNTOF(InputBuf), -1.0f, true, true);
+
+	//////////////////////////////////////////////////////////
+}
+
+void FOutputLogPanel::RenderCommandInput(const char* InputId, char* Buffer, size_t BufferSize, float Width, bool bUseLogFont, bool bReclaimFocusOnSubmit)
+{
+	if (!InputId || !Buffer || BufferSize == 0)
+		return;
+
+	CurrentInputRenderId = InputId;
+	const bool bMatchesActiveInput = (ActiveSuggestionInputId == InputId);
+
+	if (bApplySuggestionCompletion && bMatchesActiveInput)
 	{
-		std::snprintf(InputBuf, sizeof(InputBuf), "%s", PendingSuggestionText.c_str());
+		std::snprintf(Buffer, BufferSize, "%s", PendingSuggestionText.c_str());
 		LastSuggestionQuery = PendingSuggestionText;
 		bApplySuggestionCompletion = false;
 	}
-	if (bReclaimInputFocusNextFrame)
+	if (bReclaimInputFocusNextFrame && bMatchesActiveInput)
 	{
 		ImGui::SetKeyboardFocusHere();
 		bReclaimInputFocusNextFrame = false;
@@ -323,32 +345,36 @@ void FOutputLogPanel::RenderContents()
 		ImGuiInputTextFlags_CallbackHistory |
 		ImGuiInputTextFlags_CallbackEdit |
 		ImGuiInputTextFlags_CallbackAlways;
-	ImGui::SetNextItemWidth(-1.0f);
+	ImGui::SetNextItemWidth(Width);
 	ImGui::PushStyleColor(ImGuiCol_FrameBg, EditorColor::BgDeepest);
-	if (LogFont) ImGui::PushFont(LogFont, 0.0f);
-	if (ImGui::InputTextWithHint("##OutputLogInput", "Enter Console Command", InputBuf, IM_COUNTOF(InputBuf), input_text_flags, &TextEditCallbackStub, this))
+	if (bUseLogFont && LogFont) ImGui::PushFont(LogFont, 0.0f);
+	if (ImGui::InputTextWithHint(InputId, "Enter Console Command", Buffer, BufferSize, input_text_flags, &TextEditCallbackStub, this))
 	{
-		char* s = InputBuf;
-		if (s[0])
+		if (Buffer[0] != '\0')
 		{
-			ExecCommand(s);
+			ExecCommand(Buffer);
 		}
-		s[0] = 0;
+		Buffer[0] = '\0';
 		HistoryPos = -1;
 		FilteredSuggestionIndices.Reset();
 		SelectedSuggestion = 0;
 		bSuppressSuggestions = false;
 		LastSuggestionQuery.clear();
-		reclaim_focus = true;
+		reclaim_focus = bReclaimFocusOnSubmit;
 	}
-	if (LogFont) ImGui::PopFont();
+	if (bUseLogFont && LogFont) ImGui::PopFont();
 	ImGui::PopStyleColor();
 
 	const ImVec2 InputMin = ImGui::GetItemRectMin();
 	const ImVec2 InputMax = ImGui::GetItemRectMax();
 	const bool bInputActive = ImGui::IsItemActive();
 
-	if (InputBuf[0] == '\0')
+	if (bInputActive)
+	{
+		ActiveSuggestionInputId = InputId;
+	}
+
+	if ((bInputActive || bMatchesActiveInput) && Buffer[0] == '\0')
 	{
 		FilteredSuggestionIndices.Reset();
 		SelectedSuggestion = 0;
@@ -356,19 +382,27 @@ void FOutputLogPanel::RenderContents()
 		LastSuggestionQuery.clear();
 	}
 
-	ImGui::SetItemDefaultFocus();
+	if (bReclaimFocusOnSubmit)
+	{
+		ImGui::SetItemDefaultFocus();
+	}
 	if (reclaim_focus)
 		ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
 
+	const bool bPopupTarget = (ActiveSuggestionInputId == InputId);
 	const bool bShowSuggestions =
-		(bInputActive || bSuggestionPopupHovered) &&
+		(bInputActive || (bSuggestionPopupHovered && bPopupTarget)) &&
 		!bSuppressSuggestions &&
 		!FilteredSuggestionIndices.IsEmpty();
-	bSuggestionPopupHovered = false;
+	if (bPopupTarget)
+	{
+		bSuggestionPopupHovered = false;
+	}
 	if (bShowSuggestions)
+	{
 		RenderAutocompletePopup(InputMin, InputMax);
-
-	//////////////////////////////////////////////////////////
+	}
+	CurrentInputRenderId.clear();
 }
 
 bool FOutputLogPanel::PassVerbosity(ELogVerbosity Verbosity) const
@@ -436,8 +470,9 @@ int FOutputLogPanel::TextEditCallback(ImGuiInputTextCallbackData* data)
 			data->SelectionEnd = data->BufTextLen;
 			bMoveCursorToEndOnFocus = false;
 		}
-		if (LastSuggestionQuery != data->Buf)
+		if (LastSuggestionQuery != data->Buf || ActiveSuggestionInputId != CurrentInputRenderId)
 		{
+			ActiveSuggestionInputId = CurrentInputRenderId;
 			bSuppressSuggestions = false;
 			HistoryPos = -1;
 			UpdateSuggestions(data->Buf);
@@ -446,6 +481,7 @@ int FOutputLogPanel::TextEditCallback(ImGuiInputTextCallbackData* data)
 	}
 	case ImGuiInputTextFlags_CallbackEdit:
 	{
+		ActiveSuggestionInputId = CurrentInputRenderId;
 		bSuppressSuggestions = false;
 		HistoryPos = -1;
 		UpdateSuggestions(data->Buf);
@@ -847,6 +883,188 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
+	Add("p.LogBursts", "p.LogBursts [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, FParticleEmitterInstance::bLogBursts, bOn)) return false;
+			FParticleEmitterInstance::bLogBursts = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.LogBursts = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	Add("p.ShowLOD", "p.ShowLOD [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, UParticleSystemComponent::bShowAllLODDistances, bOn)) return false;
+			UParticleSystemComponent::bShowAllLODDistances = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.ShowLOD = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	Add("p.LODInfo", "p.LODInfo", [](const TArray<FString>&, const FString&)
+		{
+			int32 Count = 0;
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				const UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				const UParticleSystem* Template = PSC->GetTemplate();
+				const UWorld* World = PSC->GetWorld();
+
+				int32 ActiveParticles = 0;
+				bool bSpawning = false;
+				for (const FParticleEmitterInstance* Instance : PSC->GetEmitterInstances())
+				{
+					if (!Instance) continue;
+					ActiveParticles += Instance->ActiveParticles;
+					bSpawning |= Instance->bSpawningEnabled;
+				}
+
+				FString Distances;
+				if (Template)
+				{
+					for (float D : Template->GetLODDistances())
+						Distances += std::format("{}{:.0f}", Distances.empty() ? "" : ", ", D);
+				}
+
+				FLog::Log(ELogVerbosity::Info, "[{}] {} | LOD {}/{} | camera {:.0f} | LODDistances [{}] | particles {} | {}",
+					(World && World->IsGameWorld()) ? "Game" : "Editor",
+					Template ? Template->GetAssetPath() : FString("None"),
+					PSC->GetLODLevel(), Template ? Template->GetNumLODs() : 0,
+					PSC->GetDistanceToNearestView(), Distances, ActiveParticles,
+					bSpawning ? "Active" : "Deactivated");
+				++Count;
+			}
+			FLog::Log(ELogVerbosity::Info, "p.LODInfo: {} components", Count);
+			return true;
+		});
+
+	Add("p.LogEvents", "p.LogEvents [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, UParticleSystemComponent::bLogEvents, bOn)) return false;
+			UParticleSystemComponent::bLogEvents = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.LogEvents = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	Add("p.ShowCollisions", "p.ShowCollisions [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, UParticleSystemComponent::bShowCollisions, bOn)) return false;
+			UParticleSystemComponent::bShowCollisions = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.ShowCollisions = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	// 디버그: 모든 파티클 컴포넌트의 OnParticleCollide에 테스트 콜백을 건다
+	//  log            : 30번째 충돌마다 로그
+	//  clear-template : 첫 충돌 콜백 안에서 SetTemplate(nullptr) (콜백 중 컴포넌트 변경이 안전한지)
+	//  off            : 건 콜백 해제
+	Add("p.BindCollide", "p.BindCollide <log|clear-template|off>", [](const TArray<FString>& Args, const FString&)
+		{
+			if (Args.Num() != 2) return false;
+			static TArray<std::pair<UParticleSystemComponent*, FDelegateHandle>> Bound;
+
+			// 이미 건 것은 먼저 해제한다 (살아 있는 컴포넌트만)
+			for (const auto& [PSC, Handle] : Bound)
+			{
+				for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+				{
+					if (*It == PSC) { PSC->OnParticleCollide.Remove(Handle); break; }
+				}
+			}
+			Bound.Empty();
+			if (EqualsIgnoreCase(Args[1], "OFF"))
+			{
+				FLog::Log(ELogVerbosity::Info, "p.BindCollide off");
+				return true;
+			}
+
+			const bool bLog = EqualsIgnoreCase(Args[1], "LOG");
+			if (!bLog && !EqualsIgnoreCase(Args[1], "CLEAR-TEMPLATE")) return false;
+
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				FDelegateHandle Handle = 0;
+				if (bLog)
+				{
+					auto Counter = std::make_shared<int32>(0);
+					Handle = PSC->OnParticleCollide.Add([Counter](UParticleSystemComponent* Source, const FParticleEventCollisionData& Event)
+						{
+							if ((*Counter)++ % 30 != 0) return;
+							FLog::Log(ELogVerbosity::Info, "OnParticleCollide #{} '{}' at ({:.0f}, {:.0f}, {:.0f}) hit {}",
+								*Counter, Event.EventName.ToString(), Event.Location.X, Event.Location.Y, Event.Location.Z,
+								Event.HitActor ? Event.HitActor->GetName() : FString("None"));
+						});
+				}
+				else
+				{
+					Handle = PSC->OnParticleCollide.Add([](UParticleSystemComponent* Source, const FParticleEventCollisionData&)
+						{
+							if (Source && Source->GetTemplate())
+							{
+								FLog::Log(ELogVerbosity::Info, "OnParticleCollide: SetTemplate(nullptr) inside callback");
+								Source->SetTemplate(nullptr);
+							}
+						});
+				}
+				Bound.Add({ PSC, Handle });
+			}
+			FLog::Log(ELogVerbosity::Info, "p.BindCollide {}: {} components", Args[1], Bound.Num());
+			return true;
+		});
+
+	// 디버그: 살아 있는 모든 파티클의 Freeze 플래그를 켜고 끈다 (Freeze 처리 확인용)
+	Add("p.Freeze", "p.Freeze <0|1>", [](const TArray<FString>& Args, const FString&)
+		{
+			if (Args.Num() != 2 || (Args[1] != "0" && Args[1] != "1")) return false;
+			const bool bFreeze = Args[1] == "1";
+
+			int32 Count = 0;
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				for (FParticleEmitterInstance* Instance : PSC->GetEmitterInstances())
+				{
+					if (!Instance) continue;
+					for (int32 i = 0; i < Instance->ActiveParticles; ++i)
+					{
+						uint8* Base = Instance->ParticleData + Instance->ParticleIndices[i] * Instance->ParticleStride;
+						FBaseParticle& Particle = *reinterpret_cast<FBaseParticle*>(Base);
+						if (bFreeze) Particle.Flags |= STATE_Particle_Freeze;
+						else Particle.Flags &= ~STATE_Particle_Freeze;
+						++Count;
+					}
+				}
+			}
+			FLog::Log(ELogVerbosity::Info, "p.Freeze {}: {} particles", bFreeze ? 1 : 0, Count);
+			return true;
+		});
+
+	// 등록된 모든 파티클 컴포넌트 (에디터·PIE 월드 모두)
+	Add("p.Particles", "p.Particles <Activate|Deactivate>", [](const TArray<FString>& Args, const FString&)
+		{
+			if (Args.Num() != 2) return false;
+			const bool bActivate = EqualsIgnoreCase(Args[1], "ACTIVATE");
+			if (!bActivate && !EqualsIgnoreCase(Args[1], "DEACTIVATE")) return false;
+
+			int32 Count = 0;
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				if (bActivate) PSC->Activate();
+				else PSC->Deactivate();
+				++Count;
+			}
+			FLog::Log(ELogVerbosity::Info, "p.Particles {}: {} components", bActivate ? "Activate" : "Deactivate", Count);
+			return true;
+		});
+
 	// 자동완성 미리보기 항목 등록 (명령 + 자주 쓰는 서브명령 조합)
 	RegisterSuggestion("Cmd", "HELP", "HELP", "Show command list");
 	RegisterSuggestion("Cmd", "CLEAR", "CLEAR", "Clear output log");
@@ -867,6 +1085,18 @@ void FOutputLogPanel::RegisterCommands()
 	RegisterSuggestion("CVar", "r.shadow.CacheWholeSceneShadows", "r.shadow.CacheWholeSceneShadows", "[0|1]", true);
 	RegisterSuggestion("CVar", "r.GPUSkinning", "r.GPUSkinning", "[0|1]", true);
 	RegisterSuggestion("CVar", "r.Skinning.ForceUpdate", "r.Skinning.ForceUpdate", "[0|1]", true);
+	RegisterSuggestion("CVar", "p.LogBursts", "p.LogBursts", "[0|1] Log each particle burst", true);
+	RegisterSuggestion("CVar", "p.ShowLOD", "p.ShowLOD", "[0|1] Draw LOD distance spheres for all particles", true);
+	RegisterSuggestion("Cmd", "p.LODInfo", "p.LODInfo", "Print LOD, camera distance, particle count");
+	RegisterSuggestion("CVar", "p.LogEvents", "p.LogEvents", "[0|1] Log particle event counts (needs EventGenerator)", true);
+	RegisterSuggestion("CVar", "p.ShowCollisions", "p.ShowCollisions", "[0|1] Draw particle collision points and normals", true);
+	RegisterSuggestion("Cmd", "p.BindCollide log", "p.BindCollide log", "Log OnParticleCollide callbacks");
+	RegisterSuggestion("Cmd", "p.BindCollide clear-template", "p.BindCollide clear-template", "SetTemplate(nullptr) inside the callback");
+	RegisterSuggestion("Cmd", "p.BindCollide off", "p.BindCollide off", "Remove test callbacks");
+	RegisterSuggestion("Cmd", "p.Freeze 1", "p.Freeze 1", "Freeze all live particles in place");
+	RegisterSuggestion("Cmd", "p.Freeze 0", "p.Freeze 0", "Unfreeze all live particles");
+	RegisterSuggestion("Cmd", "p.Particles Activate", "p.Particles Activate", "Activate all particle components");
+	RegisterSuggestion("Cmd", "p.Particles Deactivate", "p.Particles Deactivate", "Stop spawning on all particle components");
 }
 
 void FOutputLogPanel::AddToHistory(const FString& CommandLine)

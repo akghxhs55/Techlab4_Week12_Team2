@@ -1,6 +1,7 @@
 #include "EnginePCH.h"
 #include "UObject/Property.h"
 
+#include "Render/Material.h"
 #include "UObject/Class.h"
 
 // ---- FColorProperty ----
@@ -22,6 +23,15 @@ void FLinearColorProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* V
 void FObjectProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value) const
 {
     UObject*& Ref = GetPropertyValue(Value);
+
+    if (PropertyClass == UMaterial::StaticClass())
+    {
+		UMaterial* Material = Cast<UMaterial>(Ref);
+        UMaterial::SerializeMaterialReference(Slot, Material);
+        Ref = Material;
+        return;
+    }
+
     UObject* Previous = Ref;
     Slot << Ref;
 
@@ -56,4 +66,26 @@ void FEnumProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value) c
 void FStructProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value) const
 {
     Struct->SerializeTaggedProperties(Slot, Value);
+}
+
+// ---- FArrayProperty ----
+void FArrayProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value) const
+{
+	if (!Inner)
+	{
+        return;
+	}
+
+    int32 NumElements = Num(Value);
+	FStructuredArchive::FArray Array = Slot.EnterArray(NumElements);
+
+    if (Slot.GetUnderlyingArchive().IsLoading())
+    {
+	    SetNumFn(Value, NumElements);
+    }
+
+    for (int32 Index = 0; Index < NumElements; ++Index)
+    {
+	    Inner->SerializeItem(Array.EnterElement(), GetElementPtr(Value, Index));
+    }
 }

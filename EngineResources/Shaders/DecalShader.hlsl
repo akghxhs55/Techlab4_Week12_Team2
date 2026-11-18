@@ -1,4 +1,5 @@
 #pragma pack_matrix(row_major)
+#include "VertexFactory.hlsli"
 
 cbuffer PerObject : register(b0)
 {
@@ -18,25 +19,18 @@ cbuffer DecalConstants : register(b1)
 Texture2D DecalTexture : register(t0);
 SamplerState DecalSampler : register(s0);
 
-struct VS_IN
-{
-    float3 Position : POSITION;
-    float3 Normal : NORMAL;
-    float4 Tangent : TANGENT;
-    float2 UV : TEXCOORD;
-    float4 Color : COLOR;
-};
-
 struct VS_OUT
 {
     float4 Position : SV_Position;
     float3 WorldPosition : TEXCOORD;
 };
 
-VS_OUT mainVS(VS_IN Input) 
+// 노멀은 쓰지 않으므로 NormalMatrix 자리에 World를 넘긴다
+VS_OUT mainVS(FVertexFactoryInput Input)
 {
     VS_OUT OUTPUT;
-    float4 WorldPosition = mul(float4(Input.Position, 1.0f), World);
+    const FVFIntermediates VF = VF_GetIntermediates(Input, World, World);
+    float4 WorldPosition = float4(VF.WorldPosition, 1.0f);
     float4 ViewPosition = mul(WorldPosition, View);
     
     OUTPUT.Position = mul(ViewPosition, Projection);

@@ -4,6 +4,7 @@
 #include "Render/Buffer.h"
 #include "Render/StaticMeshData.h"
 #include "Render/MeshRenderData.h"
+#include "Render/VertexFactory.h"
 #include <unordered_map>
 #include <vector>
 #include "Mesh.generated.h"
@@ -33,6 +34,12 @@ public:
     FString SourceObjPath;
     FVertexBuffer* GetVertexBuffer() const { return VertexBuffer.get(); }
     FIndexBuffer* GetIndexBuffer() const { return IndexBuffer.get(); }
+    // 버퍼를 다시 만들 수 있으므로 꺼낼 때마다 현재 버퍼로 맞춘다
+    const FVertexFactory* GetVertexFactory() const
+    {
+        VertexFactory.Init(VertexBuffer.get(), IndexBuffer.get());
+        return &VertexFactory;
+    }
     void RebuildRenderData();
     const FBox& GetRenderBounds() const { return RenderBounds; }
     TSharedPtr<const FMeshRenderState> GetRenderState(const std::vector<UMaterial*>& Materials);
@@ -47,6 +54,7 @@ private:
         size_t operator()(const std::vector<UMaterial*>& Slots) const;
     };
     FBox RenderBounds;
+    mutable FLocalVertexFactory VertexFactory;
     std::unordered_map<std::vector<UMaterial*>, TWeakPtr<const FMeshRenderState>, FMaterialSlotsHash> RenderStates;
     TArray<FPrimitiveSceneProxy*> RenderProxies;
 };

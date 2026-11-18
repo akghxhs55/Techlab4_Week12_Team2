@@ -39,6 +39,7 @@ struct FPropertyMeta
     float Delta = 0.0f;        // 드래그 1픽셀당 변화량. 0이면 위젯 기본값
 
     bool HasClamp() const { return ClampMin > -FLT_MAX || ClampMax < FLT_MAX; }
+    bool IsSet() const { return HasClamp() || UIMin > -FLT_MAX || UIMax < FLT_MAX || Delta > 0.0f; }
 };
 
 // 멤버 변수 하나의 리플렉션 정보 (UE: UnrealType.h의 FProperty)
@@ -227,6 +228,34 @@ class FStructProperty : public FProperty
 
 public:
     UScriptStruct* Struct = nullptr;
+    FPropertyMeta Meta;
+
+    void SerializeItem(FStructuredArchive::FSlot Slot, void* Value) const override;
+};
+
+// TArray<T> 멤버 (UE: UnrealType.h의 FArrayProperty)
+// 원소 하나를 다루는 법은 Inner가 안다. 저장 시 원소마다 Inner->SerializeItem을 호출한다.
+class FArrayProperty : public FProperty
+{
+	DECLARE_FIELD(FArrayProperty, FProperty)
+
+public:
+	using FGetNumFn = int32(*)(const void* ArrayPtr);
+	using FSetNumFn = void(*)(void* ArrayPtr, int32 NewNum);
+	using FGetDataFn = void* (*)(void* ArrayPtr);
+
+	FProperty* Inner = nullptr; // 원소 타입의 프로퍼티
+	FGetNumFn GetNumFn = nullptr;
+	FSetNumFn SetNumFn = nullptr;
+	FGetDataFn GetDataFn = nullptr;
+
+    virtual ~FArrayProperty() override { delete Inner; }
+
+    int32 Num(const void* ArrayPtr) const { return GetNumFn(ArrayPtr); }
+    void* GetElementPtr(void* ArrayPtr, int32 Index) const
+    {
+		return static_cast<uint8*>(GetDataFn(ArrayPtr)) + static_cast<size_t>(Index) * Inner->ElementSize;
+    }
 
     void SerializeItem(FStructuredArchive::FSlot Slot, void* Value) const override;
 };
@@ -278,6 +307,13 @@ struct TPropertyTypeFor<T>
     using Type = FStructProperty;
 };
 
+template <typename T>
+struct TPropertyTypeFor<TArray<T>>
+{
+    using Type = FArrayProperty;
+};
+
 // meta를 쓸 수 있는 타입. KHT가 만든 static_assert가 이걸로 검사한다.
 template <typename T>
-constexpr bool TSupportsNumericMeta = std::is_base_of_v<FNumericProperty, typename TPropertyTypeFor<T>::Type>;
+constexpr bool TSupportsNumericMeta = std::is_base_of_v<FNumericProperty, typename TPropertyTypeFor<T>::Type>
+    || std::is_same_v<typename TPropertyTypeFor<T>::Type, FStructProperty>;

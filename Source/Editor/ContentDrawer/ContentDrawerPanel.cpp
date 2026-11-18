@@ -15,6 +15,7 @@
 #include "Animation/AnimSequenceFile.h"
 #include "Animation/BlendSpaceFile.h"
 #include "Animation/AnimBlueprintFile.h"
+#include "Particles/ParticleSystemFile.h"
 
 namespace
 {
@@ -353,6 +354,10 @@ namespace
 		if (BlendSpaceFile::IsBlendSpacePath(PathString))
 		{
 			return { "Blend Space", IM_COL32(138, 198, 72, 255), true };
+		}
+		if (ParticleSystemFile::IsParticleSystemPath(PathString))
+		{
+			return { "Particle System", IM_COL32(1, 202, 252, 255), true };
 		}
 		if (FFbxMeshBake::IsBakedPath(PathString))
 		{
@@ -1092,6 +1097,11 @@ void FContentDrawerPanel::RenderContents()
 						Thumbnail = FontAsset->AtlasTexture;
 					}
 
+					if (ParticleSystemFile::IsParticleSystemPath(PathString))
+					{
+						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(ParticleSystemIconPath);
+					}
+
 					if (MeshThumbId == ImTextureID_Invalid && Thumbnail == nullptr)
 					{
 						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(FileIconPath);
@@ -1169,6 +1179,15 @@ void FContentDrawerPanel::RenderContents()
 
 						ImGui::EndDragDropSource();
 					}
+					// 파티클은 경로를 페이로드로 전달한다
+					if (!bIsDirectory && ParticleSystemFile::IsParticleSystemPath(PathString) && ImGui::BeginDragDropSource())
+					{
+						ImGui::SetDragDropPayload(EditorDragDrop::ParticleSystem, PathString.c_str(), PathString.size() + 1);
+
+						ImGui::TextUnformatted(FilenameString.c_str());
+
+						ImGui::EndDragDropSource();
+					}
 
 					// 더블 클릭 이벤트 처리
 					if (bHovered && ImGui::IsMouseDoubleClicked(ImGuiMouseButton_Left))
@@ -1195,7 +1214,7 @@ void FContentDrawerPanel::RenderContents()
 							OnOpenMesh(PathString);
 						}
 
-						else if ((BlendSpaceFile::IsBlendSpacePath(PathString) || AnimBlueprintFile::IsAnimBlueprintPath(PathString)) && OnOpenMesh)
+						else if ((BlendSpaceFile::IsBlendSpacePath(PathString) || AnimBlueprintFile::IsAnimBlueprintPath(PathString) ||	ParticleSystemFile::IsParticleSystemPath(PathString)) && OnOpenMesh)
 						{
 							OnOpenMesh(PathString);
 						}

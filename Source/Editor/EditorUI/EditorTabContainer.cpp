@@ -70,7 +70,7 @@ void FEditorTabContainer::ActivateTab(IEditorTab* Tab)
 	}
 }
 
-void FEditorTabContainer::RequestCloseTab(IEditorTab* Tab)
+bool FEditorTabContainer::RequestCloseTab(IEditorTab* Tab)
 {
 	bool bRegistered = false;
 	for (IEditorTab* Existing : Tabs)
@@ -80,23 +80,24 @@ void FEditorTabContainer::RequestCloseTab(IEditorTab* Tab)
 
 	if (!bRegistered || !Tab->CanClose())
 	{
-		return;
+		return false;
 	}
 
 	// 탭을 지우기 전에 묻는다. 지운 뒤에는 되돌릴 수 없다.
 	if (!Tab->ConfirmClose())
 	{
-		return;
+		return false;
 	}
 
 	for (IEditorTab* Existing : PendingCloseTabs)
 	{
 		if (Existing == Tab)
 		{
-			return;
+			return true;
 		}
 	}
 	PendingCloseTabs.Add(Tab);
+	return true;
 }
 
 void FEditorTabContainer::ProcessCloseRequests()
@@ -198,6 +199,11 @@ void FEditorTabContainer::DrawTabs()
 			IsInDockSpace(ExistingWindow, DockSpaceId);
 
 		ImGuiWindowFlags Flags = ImGuiWindowFlags_NoCollapse;
+		if (Tab->HasUnsavedChanges())
+		{
+			Flags |= ImGuiWindowFlags_UnsavedDocument;
+		}
+
 		if (!bInMainDockSpace)
 		{
 			Flags |= ImGuiWindowFlags_MenuBar;
@@ -223,9 +229,8 @@ void FEditorTabContainer::DrawTabs()
 		ImGui::PopStyleVar(2);
 		
 
-		if (!bOpen)
+		if (!bOpen && RequestCloseTab(Tab))
 		{
-			RequestCloseTab(Tab);
 			Tab->OnRender(false);
 			ImGui::End();
 			continue;

@@ -19,5 +19,8 @@ public:
 	FFloatDistribution& GetStartVelocityRadial() { return StartVelocityRadial; }
 
 private:
-	FVectorDistribution StartVelocity;	FFloatDistribution  StartVelocityRadial;  // 에미터 원점 → 파티클 방향으로 더하는 속도
+	UPROPERTY(EditAnywhere)
+	FVectorDistribution StartVelocity;
+	UPROPERTY(EditAnywhere)
+	FFloatDistribution  StartVelocityRadial;  // 에미터 원점 → 파티클 방향으로 더하는 속도
 };

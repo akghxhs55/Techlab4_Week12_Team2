@@ -3,7 +3,7 @@
 #include "LightData.hlsli"
 #include "LightEvaluation.hlsli"
 #include "LightGridCommon.hlsli"
-#include "GpuSkinCommon.hlsli"
+#include "VertexFactory.hlsli"
 
 // 셰이더 스캐너는 매크로 정의 없이 이 파일을 컴파일하므로 기본 변형에는 Lambert를 쓴다.
 // 명시적인 변형은 조명 모델 또는 뷰 모드 하나만 1로 설정한다.
@@ -42,7 +42,7 @@ StructuredBuffer<FLightRenderParameters> SceneLights : register(t8);
 StructuredBuffer<uint4> TileLightRanges : register(t9);
 StructuredBuffer<uint> TilePointIndices : register(t10);
 StructuredBuffer<uint> TileSpotIndices : register(t12);
-// 언리얼 ScreenShadowMask: 그림자 광원마다 배정된 채널(R~A)에 Projection 결과가 들어 있다. 1 = 빛 받음.
+// 그림자 광원마다 배정된 채널(R~A)에 Projection 결과가 들어 있다. 1 = 빛 받음.
 Texture2D<float4> ScreenShadowMask : register(t13);
 
 cbuffer MaterialParams : register(b2)
@@ -58,16 +58,6 @@ Texture2D ColorTexture : register(t0);
 Texture2D NormalTexture : register(t1);
 
 SamplerState ColorSampler : register(s0);
-
-struct VS_IN
-{
-	float3 Position : POSITION;
-	float3 Normal : NORMAL;
-	float4 Tangent : TANGENT;
-	float2 UV : TEXCOORD;
-	float4 Color : COLOR;
-	GPU_SKIN_VS_INPUT
-};
 
 struct VS_OUT
 {
@@ -325,29 +315,27 @@ FLightResult CalculateTiledLighting(float3 PixelPosition, float3 P, float ViewDe
 #endif
 
 
-VS_OUT Uber_VS(VS_IN Input)
+VS_OUT Uber_VS(FVertexFactoryInput Input)
 {
     VS_OUT Output;
-    GPU_SKIN_APPLY(Input, Input.Position, Input.Normal, Input.Tangent);
-    float4 WorldPosition = mul(float4(Input.Position, 1.0f), World);
+    const FVFIntermediates VF = VF_GetIntermediates(Input, World, NormalMatrix);
+    float4 WorldPosition = float4(VF.WorldPosition, 1.0f);
     float4 ViewPosition = mul(WorldPosition, View);
     Output.Position = mul(ViewPosition, Projection);
-    Output.Color = Input.Color;
-#if GPU_SKIN
+    Output.Color = VF.Color;
+#if VF_GPU_SKIN
+    // 웨이트 히트맵은 스킨 정점에만 있는 디버그 정보라 VF 밖에서 직접 읽는다
     if (ShadowFlags.y > 0.5f)
     {
         const uint Bone = (uint)(ShadowFlags.y - 0.5f);   // 본 번호 + 1로 실은 값을 되돌린다
         Output.Color = float4(GpuSkinWeightColor(GpuSkinWeightForBone(Input.BlendIndices, Input.BlendWeights, Bone)), 1.0f);
     }
 #endif
-    Output.UV = Input.UV * UVTransform.zw + UVTransform.xy;
+    Output.UV = VF.UV * UVTransform.zw + UVTransform.xy;
 
-    float3 N = mul(float4(Input.Normal, 0.0f), NormalMatrix).xyz;
+    float3 N = VF.WorldNormal;
     Output.WorldNormal = N;
-    float3 T = mul(float4(Input.Tangent.xyz, 0.0f), World).xyz;
-    // CPU가 구한 로컬 공간 부호에 월드 변환의 거울 반전만 반영한다.
-    float Handedness = Input.Tangent.w * (determinant((float3x3)World) < 0.0f ? -1.0f : 1.0f);
-    Output.WorldTangent = float4(T, Handedness);
+    Output.WorldTangent = VF.WorldTangent;
 #if LIGHTING_MODEL_GOURAUD
     FLightResult Lit = CalculateLighting(float3(0.0f, 0.0f, 0.0f), WorldPosition.xyz, ViewPosition.x, N, true);
     Output.VertexDiffuse = Lit.Diffuse;
@@ -377,6 +365,10 @@ FUberOutput Uber_PS(VS_OUT Input)
     {
         float4 TextureColor = ColorTexture.Sample(ColorSampler, Input.UV);
         SurfaceColor = float4(pow(max(TextureColor.rgb, 0.0f), 2.2f), TextureColor.a);
+#if VF_MESH_PARTICLE
+        // 텍스처가 있으면 정점 색을 쓰지 않으므로 파티클 색(Color/ColorOverLife 모듈)을 여기서 곱한다
+        SurfaceColor *= Input.Color;
+#endif
     }
     else
     {
@@ -410,5 +402,5 @@ FUberOutput Uber_PS(VS_OUT Input)
 }
 
 // 현재 리소스 매니저는 .hlsl 파일을 스캔할 때 mainVS/mainPS 진입점을 찾는다.
-VS_OUT mainVS(VS_IN Input) { return Uber_VS(Input); }
+VS_OUT mainVS(FVertexFactoryInput Input) { return Uber_VS(Input); }
 FUberOutput mainPS(VS_OUT Input) { return Uber_PS(Input); }

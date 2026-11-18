@@ -1,18 +1,6 @@
-// Resources/Shader/GpuSkinCommon.hlsli
-// 스켈레탈을 그리는 패스의 버텍스 셰이더가 공유한다. GPU_SKIN=1로 컴파일한 변형에서만 스키닝한다.
+// GPU 스킨 계산 함수. VF_GpuSkin.hlsli가 포함한다.
 #ifndef GPU_SKIN_COMMON_HLSLI
 #define GPU_SKIN_COMMON_HLSLI
-
-#ifndef GPU_SKIN
-#define GPU_SKIN 0
-#endif
-
-#if GPU_SKIN
-
-// FGpuSkinVertex에서 FVertex 다음에 오는 필드. 리플렉션이 이 선언으로 레이아웃을 만든다
-#define GPU_SKIN_VS_INPUT \
-    uint4 BlendIndices : BLENDINDICES; \
-    float4 BlendWeights : BLENDWEIGHT;
 
 struct FGpuSkinBoneMatrix
 {
@@ -74,15 +62,5 @@ float3 GpuSkinWeightColor(float Weight)
     const float3 High = float3(1.0f, 0.1f, 0.0f);
     return T < 0.5f ? lerp(Low, Mid, T * 2.0f) : lerp(Mid, High, T * 2.0f - 1.0f);
 }
-
-// 스키닝 결과를 로컬 정점처럼 넘긴다. 이후의 World 변환 코드는 그대로 쓴다
-#define GPU_SKIN_APPLY(Input, Position, Normal, Tangent) GpuSkinVertex(Input.BlendIndices, Input.BlendWeights, Position, Normal, Tangent)
-
-#else
-
-#define GPU_SKIN_VS_INPUT
-#define GPU_SKIN_APPLY(Input, Position, Normal, Tangent)
-
-#endif
 
 #endif
