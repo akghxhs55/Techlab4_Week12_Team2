@@ -34,8 +34,9 @@ public:
 	virtual void Landed(const FHitResult& Hit) override;
 	// 공격 Sweep 결과를 받는다. 맞은 액터가 AMyCharacter면 피격 처리한다
 	void DetectedHit(const FHitResult& Hit);
-	// 피격 반응. 파생 캐릭터가 맞았을 때 연출(이펙트 등)을 덧붙일 수 있게 virtual
-	virtual void SetIsHit();
+	// 피격 반응. 파생 캐릭터가 맞았을 때 연출(이펙트, 도망 등)을 덧붙일 수 있게 virtual
+	// Attacker는 때린 액터 (모르면 nullptr). 호출 안에서만 쓰고 포인터를 들고 있지 않는다
+	virtual void SetIsHit(AActor* Attacker = nullptr);
 
 	USpringArmComponent* SpringArmComponent = nullptr;
 	UCameraComponent* CameraComponent = nullptr;
