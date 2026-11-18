@@ -55,6 +55,7 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 	if (Run)     BlendSpace->AddSample(Run, FVector(RunSpeed, 0.0f, 0.0f));
 	LocomotionPlayer.BlendSpace = BlendSpace;
 	LocomotionPlayer.X = 0.0f;
+	LocomotionPlayer.bExtractRootMotion = false;
 	KRS_LOG(Info, "[Kurisu] root motion speeds (cm/s): Walk {} / SlowRun {} / Run {}", WalkSpeed, SlowRunSpeed, RunSpeed);
 
 	// ---- 액션 클립 ----
@@ -66,12 +67,15 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 	JumpPlayer.AirborneStartTime = JumpTakeoffTime;
 	JumpPlayer.AirborneEndTime = JumpLandTime;
 
+	// 구르기·슬라이드도 루트 모션은 뽑지 않는다. 캐릭터가 클립의 순간 속도(GetDashTravelSpeed)를 읽어 직접 움직인다
 	RollPlayer.Sequence = LoadSequence(RollAnimationPath);
 	RollPlayer.bLooping = false;
-	RollPlayer.bForwardRootMotionOnly = true;
+	RollPlayer.bExtractRootMotion = false;
+	RollPlayer.StartTime = RollStartTime;
 
 	SlidePlayer.Sequence = LoadSequence(SlideAnimationPath);
 	SlidePlayer.bLooping = false;
+	SlidePlayer.bExtractRootMotion = false;
 
 	// 공격 클립은 제자리라 루트 모션을 뽑지 않는다 (공격 중에는 MaxWalkSpeed 0이라 그 자리에 선다)
 	JabPlayer.Sequence = LoadSequence(JabAnimationPath);
@@ -98,6 +102,7 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 		bJumpRequested = false;
 		bJumpTakeoffDone = false;
 		bJumpTakeoffPending = false;
+		bJumpLeftGround = false;
 	};
 	JumpState = StateMachine.AddState(JumpDesc);
 
@@ -105,13 +110,15 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 	RollDesc.Name = "Roll";
 	RollDesc.Pose.SetLinkNode(&RollPlayer);
 	RollDesc.OnEnter = [this](UAnimInstance*) { bRollRequested = false; };
-	const int32 Roll = StateMachine.AddState(RollDesc);
+	RollState = StateMachine.AddState(RollDesc);
+	const int32 Roll = RollState;
 
 	FAnimStateDesc SlideDesc;
 	SlideDesc.Name = "Slide";
 	SlideDesc.Pose.SetLinkNode(&SlidePlayer);
 	SlideDesc.OnEnter = [this](UAnimInstance*) { bSlideRequested = false; };
-	const int32 Slide = StateMachine.AddState(SlideDesc);
+	SlideState = StateMachine.AddState(SlideDesc);
+	const int32 Slide = SlideState;
 
 	FAnimStateDesc JabDesc;
 	JabDesc.Name = "Jab";
@@ -162,6 +169,15 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 	RollToLoco.Rule = [this](const FAnimTransitionContext&) { return RollPlayer.GetTimeRemaining() <= ActionBlendOutTime; };
 	StateMachine.AddTransition(RollToLoco);
 
+	// 이동 입력이 있으면 천천히 일어서는 구간을 끊고 바로 달린다
+	FAnimTransitionDesc RollMoveCancel;
+	RollMoveCancel.From = Roll;
+	RollMoveCancel.To = LocomotionState;
+	RollMoveCancel.Priority = 1;
+	RollMoveCancel.CrossfadeDuration = ActionBlendOutTime;
+	RollMoveCancel.Rule = [this](const FAnimTransitionContext&) { return bHasMoveInput && RollPlayer.CurrentTime >= RollMoveCancelTime; };
+	StateMachine.AddTransition(RollMoveCancel);
+
 	FAnimTransitionDesc LocoToSlide;
 	LocoToSlide.From = LocomotionState;
 	LocoToSlide.To = Slide;
@@ -176,6 +192,14 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 	SlideToLoco.CrossfadeDuration = ActionBlendOutTime;
 	SlideToLoco.Rule = [this](const FAnimTransitionContext&) { return SlidePlayer.GetTimeRemaining() <= ActionBlendOutTime; };
 	StateMachine.AddTransition(SlideToLoco);
+
+	FAnimTransitionDesc SlideMoveCancel;
+	SlideMoveCancel.From = Slide;
+	SlideMoveCancel.To = LocomotionState;
+	SlideMoveCancel.Priority = 1;
+	SlideMoveCancel.CrossfadeDuration = ActionBlendOutTime;
+	SlideMoveCancel.Rule = [this](const FAnimTransitionContext&) { return bHasMoveInput && SlidePlayer.GetTimeRemaining() <= SlideMoveCancelRemainingTime; };
+	StateMachine.AddTransition(SlideMoveCancel);
 
 	// ---- 공격 ----
 	// 시작은 짧게 섞어 손이 바로 나가게 한다
@@ -225,18 +249,51 @@ void UKurisuAnimInstance::NativeInitializeAnimation()
 	PunchToLoco.CrossfadeDuration = ActionBlendOutTime;
 	PunchToLoco.Rule = [this](const FAnimTransitionContext&) { return PunchPlayer.GetTimeRemaining() <= ActionBlendOutTime; };
 	StateMachine.AddTransition(PunchToLoco);
+
+	// 후딜 캔슬. 콤보 전환(Priority 0)을 먼저 보므로 다음 공격이 걸려 있으면 콤보가 이긴다
+	FAnimTransitionDesc JabMoveCancel;
+	JabMoveCancel.From = JabState;
+	JabMoveCancel.To = LocomotionState;
+	JabMoveCancel.Priority = 1;
+	JabMoveCancel.CrossfadeDuration = MoveCancelBlendTime;
+	JabMoveCancel.Rule = [this](const FAnimTransitionContext&) { return bHasMoveInput && JabPlayer.CurrentTime >= JabComboTime + AttackMoveCancelDelay; };
+	StateMachine.AddTransition(JabMoveCancel);
+
+	FAnimTransitionDesc PunchMoveCancel;
+	PunchMoveCancel.From = PunchState;
+	PunchMoveCancel.To = LocomotionState;
+	PunchMoveCancel.Priority = 1;
+	PunchMoveCancel.CrossfadeDuration = MoveCancelBlendTime;
+	PunchMoveCancel.Rule = [this](const FAnimTransitionContext&) { return bHasMoveInput && PunchPlayer.CurrentTime >= PunchComboTime + AttackMoveCancelDelay; };
+	StateMachine.AddTransition(PunchMoveCancel);
+
+	FAnimTransitionDesc JabToRoll;
+	JabToRoll.From = JabState;
+	JabToRoll.To = Roll;
+	JabToRoll.Priority = -1;
+	JabToRoll.CrossfadeDuration = 0.1f;
+	JabToRoll.Rule = [this](const FAnimTransitionContext&) { return bRollRequested; };
+	StateMachine.AddTransition(JabToRoll);
+
+	FAnimTransitionDesc PunchToRoll;
+	PunchToRoll.From = PunchState;
+	PunchToRoll.To = Roll;
+	PunchToRoll.Priority = -1;
+	PunchToRoll.CrossfadeDuration = 0.1f;
+	PunchToRoll.Rule = [this](const FAnimTransitionContext&) { return bRollRequested; };
+	StateMachine.AddTransition(PunchToRoll);
 }
 
 void UKurisuAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 {
 	if (const AKurisuCharacter* Character = Cast<AKurisuCharacter>(TryGetPawnOwner()))
 	{
-		// Blend Space 축은 실제 속도가 아니라 "원하는 속도"다. 실제 속도는 이 값으로 고른 클립의 루트 모션이 만든다
-		// Run 속도를 넘는 만큼은 Run 클립을 빨리 돌려서 낸다
-		const float Desired = Character->GetDesiredGroundSpeed();
-		LocomotionPlayer.X = std::min(Desired, RunSpeed);
-		LocomotionPlayer.PlayRate = (Desired > RunSpeed && RunSpeed > 0.0f) ? Desired / RunSpeed : 1.0f;
+		// Blend Space 축은 실제 속도다. Run 속도를 넘는 만큼은 Run 클립을 빨리 돌려 발을 맞춘다
+		const float GroundSpeed = Character->GetGroundSpeed();
+		LocomotionPlayer.X = std::min(GroundSpeed, RunSpeed);
+		LocomotionPlayer.PlayRate = (GroundSpeed > RunSpeed && RunSpeed > 0.0f) ? GroundSpeed / RunSpeed : 1.0f;
 		bIsInAir = Character->IsFalling();
+		VerticalSpeed = Character->GetVelocity().Z * WorldToCm;
 		bHasMoveInput = Character->HasMovementInput();
 	}
 
@@ -257,11 +314,35 @@ void UKurisuAnimInstance::NativeUpdateAnimation(float DeltaSeconds)
 		bJumpTakeoffPending = true;
 	}
 
-	// 높아진 만큼 길어진 체공 시간에 맞춰 공중 구간만 느리게 재생한다. 실제로 떠 있는 동안에만 적용
-	const float ClipAirTime = JumpLandTime - JumpTakeoffTime;
-	const bool bInAirSegment = bInJumpState && bJumpTakeoffDone && bIsInAir
-		&& JumpPlayer.CurrentTime >= JumpTakeoffTime && JumpPlayer.CurrentTime < JumpLandTime;
-	JumpPlayer.PlayRate = (bInAirSegment && ClipAirTime > 0.0f) ? ClipAirTime / GetJumpAirTime() : 1.0f;
+	// 공중 구간: 수직 속도로 클립의 목표 시각을 정하고, 그 시각까지 가도록 재생 속도를 정한다 (Notify를 건너뛰지 않게 시간을 직접 바꾸지 않는다)
+	JumpPlayer.PlayRate = 1.0f;
+	if (bInJumpState && bJumpTakeoffDone && JumpPlayer.CurrentTime >= JumpTakeoffTime && JumpPlayer.CurrentTime < JumpLandTime)
+	{
+		if (bIsInAir)
+			bJumpLeftGround = true;
+
+		if (bIsInAir && DeltaSeconds > 0.0f)
+		{
+			float Target = JumpPlayer.CurrentTime;
+			if (VerticalSpeed > 0.0f && JumpTakeoffSpeed > 0.0f)
+			{
+				const float Rise = 1.0f - std::clamp(VerticalSpeed / JumpTakeoffSpeed, 0.0f, 1.0f);
+				Target = JumpTakeoffTime + Rise * (JumpApexTime - JumpTakeoffTime);
+			}
+			else if (JumpLandSpeed > 0.0f)
+			{
+				// 발판보다 아래로 더 떨어지면 착지 직전 포즈에서 기다린다
+				const float Fall = std::clamp(-VerticalSpeed / JumpLandSpeed, 0.0f, 0.95f);
+				Target = JumpApexTime + Fall * (JumpLandTime - JumpApexTime);
+			}
+			JumpPlayer.PlayRate = std::clamp((Target - JumpPlayer.CurrentTime) / DeltaSeconds, 0.0f, 6.0f);
+		}
+		else if (!bIsInAir && bJumpLeftGround)
+		{
+			// 낮은 점프·머리 부딪힘 등으로 일찍 내려왔다: 착지 프레임까지 빨리 돌린다
+			JumpPlayer.PlayRate = JumpEarlyLandPlayRate;
+		}
+	}
 }
 
 bool UKurisuAnimInstance::RequestJump()
@@ -273,7 +354,7 @@ bool UKurisuAnimInstance::RequestJump()
 
 bool UKurisuAnimInstance::RequestRoll()
 {
-	if (IsInAction() || bIsInAir) return false;
+	if (!CanRoll()) return false;
 	bRollRequested = true;
 	return true;
 }
@@ -309,6 +390,34 @@ bool UKurisuAnimInstance::IsInAction() const
 	// 요청은 다음 Update에서 상태가 바뀌므로, 아직 Locomotion이어도 요청이 걸려 있으면 액션 중으로 본다
 	return bJumpRequested || bRollRequested || bSlideRequested || bJabRequested || bPunchRequested
 		|| StateMachine.GetCurrentStateIndex() != LocomotionState;
+}
+
+bool UKurisuAnimInstance::IsInDashState() const
+{
+	const int32 State = StateMachine.GetCurrentStateIndex();
+	return State != INDEX_NONE && (State == RollState || State == SlideState);
+}
+
+float UKurisuAnimInstance::GetDashTravelSpeed() const
+{
+	const int32 State = StateMachine.GetCurrentStateIndex();
+	const FAnimNode_MixamoSequencePlayer* Player = State == RollState ? &RollPlayer : State == SlideState ? &SlidePlayer : nullptr;
+	if (!Player || !Player->Sequence)
+		return 0.0f;
+
+	// 지금 시각부터 짧은 구간 동안 클립이 간 거리 → 클립 시간 기준 속도 → 재생 속도를 곱해 실제 시간 기준으로
+	constexpr float Window = 1.0f / 30.0f;
+	const float Distance = MixamoRootMotion::GetTravelDelta(Player->Sequence, Player->CurrentTime, Window, false);
+	return std::max(Distance / Window * Player->PlayRate, 0.0f);
+}
+
+bool UKurisuAnimInstance::IsInAttackRecovery() const
+{
+	if (bJumpRequested || bRollRequested || bSlideRequested || bJabRequested || bPunchRequested)
+		return false;
+	const int32 State = StateMachine.GetCurrentStateIndex();
+	return (State == JabState && JabPlayer.CurrentTime >= JabComboTime)
+		|| (State == PunchState && PunchPlayer.CurrentTime >= PunchComboTime);
 }
 
 bool UKurisuAnimInstance::IsInJumpWindup() const

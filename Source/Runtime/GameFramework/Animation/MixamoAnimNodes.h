@@ -47,6 +47,9 @@ struct FAnimNode_MixamoSequencePlayer : public FAnimNode_SequencePlayer
 // 같이 묶으면 섞이는 동안 걷기가 몇 배 느려지므로, 자기 시간(FreeTime)으로 따로 돈다 (UE Sync Group과 같은 생각).
 struct FAnimNode_MixamoBlendSpacePlayer : public FAnimNode_BlendSpacePlayer
 {
+	// false면 포즈만 제자리로 만들고 루트 모션은 넘기지 않는다 (이동을 코드가 할 때)
+	bool bExtractRootMotion = true;
+
 	void Update(const FAnimationUpdateContext& Context) override;
 	void Evaluate(FPoseContext& Output) override;
 

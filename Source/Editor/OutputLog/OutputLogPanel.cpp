@@ -805,6 +805,23 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
+#if !defined(ENGINE_SHIPPING)
+	Add("CauseCrash", "CauseCrash", [](const TArray<FString>& Args, const FString&)
+		{
+			// Args[0]은 명령 이름이다. 추가 인자가 있으면 사용법을 표시한다.
+			if (Args.Num() != 1)
+			{
+				return false;
+			}
+
+			// 전용 Windows 예외를 일으켜 실제 크래시와 같은 덤프 저장 경로를 검증한다.
+			constexpr DWORD CauseCrashExceptionCode = 0xE04B0001u;
+			RaiseException(CauseCrashExceptionCode, EXCEPTION_NONCONTINUABLE, 0, nullptr);
+
+			return true;
+		});
+#endif
+
 	Add("STAT", "STAT <fps|memory|profile|light|decal|skinning|all|none>", [](const TArray<FString>&, const FString& Line)
 		{
 			FString Message;
