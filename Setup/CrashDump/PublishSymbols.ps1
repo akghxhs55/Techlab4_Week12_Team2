@@ -91,6 +91,12 @@ try {
         }
     }
 
+    # 원시 UNC 경로를 사용하는 디버거도 SymSrv 저장소로 인식하게 한다.
+    $MarkerPath = Join-Path $Store 'pingme.txt'
+    if (-not (Test-Path -LiteralPath $MarkerPath -PathType Leaf)) {
+        [IO.File]::WriteAllText($MarkerPath, '')
+    }
+
     # 모든 파일 등록이 성공했을 때 저장소 주소와 완료 메시지를 출력한다.
     Write-Output "Symbol store: $Store"
     Write-Output "Build ID: $BuildId"
