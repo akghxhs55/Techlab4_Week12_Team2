@@ -43,12 +43,30 @@ try {
                 "$drive\", '$(ProjectDir)..\..\')
             $content = $content.Replace(
                 "$drive/", '$(ProjectDir)../../')
+            # Premake also emits the drive root without a trailing separator.
+            $content = $content.Replace($drive, '$(ProjectDir)..\..')
             [IO.File]::WriteAllText(
                 $_.FullName, $content, $encoding)
         }
 
         if (-not (Test-Path -LiteralPath $solution -PathType Leaf)) {
             throw "Solution was not generated: $solution"
+        }
+
+        # Solution paths are relative to the repository, not to ProjectDir.
+        $solutionContent = [IO.File]::ReadAllText($solution)
+        $solutionContent = $solutionContent.Replace("$drive\", '')
+        $solutionContent = $solutionContent.Replace("$drive/", '')
+        [IO.File]::WriteAllText($solution, $solutionContent, $encoding)
+
+        [xml]$solutionDocument = $solutionContent
+        $projectReferences = $solutionDocument.SelectNodes(
+            '//Project/@Path | //BuildDependency/@Project')
+        foreach ($projectReference in $projectReferences) {
+            $projectPath = Join-Path $engineRoot $projectReference.Value
+            if (-not (Test-Path -LiteralPath $projectPath -PathType Leaf)) {
+                throw "Solution references a missing project: $projectPath"
+            }
         }
     }
     finally {
