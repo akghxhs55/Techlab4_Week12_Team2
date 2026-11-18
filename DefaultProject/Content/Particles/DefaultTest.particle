@@ -424,7 +424,7 @@
                             "EmitterDuration": 1.0,
                             "EmitterLoops": 0,
                             "InterpolationMethod": "None",
-                            "Material": "ParticleMeshTranslucent",
+                            "Material": { "Asset": "ParticleMeshTranslucent" },
                             "RandomImageTime": 0.0,
                             "SortMode": "DistanceToView",
                             "SubImages_Horizontal": 1,

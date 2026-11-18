@@ -385,8 +385,9 @@ namespace
 		return isChanged;
 	}
 
-	void DrawTextureSlot(UMaterial** MaterialPtr, int32 SlotIndex)
+	bool DrawTextureSlot(UMaterial** MaterialPtr, int32 SlotIndex)
 	{
+		bool bChanged = false;
 		const float ThumbnailSize = EditorStyle::Scale(64.0f);
 
 		UMaterial* Material = *MaterialPtr;
@@ -433,13 +434,14 @@ namespace
 				if (Material)
 				{
 					// 슬롯이 배열 범위 밖이면 그 자리까지 늘려 준다
-					while (static_cast<int32>(Material->Textures.Num()) <= SlotIndex)
+					while (Material->Textures.Num() <= SlotIndex)
 					{
 						Material->Textures.Add(nullptr);
 					}
 
 					Material->Textures[SlotIndex] = DroppedTexture;
 					Texture = DroppedTexture;
+					bChanged = true;
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -461,6 +463,8 @@ namespace
 		ImGui::EndGroup();
 
 		ImGui::PopID();
+
+		return bChanged;
 	}
 
 	FString GetAssetDisplayName(const FString& Path)
@@ -1465,7 +1469,7 @@ namespace
 
 			if (PropertyClass == UMaterial::StaticClass())
 			{
-				DrawTextureSlot(reinterpret_cast<UMaterial**>(ObjPtr), 0);
+				return DrawTextureSlot(reinterpret_cast<UMaterial**>(ObjPtr), 0);
 			}
 			else if (PropertyClass == UFont::StaticClass())
 			{

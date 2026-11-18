@@ -1,6 +1,7 @@
 #include "EnginePCH.h"
 #include "UObject/Property.h"
 
+#include "Render/Material.h"
 #include "UObject/Class.h"
 
 // ---- FColorProperty ----
@@ -22,6 +23,15 @@ void FLinearColorProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* V
 void FObjectProperty::SerializeItem(FStructuredArchive::FSlot Slot, void* Value) const
 {
     UObject*& Ref = GetPropertyValue(Value);
+
+    if (PropertyClass == UMaterial::StaticClass())
+    {
+		UMaterial* Material = Cast<UMaterial>(Ref);
+        UMaterial::SerializeMaterialReference(Slot, Material);
+        Ref = Material;
+        return;
+    }
+
     UObject* Previous = Ref;
     Slot << Ref;
 
