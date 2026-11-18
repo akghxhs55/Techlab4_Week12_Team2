@@ -16,16 +16,19 @@ const char* FAssetEditorTab::GetTabName() const
 	{
 		NamedPath = Editor.GetAssetPath();
 		const FString Filename = std::filesystem::path(NamedPath).filename().string();
-		const FString Suffix = FString(" (") + Editor.GetEditorTypeName() + ")" + TabId;
-		TabName = Filename + Suffix;
-		DirtyTabName = Filename + "*" + Suffix;
+		TabName = Filename + " (" + Editor.GetEditorTypeName() + ")" + TabId;
 	}
-	return Editor.IsDirty() ? DirtyTabName.c_str() : TabName.c_str();
+	return TabName.c_str();
 }
 
 bool FAssetEditorTab::ConfirmClose()
 {
 	return Editor.ConfirmClose();
+}
+
+bool FAssetEditorTab::HasUnsavedChanges() const
+{
+	return Editor.IsDirty();
 }
 
 void FAssetEditorTab::OnCloseRequested()

@@ -14,7 +14,7 @@ public:
 
 	void RemoveTab(IEditorTab* Tab);
 	void ActivateTab(IEditorTab* Tab);
-	void RequestCloseTab(IEditorTab* Tab);
+	bool RequestCloseTab(IEditorTab* Tab);
 	void ProcessCloseRequests();
 
 	IEditorTab* GetMainSelectedTab() const { return MainSelectedTab; }
