@@ -113,10 +113,7 @@ namespace Tasks {
 		if (CurrentWorker >= 0 &&
 			static_cast<size_t>(CurrentWorker) < WorkerQueues.size()) {
 			if (WorkerQueues[CurrentWorker]->Push(Task)) {
-				if (SleepingWorkerCount.load(std::memory_order_relaxed) > 0) {
-					std::lock_guard<std::mutex> Lock(WakeMutex);
-					WakeCondition.notify_one();
-				}
+				NotifyWorkAdded(false);
 				return;
 			}
 		}
@@ -127,9 +124,24 @@ namespace Tasks {
 			GlobalQueue.push_back(Task);
 		}
 
-		{
-			std::lock_guard<std::mutex> Lock(WakeMutex);
+		NotifyWorkAdded(true);
+	}
+
+	void FTaskScheduler::NotifyWorkAdded(bool bWakeAll) {
+		// 워커는 SleepingWorkerCount를 올린 뒤 WorkEpoch를 확인하고, 여기서는 WorkEpoch를 올린 뒤
+		// SleepingWorkerCount를 확인한다. 둘 다 seq_cst라 최소 한쪽은 상대의 변경을 보므로
+		// "작업은 들어왔는데 아무도 안 깨움" 상황이 생기지 않는다.
+		WorkEpoch.fetch_add(1, std::memory_order_seq_cst);
+		if (SleepingWorkerCount.load(std::memory_order_seq_cst) == 0) {
+			return;
+		}
+
+		std::lock_guard<std::mutex> Lock(WakeMutex);
+		if (bWakeAll) {
 			WakeCondition.notify_all();
+		}
+		else {
+			WakeCondition.notify_one();
 		}
 	}
 
@@ -212,17 +224,23 @@ namespace Tasks {
 		TLS_WorkerIndex = WorkerIndex;
 
 		while (bIsRunning.load(std::memory_order_relaxed)) {
+			// 일감을 찾기 전에 기록해 둔다. 찾지 못한 뒤 들어온 작업은 이 값을 바꾼다.
+			const uint64_t SeenEpoch = WorkEpoch.load(std::memory_order_seq_cst);
 			if (ExecuteOneTask()) {
 				continue;
 			}
 
 			// 처리할 일감이 없으면 대기 상태로 전환
 			std::unique_lock<std::mutex> Lock(WakeMutex);
-			SleepingWorkerCount.fetch_add(1, std::memory_order_relaxed);
+			SleepingWorkerCount.fetch_add(1, std::memory_order_seq_cst);
 
-			WakeCondition.wait_for(Lock, std::chrono::milliseconds(1));
+			// 새 작업 알림이나 종료 요청으로 깨어난다. 타임아웃은 Steal 경합으로 놓친 일감을 다시 확인하기 위한 안전장치다.
+			WakeCondition.wait_for(Lock, std::chrono::milliseconds(10), [this, SeenEpoch] {
+				return !bIsRunning.load(std::memory_order_relaxed) ||
+					WorkEpoch.load(std::memory_order_seq_cst) != SeenEpoch;
+			});
 
-			SleepingWorkerCount.fetch_sub(1, std::memory_order_relaxed);
+			SleepingWorkerCount.fetch_sub(1, std::memory_order_seq_cst);
 		}
 		TLS_WorkerIndex = -1;
 	}

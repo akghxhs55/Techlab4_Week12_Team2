@@ -74,5 +74,10 @@ namespace Tasks
         std::mutex WakeMutex;
         std::condition_variable WakeCondition;
         std::atomic<int32_t> SleepingWorkerCount{ 0 };
+        // 작업이 들어올 때마다 증가한다. 잠들기 직전 값과 다르면 그사이 새 작업이 들어온 것이다.
+        std::atomic<uint64_t> WorkEpoch{ 0 };
+
+        // 작업을 넣은 뒤 호출한다. 잠든 워커가 있을 때만 깨운다.
+        void NotifyWorkAdded(bool bWakeAll);
     };
 }

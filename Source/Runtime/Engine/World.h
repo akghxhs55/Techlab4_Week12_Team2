@@ -83,7 +83,9 @@ public:
 
 	int32 GetActorNum();
 
+	// Tick 도중이면 정리(EndPlay, 컴포넌트/틱 해제)만 즉시 하고 메모리 해제는 Tick 끝으로 미룬다.
 	bool DestroyActor(AActor* Actor);
+	bool IsPendingDestroy(const AActor* Actor) const;
 
 	using FOnWorldActorDestroyed = std::function<void(UWorld*, AActor*)>;
 	static void SetOnActorDestroyedCallback(FOnWorldActorDestroyed InCallback);
@@ -100,7 +102,7 @@ public:
 	// 파티클 충돌용. 에미터마다 한 번 Bounds와 겹치는 메시 프록시를 모아 두고,
 	// 파티클마다는 그 후보에만 SweepAgainstCandidates로 검사한다 (BVH 순회·트랜스폼 갱신을 파티클 수만큼 하지 않는다)
 	void GatherSweepCandidates(const FBox& Bounds, const AActor* IgnoreActor, TArray<FPrimitiveSceneProxy*>& OutCandidates);
-	// SweepSingle의 메시 경로와 같은 판정(반지름만큼 키운 AABB). 시작점이 이미 안이면 bStartPentrating
+	// SweepSingle의 메시 경로와 같은 판정(반지름만큼 키운 AABB). 시작점이 이미 안이면 bStartPenetrating
 	static bool SweepAgainstCandidates(const TArray<FPrimitiveSceneProxy*>& Candidates, const FRay& WorldRay,
 		float MaxDistance, float Radius, FHitResult& OutHit);
 
@@ -148,6 +150,11 @@ private:
 	void EditorWorldTick(float DeltaTime);
 	void PreviewWorldTick(float DeltaTime);
 
+	// 월드가 들고 있는 플레이어/카메라 포인터가 사라질 액터를 가리키지 않게 끊는다.
+	void ReleaseWorldReferences(AActor* Actor);
+	// Tick 중 Destroy된 액터들의 메모리를 실제로 해제한다.
+	void FlushPendingDestroyActors();
+
 	EWorldType WorldType = EWorldType::None;
 
 	// 등록된 Tick 함수만 실행한다. Actor보다 먼저 사라져도 남은 함수와의 연결을 스스로 끊는다.
@@ -155,6 +162,10 @@ private:
 	FCoroutineScheduler CoroutineScheduler;
 
 	TQueue<AActor*> BeginPlayList;
+
+	// Tick 도중 Destroy된 액터. 콜백/이터레이터가 해제된 메모리를 밟지 않도록 Tick 끝에서 delete한다.
+	TArray<AActor*> PendingDestroyActors;
+	bool bIsTicking = false;
 
 	//메인 카메라 
 	ACameraActor* MainCamera = nullptr;

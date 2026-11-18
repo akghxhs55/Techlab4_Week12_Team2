@@ -22,7 +22,7 @@ struct FHitResult
 	float PenetrationDepth;
 
 	bool bBlockingHit = false;
-	bool bStartPentrating = false;
+	bool bStartPenetrating = false;
 
 	UPrimitiveComponent* HitComponent = nullptr;
 
