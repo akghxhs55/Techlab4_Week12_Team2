@@ -105,7 +105,7 @@ protected:
 	int32 SelectedBoneIndex = -1;
 
 	float BoneSphereSize = 0.0f;
-	FVector4 BoneVisualizerColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
+	FVector4 BoneVisualizerColor = FVector4(1.0f, 1.0f, 1.0f, 1.0f);
 	bool bShowBoneVisualizer = true;
 	EBoneDrawMode BoneDrawMode = EBoneDrawMode::AllHierarchy;
 	bool bShowMesh = true;

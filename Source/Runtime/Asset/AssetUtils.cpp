@@ -2,6 +2,8 @@
 #include "Asset/AssetUtils.h"
 #include "Core/Misc/Paths.h"
 #include <algorithm>
+#include <cctype>
+#include <string_view>
 
 namespace
 {
@@ -20,6 +22,30 @@ namespace
         for (; Part != NormalFile.end(); ++Part) Relative /= *Part;
         return true;
     }
+
+    // 다른 PC에서 베이크된 절대 경로(/Content/, /EngineResources/)를 현재 작업 디렉터리 기준으로 복구한다.
+    bool TryRemapStaleContentPath(fs::path& InOutFile)
+    {
+        FString Normal = FPaths::ToUtf8(InOutFile);
+        std::replace(Normal.begin(), Normal.end(), '\\', '/');
+        FString Lower = Normal;
+        std::transform(Lower.begin(), Lower.end(), Lower.begin(),
+            [](unsigned char Ch) { return static_cast<char>(std::tolower(Ch)); });
+
+        auto TryRemapMarker = [&](std::string_view Marker, const fs::path& BaseDir) -> bool
+        {
+            const size_t Pos = Lower.rfind(Marker);
+            if (Pos == FString::npos) return false;
+            const fs::path Candidate = (BaseDir / FPaths::FromUtf8(Normal.substr(Pos + Marker.size()))).lexically_normal();
+            std::error_code ExistEc;
+            if (!fs::exists(Candidate, ExistEc)) return false;
+            InOutFile = Candidate;
+            return true;
+        };
+
+        return TryRemapMarker("/content/", FPaths::ProjectContentDir())
+            || TryRemapMarker("/engineresources/", FPaths::EngineResourcesDir());
+    }
 }
 FString FAssetUtils::NormalizeAssetPath(const FString& Path)
 {
@@ -37,6 +63,7 @@ FString FAssetUtils::ResolveAssetFilePath(const FString& Path)
     if (File.is_relative() && *File.begin() != "..") File = FPaths::ProjectContentDir() / File;
     std::error_code Ec;
     File = fs::absolute(File, Ec).lexically_normal();
+    if (!Ec && File.is_absolute() && !fs::exists(File, Ec) && TryRemapStaleContentPath(File)) Ec.clear();
     return Ec ? FString{} : FPaths::ToUtf8(File);
 }
 FString FAssetUtils::GetAssetKey(const FString& Path)

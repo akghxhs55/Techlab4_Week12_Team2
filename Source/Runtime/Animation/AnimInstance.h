@@ -60,6 +60,7 @@ public:
 protected:
 	virtual void NativeInitializeAnimation() {}
 	virtual void NativeUpdateAnimation(float DeltaSeconds) {}
+	virtual void NativeEvaluateAnimation(FPoseContext& Output) {}
 	virtual void NativeUninitializeAnimation() {}
 	// 클래스 없이 이름만 있는 Notify(FAnimNotifyEvent::NotifyName)를 받는다
 	virtual void HandleNamedNotify(const FName& NotifyName) {}

@@ -6,6 +6,7 @@
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/PlayerController.h"
 #include "Camera/CameraComponent.h"
+#include "Camera/PlayerCameraManager.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Components/StaticMeshComponent.h"
@@ -71,6 +72,46 @@ namespace
 				UAssetManager::Get().RegisterAsset("GundamThrusterConeAdditive", ConeMat);
 			}
 		}
+
+		if (!UAssetManager::FindLoadedAsset("GundamShockwaveAdditive"))
+		{
+			UTexture2D* RingTex = UAssetManager::GetAssetByPath<UTexture2D>("Textures/ShockwaveRing.png");
+			if (!RingTex)
+			{
+				RingTex = UAssetManager::GetAssetByPath<UTexture2D>("Textures/ThrusterGlow.png");
+			}
+			if (RingTex)
+			{
+				UMaterial* ShockMat = NewObject<UMaterial>();
+				ShockMat->PSOType = EPSOType::Particle_Additive;
+				ShockMat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/ParticleSpriteShader.hlsl");
+				ShockMat->Textures.Add(RingTex);
+				ShockMat->BlendState = EBlendState::Additive;
+				ShockMat->DepthStencilState = EDepthStencilState::ReadOnly;
+				ShockMat->SamplerState = ESamplerState::LinearClamp;
+				UAssetManager::Get().RegisterAsset("GundamShockwaveAdditive", ShockMat);
+			}
+		}
+
+		if (!UAssetManager::FindLoadedAsset("GundamWingBeamAdditive"))
+		{
+			UTexture2D* WingTex = UAssetManager::GetAssetByPath<UTexture2D>("Textures/WingBeam.png");
+			if (!WingTex)
+			{
+				WingTex = UAssetManager::GetAssetByPath<UTexture2D>("Engine/Textures/BeamGlow.png");
+			}
+			if (WingTex)
+			{
+				UMaterial* WingMat = NewObject<UMaterial>();
+				WingMat->PSOType = EPSOType::Particle_Additive;
+				WingMat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/ParticleSpriteShader.hlsl");
+				WingMat->Textures.Add(WingTex);
+				WingMat->BlendState = EBlendState::ParticleAdditive;
+				WingMat->DepthStencilState = EDepthStencilState::ReadOnly;
+				WingMat->SamplerState = ESamplerState::LinearClamp;
+				UAssetManager::Get().RegisterAsset("GundamWingBeamAdditive", WingMat);
+			}
+		}
 	}
 }
 
@@ -124,6 +165,22 @@ AGundamCharacter::AGundamCharacter()
 	LeftFootThrusterParticle->SetupAttachment(CapsuleComponent);
 	LeftFootThrusterParticle->SetRelativeLocation(FVector(-0.04f, -0.11f, -0.88f));
 
+	WingUpperLeftParticle = CreateDefaultSubobject<UParticleSystemComponent>("WingUpperLeftParticle");
+	WingUpperLeftParticle->SetupAttachment(CapsuleComponent);
+
+	WingLowerLeftParticle = CreateDefaultSubobject<UParticleSystemComponent>("WingLowerLeftParticle");
+	WingLowerLeftParticle->SetupAttachment(CapsuleComponent);
+
+	WingUpperRightParticle = CreateDefaultSubobject<UParticleSystemComponent>("WingUpperRightParticle");
+	WingUpperRightParticle->SetupAttachment(CapsuleComponent);
+
+	WingLowerRightParticle = CreateDefaultSubobject<UParticleSystemComponent>("WingLowerRightParticle");
+	WingLowerRightParticle->SetupAttachment(CapsuleComponent);
+
+	DashShockwaveParticle = CreateDefaultSubobject<UParticleSystemComponent>("DashShockwaveParticle");
+	DashShockwaveParticle->SetupAttachment(CapsuleComponent);
+	DashShockwaveParticle->SetAutoActivate(false);
+
 	if (FPaths::HasProject())
 	{
 		EnsureThrusterMaterialsRegistered();
@@ -139,6 +196,17 @@ AGundamCharacter::AGundamCharacter()
 		{
 			RightFootThrusterParticle->InitializeSystem(FootTemplate);
 			LeftFootThrusterParticle->InitializeSystem(FootTemplate);
+		}
+		if (UParticleSystem* WingTemplate = UAssetManager::LoadParticleSystem("Particles/WingLight.particle"))
+		{
+			WingUpperLeftParticle->InitializeSystem(WingTemplate);
+			WingLowerLeftParticle->InitializeSystem(WingTemplate);
+			WingUpperRightParticle->InitializeSystem(WingTemplate);
+			WingLowerRightParticle->InitializeSystem(WingTemplate);
+		}
+		if (UParticleSystem* ShockTemplate = UAssetManager::LoadParticleSystem("Particles/BoostShockwave.particle"))
+		{
+			DashShockwaveParticle->InitializeSystem(ShockTemplate);
 		}
 	}
 }
@@ -180,6 +248,8 @@ void AGundamCharacter::EnsureVisualAssets()
 	BackBoneIndex = SkeletalMeshComponent->FindBoneIndex("上半身2");
 	RightFootBoneIndex = SkeletalMeshComponent->FindBoneIndex("右足首");
 	LeftFootBoneIndex = SkeletalMeshComponent->FindBoneIndex("左足首");
+	WingLeftBoneIndex = SkeletalMeshComponent->FindBoneIndex("Wing_L");
+	WingRightBoneIndex = SkeletalMeshComponent->FindBoneIndex("Wing_R");
 
 	if (BackThrusterParticle && !BackThrusterParticle->GetTemplate())
 	{
@@ -197,6 +267,27 @@ void AGundamCharacter::EnsureVisualAssets()
 		if (LeftFootThrusterParticle && !LeftFootThrusterParticle->GetTemplate())
 		{
 			LeftFootThrusterParticle->SetTemplate(FootTemplate);
+		}
+	}
+	if (UParticleSystem* WingTemplate = UAssetManager::LoadParticleSystem("Particles/WingLight.particle"))
+	{
+		UParticleSystemComponent* WingComps[4] = {
+			WingUpperLeftParticle, WingLowerLeftParticle,
+			WingUpperRightParticle, WingLowerRightParticle
+		};
+		for (UParticleSystemComponent* Comp : WingComps)
+		{
+			if (Comp && !Comp->GetTemplate())
+			{
+				Comp->SetTemplate(WingTemplate);
+			}
+		}
+	}
+	if (DashShockwaveParticle && !DashShockwaveParticle->GetTemplate())
+	{
+		if (UParticleSystem* ShockTemplate = UAssetManager::LoadParticleSystem("Particles/BoostShockwave.particle"))
+		{
+			DashShockwaveParticle->SetTemplate(ShockTemplate);
 		}
 	}
 }
@@ -224,8 +315,14 @@ void AGundamCharacter::Tick(float DeltaTime)
 	UpdateBoosterAndDescend(DeltaTime, bSpaceDown, bShiftDown);
 
 	const bool bBoosting = (bSpaceDown && !bShiftDown) || (DashKeyIndex >= 0);
+	if (UGundamAnimInstance* AnimInstance = Cast<UGundamAnimInstance>(SkeletalMeshComponent ? SkeletalMeshComponent->GetAnimInstance() : nullptr))
+	{
+		AnimInstance->SetWingBoostTarget((DashKeyIndex >= 0) ? 1.0f : (bBoosting ? 0.65f : 0.0f));
+	}
 	UpdateMeshTilt(DeltaTime, bBoosting, bShiftDown);
 	UpdateThrusters(DeltaTime, bBoosting);
+	UpdateWingEffects(DeltaTime, bBoosting);
+	UpdateSpeedLines(DeltaTime, bBoosting);
 	HandleWeaponInput();
 
 	if (CurrentWeapon == EGundamWeapon::Funnel && OrbitingFunnels.IsEmpty() && FunnelRespawnTimer > 0.0f)
@@ -249,7 +346,7 @@ void AGundamCharacter::UpdateThrusters(float DeltaTime, bool bBoosting)
 
 	const float HorizontalSpeed = FVector(GetVelocity().X, GetVelocity().Y, 0.0f).Size();
 	const bool bMoving = HorizontalSpeed > 0.6f;
-	const float TargetScale = (DashKeyIndex >= 0) ? 1.75f : (bBoosting ? 1.45f : (bMoving ? 1.10f : 0.65f));
+	const float TargetScale = (DashKeyIndex >= 0) ? 1.85f : (bBoosting ? 1.55f : (bMoving ? 1.25f : 0.90f));
 	const float Alpha = 1.0f - std::exp(-12.0f * DeltaTime);
 	CurrentThrusterScale += (TargetScale - CurrentThrusterScale) * Alpha;
 	const FVector ScaleVec(CurrentThrusterScale, CurrentThrusterScale, CurrentThrusterScale);
@@ -264,7 +361,7 @@ void AGundamCharacter::UpdateThrusters(float DeltaTime, bool bBoosting)
 		if (BackBoneIndex >= 0)
 		{
 			const FVector BonePos = SkeletalMeshComponent->GetBoneWorldMatrix(BackBoneIndex).TransformPosition(FVector::ZeroVector);
-			BackThrusterParticle->SetWorldLocationAndRotation(BonePos - MeshForward * 0.16f + MeshUp * 0.04f, MeshWorldRot, false);
+			BackThrusterParticle->SetWorldLocationAndRotation(BonePos - MeshForward * 0.24f + MeshUp * 0.10f, MeshWorldRot, false);
 		}
 		else
 		{
@@ -278,7 +375,7 @@ void AGundamCharacter::UpdateThrusters(float DeltaTime, bool bBoosting)
 		if (RightFootBoneIndex >= 0)
 		{
 			const FVector BonePos = SkeletalMeshComponent->GetBoneWorldMatrix(RightFootBoneIndex).TransformPosition(FVector::ZeroVector);
-			RightFootThrusterParticle->SetWorldLocationAndRotation(BonePos - MeshUp * 0.10f - MeshForward * 0.03f, MeshWorldRot, false);
+			RightFootThrusterParticle->SetWorldLocationAndRotation(BonePos - MeshUp * 0.13f - MeshForward * 0.10f, MeshWorldRot, false);
 		}
 		else
 		{
@@ -292,7 +389,7 @@ void AGundamCharacter::UpdateThrusters(float DeltaTime, bool bBoosting)
 		if (LeftFootBoneIndex >= 0)
 		{
 			const FVector BonePos = SkeletalMeshComponent->GetBoneWorldMatrix(LeftFootBoneIndex).TransformPosition(FVector::ZeroVector);
-			LeftFootThrusterParticle->SetWorldLocationAndRotation(BonePos - MeshUp * 0.10f - MeshForward * 0.03f, MeshWorldRot, false);
+			LeftFootThrusterParticle->SetWorldLocationAndRotation(BonePos - MeshUp * 0.13f - MeshForward * 0.10f, MeshWorldRot, false);
 		}
 		else
 		{
@@ -300,6 +397,101 @@ void AGundamCharacter::UpdateThrusters(float DeltaTime, bool bBoosting)
 		}
 		LeftFootThrusterParticle->SetRelativeScale3D(ScaleVec);
 	}
+}
+
+void AGundamCharacter::UpdateWingEffects(float DeltaTime, bool bBoosting)
+{
+	(void)DeltaTime;
+	(void)bBoosting;
+	if (!SkeletalMeshComponent)
+	{
+		return;
+	}
+
+	// 부스트·대쉬 여부와 무관하게 날개 파티클 크기는 항상 일정하게 유지
+	CurrentWingScale = 0.89f;
+
+	UParticleSystemComponent* WingComps[4] = {
+		WingUpperLeftParticle, WingLowerLeftParticle,
+		WingUpperRightParticle, WingLowerRightParticle
+	};
+
+	const FQuat MeshQuat = SkeletalMeshComponent->GetWorldRotation().Quaternion();
+	const FVector MeshForward = MeshQuat.GetForwardVector();
+	const FVector MeshRight = MeshQuat.GetRightVector();
+	const FVector MeshUp = MeshQuat.GetUpVector();
+
+	const FVector BaseCenter = (BackBoneIndex >= 0)
+		? SkeletalMeshComponent->GetBoneWorldMatrix(BackBoneIndex).TransformPosition(FVector::ZeroVector)
+		: (GetActorLocation() + MeshUp * 0.35f);
+	const FVector WingLPos = (WingLeftBoneIndex >= 0)
+		? SkeletalMeshComponent->GetBoneWorldMatrix(WingLeftBoneIndex).TransformPosition(FVector::ZeroVector)
+		: (BaseCenter - MeshForward * 0.22f - MeshRight * 0.16f + MeshUp * 0.14f);
+	const FVector WingRPos = (WingRightBoneIndex >= 0)
+		? SkeletalMeshComponent->GetBoneWorldMatrix(WingRightBoneIndex).TransformPosition(FVector::ZeroVector)
+		: (BaseCenter - MeshForward * 0.22f + MeshRight * 0.16f + MeshUp * 0.14f);
+
+	// 4매 날개(좌상/좌하/우상/우하) 각각의 기점과 실제 FBX 날개 각도에 맞춘 빔 방향
+	for (int32 i = 0; i < 4; ++i)
+	{
+		UParticleSystemComponent* Comp = WingComps[i];
+		if (!Comp)
+		{
+			continue;
+		}
+
+		const bool bRightSide = (i >= 2);
+		const bool bUpperWing = (i % 2 == 0);
+		const float SideSign = bRightSide ? 1.0f : -1.0f;
+		const FVector RootPos = bRightSide ? WingRPos : WingLPos;
+
+		const FVector Origin = bUpperWing
+			? (RootPos - MeshForward * 0.12f + MeshRight * (SideSign * 0.24f) + MeshUp * 0.08f)
+			: (RootPos - MeshForward * 0.12f + MeshRight * (SideSign * 0.18f) - MeshUp * 0.02f);
+		const FVector BeamDir = (bUpperWing
+			? (-MeshForward * 0.26f + MeshRight * (SideSign * 0.93f) + MeshUp * 0.24f)
+			: (-MeshForward * 0.26f + MeshRight * (SideSign * 0.80f) - MeshUp * 0.54f)).GetSafeNormal();
+
+		FRotator WingRot;
+		WingRot.LookDirection(BeamDir);
+		Comp->SetWorldLocationAndRotation(Origin, WingRot, false);
+
+		const float BladeScale = CurrentWingScale * (bUpperWing ? 1.0f : 0.85f);
+		Comp->SetRelativeScale3D(FVector(BladeScale, BladeScale, BladeScale));
+	}
+}
+
+void AGundamCharacter::UpdateSpeedLines(float DeltaTime, bool bBoosting)
+{
+	APlayerController* PC = GetController();
+	APlayerCameraManager* PCM = PC ? PC->GetCameraManager() : nullptr;
+	if (!PCM || DeltaTime <= 0.0f)
+	{
+		return;
+	}
+
+	const float TargetIntensity = (DashKeyIndex >= 0) ? 1.0f : (bBoosting ? 0.45f : 0.0f);
+	const float Rate = (TargetIntensity > CurrentSpeedLineIntensity) ? 14.0f : 7.0f;
+	const float Alpha = 1.0f - std::exp(-Rate * DeltaTime);
+	CurrentSpeedLineIntensity += (TargetIntensity - CurrentSpeedLineIntensity) * Alpha;
+	if (CurrentSpeedLineIntensity < 0.005f && TargetIntensity == 0.0f)
+	{
+		CurrentSpeedLineIntensity = 0.0f;
+	}
+	PCM->SpeedLineIntensity = CurrentSpeedLineIntensity;
+}
+
+void AGundamCharacter::TriggerDashShockwave()
+{
+	if (!DashShockwaveParticle)
+	{
+		return;
+	}
+
+	const FVector ShockPos = GetActorLocation() + FVector(0.0f, 0.0f, 0.25f);
+	DashShockwaveParticle->SetWorldLocation(ShockPos, false);
+	// SetAutoActivate(false)로 틱이 꺼져 있으므로 Activate(true)로 컴포넌트 틱과 에미터를 함께 재시작한다.
+	DashShockwaveParticle->Activate(true);
 }
 
 void AGundamCharacter::UpdateControlRotationSync()
@@ -354,6 +546,7 @@ void AGundamCharacter::UpdateDashInput(float DeltaTime)
 				const FVector DashDir = DirTable[i];
 				CharacterMovementComponent->Velocity.X = DashDir.X * BurstSpeedWorld;
 				CharacterMovementComponent->Velocity.Y = DashDir.Y * BurstSpeedWorld;
+				TriggerDashShockwave();
 			}
 			LastTapTime[i] = InputClock;
 		}

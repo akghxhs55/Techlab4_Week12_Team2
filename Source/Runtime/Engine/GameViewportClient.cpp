@@ -190,6 +190,7 @@ FSceneView FGameViewportClient::CalcSceneView(const FRect& InViewRect)
 			OutView.LetterboxAmount = PCM->LetterboxAmount;
 			OutView.LetterboxAspect = PCM->LetterboxAspect;
 			OutView.VignetteIntensity = PCM->VignetteIntensity;
+			OutView.SpeedLineIntensity = PCM->SpeedLineIntensity;
 
 			return OutView;
 		}

@@ -10,15 +10,15 @@
                         },
                         {
                             "Class": "UParticleModuleSize",
-                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.11, "Y": 0.11, "Z": 0.11 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": true }, "bEnabled": true } }
+                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.24, "Y": 0.24, "Z": 0.24 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": true }, "bEnabled": true } }
                         },
                         {
                             "Class": "UParticleModuleColorOverLife",
                             "Data": { "Properties": {
-                                "ColorOverLife": { "Constant": { "X": 0.88, "Y": 0.98, "Z": 1.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": false },
+                                "ColorOverLife": { "Constant": { "X": 0.45, "Y": 0.88, "Z": 1.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": false },
                                 "AlphaOverLife": { "Constant": 1.0, "CurveKeys": [
-                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.85 },
-                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.55 }
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.96 },
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.82 }
                                 ], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Curve" },
                                 "bClampAlpha": true, "bEnabled": true } }
                         }
@@ -30,7 +30,7 @@
                             "EmitterDuration": 1.0,
                             "EmitterLoops": 0,
                             "InterpolationMethod": "None",
-                            "Material": "GundamThrusterGlow",
+                            "Material": { "Asset": "GundamThrusterGlow" },
                             "RandomImageTime": 0.0,
                             "SortMode": "None",
                             "SubImages_Horizontal": 1,
@@ -71,7 +71,7 @@
                         },
                         {
                             "Class": "UParticleModuleSize",
-                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.28, "Y": 0.28, "Z": 0.28 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.34, "Y": 0.34, "Z": 0.34 }, "MinValue": { "X": 0.20, "Y": 0.20, "Z": 0.20 }, "Mode": "Uniform", "bLockAxes": true }, "bEnabled": true } }
+                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.54, "Y": 0.54, "Z": 0.54 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.64, "Y": 0.64, "Z": 0.64 }, "MinValue": { "X": 0.44, "Y": 0.44, "Z": 0.44 }, "Mode": "Uniform", "bLockAxes": true }, "bEnabled": true } }
                         },
                         {
                             "Class": "UParticleModuleSizeMultiplyLife",
@@ -98,10 +98,10 @@
                         {
                             "Class": "UParticleModuleColorOverLife",
                             "Data": { "Properties": {
-                                "ColorOverLife": { "Constant": { "X": 0.14, "Y": 0.56, "Z": 1.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": false },
+                                "ColorOverLife": { "Constant": { "X": 0.22, "Y": 0.68, "Z": 1.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": false },
                                 "AlphaOverLife": { "Constant": 1.0, "CurveKeys": [
-                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.68 },
-                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.45, "Value": 0.50 },
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.96 },
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.45, "Value": 0.82 },
                                     { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.0 }
                                 ], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Curve" },
                                 "bClampAlpha": true, "bEnabled": true } }
@@ -114,7 +114,7 @@
                             "EmitterDuration": 1.0,
                             "EmitterLoops": 0,
                             "InterpolationMethod": "None",
-                            "Material": "GundamThrusterConeAdditive",
+                            "Material": { "Asset": "GundamThrusterConeAdditive" },
                             "RandomImageTime": 0.0,
                             "SortMode": "None",
                             "SubImages_Horizontal": 1,
@@ -150,7 +150,7 @@
                         },
                         {
                             "Class": "UParticleModuleSize",
-                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.18, "Y": 0.18, "Z": 0.18 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.22, "Y": 0.22, "Z": 0.22 }, "MinValue": { "X": 0.14, "Y": 0.14, "Z": 0.14 }, "Mode": "Uniform", "bLockAxes": true }, "bEnabled": true } }
+                            "Data": { "Properties": { "StartSize": { "Constant": { "X": 0.34, "Y": 0.34, "Z": 0.34 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.40, "Y": 0.40, "Z": 0.40 }, "MinValue": { "X": 0.28, "Y": 0.28, "Z": 0.28 }, "Mode": "Uniform", "bLockAxes": true }, "bEnabled": true } }
                         },
                         {
                             "Class": "UParticleModuleSizeMultiplyLife",
@@ -179,7 +179,7 @@
                             "Data": { "Properties": {
                                 "ColorOverLife": { "Constant": { "X": 0.85, "Y": 0.97, "Z": 1.0 }, "CurveKeysX": [], "CurveKeysY": [], "CurveKeysZ": [], "MaxValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "MinValue": { "X": 0.0, "Y": 0.0, "Z": 0.0 }, "Mode": "Constant", "bLockAxes": false },
                                 "AlphaOverLife": { "Constant": 1.0, "CurveKeys": [
-                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.78 },
+                                    { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 0.0, "Value": 0.98 },
                                     { "ArriveTangent": 0.0, "InterpMode": "Linear", "KeyId": -1, "LeaveTangent": 0.0, "Time": 1.0, "Value": 0.0 }
                                 ], "MaxValue": 0.0, "MinValue": 0.0, "Mode": "Curve" },
                                 "bClampAlpha": true, "bEnabled": true } }
@@ -192,7 +192,7 @@
                             "EmitterDuration": 1.0,
                             "EmitterLoops": 0,
                             "InterpolationMethod": "None",
-                            "Material": "GundamThrusterConeAdditive",
+                            "Material": { "Asset": "GundamThrusterConeAdditive" },
                             "RandomImageTime": 0.0,
                             "SortMode": "None",
                             "SubImages_Horizontal": 1,

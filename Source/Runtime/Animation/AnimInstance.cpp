@@ -50,6 +50,7 @@ void UAnimInstance::EvaluateAnimation(FPoseContext& Output)
 	{
 		Output.ResetToRefPose();
 	}
+	NativeEvaluateAnimation(Output);
 }
 
 void UAnimInstance::TriggerAnimNotifies(float DeltaSeconds)

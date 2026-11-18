@@ -77,6 +77,11 @@ public:
 	UParticleSystemComponent* BackThrusterParticle = nullptr;
 	UParticleSystemComponent* RightFootThrusterParticle = nullptr;
 	UParticleSystemComponent* LeftFootThrusterParticle = nullptr;
+	UParticleSystemComponent* WingUpperLeftParticle = nullptr;
+	UParticleSystemComponent* WingLowerLeftParticle = nullptr;
+	UParticleSystemComponent* WingUpperRightParticle = nullptr;
+	UParticleSystemComponent* WingLowerRightParticle = nullptr;
+	UParticleSystemComponent* DashShockwaveParticle = nullptr;
 
 private:
 	void EnsureVisualAssets();
@@ -86,6 +91,9 @@ private:
 	void UpdateBoosterAndDescend(float DeltaTime, bool bSpaceDown, bool bShiftDown);
 	void UpdateMeshTilt(float DeltaTime, bool bBoosting, bool bDescending);
 	void UpdateThrusters(float DeltaTime, bool bBoosting);
+	void UpdateWingEffects(float DeltaTime, bool bBoosting);
+	void UpdateSpeedLines(float DeltaTime, bool bBoosting);
+	void TriggerDashShockwave();
 	void DeployOrbitingFunnels();
 	void ClearOrbitingFunnels();
 	void UpdateOrbitingFunnels(float DeltaTime);
@@ -97,6 +105,8 @@ private:
 	EGundamWeapon CurrentWeapon = EGundamWeapon::BeamRifle;
 	FRotator CurrentMeshTilt = FRotator(0.0f, 0.0f, 0.0f);
 	float CurrentThrusterScale = 0.35f;
+	float CurrentWingScale = 0.89f;
+	float CurrentSpeedLineIntensity = 0.0f;
 
 	TArray<AGundamFunnel*> OrbitingFunnels;
 	float FunnelOrbitTime = 0.0f;
@@ -111,6 +121,8 @@ private:
 	int32 BackBoneIndex = -1;
 	int32 RightFootBoneIndex = -1;
 	int32 LeftFootBoneIndex = -1;
+	int32 WingLeftBoneIndex = -1;
+	int32 WingRightBoneIndex = -1;
 
 	bool bWasNum1Down = false;
 	bool bWasNum2Down = false;

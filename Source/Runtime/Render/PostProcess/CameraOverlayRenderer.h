@@ -12,7 +12,8 @@ struct alignas(16) FCameraOverlayData
 	float VignettePower;
 	float LetterboxAmount;
 	float LetterboxAspect;
-	float Padding[2];
+	float SpeedLineIntensity;
+	float SpeedLineTime;
 };
 static_assert(sizeof(FCameraOverlayData) == 48);
 
