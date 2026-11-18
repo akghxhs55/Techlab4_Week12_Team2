@@ -93,6 +93,7 @@ private:
 	const FString FolderIconPath = "Engine/Icons/Folder.png";
 	const FString FileIconPath = "Engine/Icons/File.png";
 	const FString ParticleSystemIconPath = "Engine/Icons/ParticleSystem.png";
+	const FString SceneIconPath = "Engine/Icons/Scene.png";
 
 	FBlendSpaceAssetCreator BlendSpaceCreator;
     FAnimBlueprintAssetCreator AnimBlueprintCreator;

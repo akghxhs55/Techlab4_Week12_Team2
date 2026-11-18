@@ -12,7 +12,7 @@ struct FLightSceneInfo;
 inline constexpr uint32 ShadowBorder = 4;
 // 깊이 아틀라스 한 장(Texture2DArray 슬라이스 하나)의 크기와 최대 슬라이스 수
 inline constexpr uint32 ShadowAtlasSize = 4096;
-inline constexpr uint32 MaxShadowAtlasSlices = 4;
+inline constexpr uint32 MaxShadowAtlasSlices = 8;
 inline constexpr float UnrealUnitsToWorld = 0.01f;
 
 // 그림자 콘솔 변수. 이름과 기본값은 언리얼 r.Shadow.* 와 같다. 콘솔 명령은 OutputLogPanel에서 연결한다.
@@ -135,5 +135,7 @@ struct FShadowProjectionConstants
 	float    LightSourceSize;      // Directional: tan(각반지름), Spot: SourceRadius (월드)
 	float    MaxSoftKernelTexels;
 	float    WorldTexelScale;      // 텍셀 하나의 월드 크기. Directional은 그대로, Spot·Point는 라이트 공간 거리를 곱해서 쓴다
+	float    MaxSoftKernelWorld;   // Directional PCSS 탐색·반그림자 반경 상한 (월드). 모든 캐스케이드가 같은 값을 써서 전환 시 블러가 튀지 않는다
+	float    Padding[3];
 };
-static_assert(sizeof(FShadowProjectionConstants) == 272);
+static_assert(sizeof(FShadowProjectionConstants) == 288);

@@ -16,7 +16,7 @@
                                     "Location": {
                                         "X": 0.0,
                                         "Y": 0.0,
-                                        "Z": -1.6005268096923828
+                                        "Z": 0.36214447021484375
                                     },
                                     "Rotation": {
                                         "Pitch": 0.0,
@@ -2179,6 +2179,176 @@
                                 "bReceivesDecals": true,
                                 "bVisible": true
                             }
+                        },
+                        {
+                            "Class": "UParticleSystemComponent",
+                            "DefaultSubobjectName": "WingUpperLeftParticle",
+                            "Name": "WingUpperLeftParticle",
+                            "Parent": "CapsuleComponent",
+                            "Properties": {
+                                "Template": "Particles/WingLight.particle",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bAutoActivate": true,
+                                "bBlockComponent": false,
+                                "bCastShadow": false,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveShadow": true,
+                                "bReceivesDecals": true,
+                                "bVisible": true
+                            }
+                        },
+                        {
+                            "Class": "UParticleSystemComponent",
+                            "DefaultSubobjectName": "WingLowerLeftParticle",
+                            "Name": "WingLowerLeftParticle",
+                            "Parent": "CapsuleComponent",
+                            "Properties": {
+                                "Template": "Particles/WingLight.particle",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bAutoActivate": true,
+                                "bBlockComponent": false,
+                                "bCastShadow": false,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveShadow": true,
+                                "bReceivesDecals": true,
+                                "bVisible": true
+                            }
+                        },
+                        {
+                            "Class": "UParticleSystemComponent",
+                            "DefaultSubobjectName": "WingUpperRightParticle",
+                            "Name": "WingUpperRightParticle",
+                            "Parent": "CapsuleComponent",
+                            "Properties": {
+                                "Template": "Particles/WingLight.particle",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bAutoActivate": true,
+                                "bBlockComponent": false,
+                                "bCastShadow": false,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveShadow": true,
+                                "bReceivesDecals": true,
+                                "bVisible": true
+                            }
+                        },
+                        {
+                            "Class": "UParticleSystemComponent",
+                            "DefaultSubobjectName": "WingLowerRightParticle",
+                            "Name": "WingLowerRightParticle",
+                            "Parent": "CapsuleComponent",
+                            "Properties": {
+                                "Template": "Particles/WingLight.particle",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bAutoActivate": true,
+                                "bBlockComponent": false,
+                                "bCastShadow": false,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveShadow": true,
+                                "bReceivesDecals": true,
+                                "bVisible": true
+                            }
+                        },
+                        {
+                            "Class": "UParticleSystemComponent",
+                            "DefaultSubobjectName": "DashShockwaveParticle",
+                            "Name": "DashShockwaveParticle",
+                            "Parent": "CapsuleComponent",
+                            "Properties": {
+                                "Template": "Particles/BoostShockwave.particle",
+                                "Transform": {
+                                    "Location": {
+                                        "X": 0.0,
+                                        "Y": 0.0,
+                                        "Z": 0.0
+                                    },
+                                    "Rotation": {
+                                        "Pitch": 0.0,
+                                        "Roll": 0.0,
+                                        "Yaw": 0.0
+                                    },
+                                    "Scale": {
+                                        "X": 1.0,
+                                        "Y": 1.0,
+                                        "Z": 1.0
+                                    }
+                                },
+                                "bAutoActivate": false,
+                                "bBlockComponent": false,
+                                "bCastShadow": false,
+                                "bGenerateOverlapEvents": true,
+                                "bHiddenInGame": false,
+                                "bReceiveShadow": true,
+                                "bReceivesDecals": true,
+                                "bVisible": true
+                            }
                         }
                     ],
                     "Name": "AGundamCharacter_0",
@@ -2191,12 +2361,12 @@
                         "DoubleTapWindow": 0.2800000011920929,
                         "FastDescendAccel": 38.0,
                         "FunnelCount": 6,
+                        "FunnelOrbitRadius": 1.350000023841858,
+                        "FunnelRespawnDelay": 0.6499999761581421,
                         "FunnelSpeed": 18.0,
                         "MaxBoosterUpSpeed": 6.5,
-                        "MaxDashDuration": 0.6499999761581421,
                         "MaxFastDescendSpeed": 18.0,
                         "MaxTiltAngle": 14.0,
-                        "MinDashDuration": 0.2199999988079071,
                         "NormalWalkSpeed": 800.0,
                         "ScriptPath": "",
                         "TiltInterpSpeed": 8.0,
@@ -2241,11 +2411,11 @@
                             "Name": "UDirectionalLightComponent",
                             "Parent": "",
                             "Properties": {
-                                "AngularRadiusDegrees": 3.0,
-                                "CascadeDistributionExponent": 3.0,
-                                "CascadeTransitionFraction": 0.10000000149011612,
+                                "AngularRadiusDegrees": 0.75,
+                                "CascadeDistributionExponent": 2.0,
+                                "CascadeTransitionFraction": 0.3,
                                 "DynamicShadowCascades": 4,
-                                "DynamicShadowDistanceMovableLight": 1000.0,
+                                "DynamicShadowDistanceMovableLight": 300.0,
                                 "Intensity": 0.20000000298023224,
                                 "LightColor": 4294967295,
                                 "ShadowBias": 0.5,
@@ -2260,9 +2430,9 @@
                                         "Z": 26.811134338378906
                                     },
                                     "Rotation": {
-                                        "Pitch": 13.043320655822754,
-                                        "Roll": 3.00075101852417,
-                                        "Yaw": 18.22085952758789
+                                        "Pitch": 13.04332160949707,
+                                        "Roll": 3.000751495361328,
+                                        "Yaw": 18.220857620239258
                                     },
                                     "Scale": {
                                         "X": 1.0,
@@ -2379,189 +2549,6 @@
                         }
                     ],
                     "Name": "ADirectionalLightActor_0",
-                    "ParentActor": "",
-                    "ParentComponent": "",
-                    "Properties": {
-                        "ScriptPath": "",
-                        "bActorEnableCollision": true
-                    },
-                    "RootComponentName": "UDirectionalLightComponent"
-                },
-                {
-                    "Class": "ADirectionalLightActor",
-                    "Components": [
-                        {
-                            "Class": "USceneComponent",
-                            "DefaultSubobjectName": "DefaultSceneRoot",
-                            "Name": "DefaultSceneRoot",
-                            "Parent": "",
-                            "Properties": {
-                                "Transform": {
-                                    "Location": {
-                                        "X": 0.0,
-                                        "Y": 0.0,
-                                        "Z": 0.0
-                                    },
-                                    "Rotation": {
-                                        "Pitch": 0.0,
-                                        "Roll": 0.0,
-                                        "Yaw": 0.0
-                                    },
-                                    "Scale": {
-                                        "X": 1.0,
-                                        "Y": 1.0,
-                                        "Z": 1.0
-                                    }
-                                },
-                                "bAutoActivate": true,
-                                "bHiddenInGame": false,
-                                "bVisible": true
-                            }
-                        },
-                        {
-                            "Class": "UDirectionalLightComponent",
-                            "DefaultSubobjectName": "UDirectionalLightComponent",
-                            "Name": "UDirectionalLightComponent",
-                            "Parent": "",
-                            "Properties": {
-                                "AngularRadiusDegrees": 3.0,
-                                "CascadeDistributionExponent": 3.0,
-                                "CascadeTransitionFraction": 0.10000000149011612,
-                                "DynamicShadowCascades": 4,
-                                "DynamicShadowDistanceMovableLight": 1000.0,
-                                "Intensity": 0.20000000298023224,
-                                "LightColor": 4294967295,
-                                "ShadowBias": 0.5,
-                                "ShadowDistanceFadeoutFraction": 0.10000000149011612,
-                                "ShadowResolutionScale": 1.0,
-                                "ShadowSharpen": 0.0,
-                                "ShadowSlopeBias": 0.5,
-                                "Transform": {
-                                    "Location": {
-                                        "X": -44.725982666015625,
-                                        "Y": -13.704424858093262,
-                                        "Z": 25.568994522094727
-                                    },
-                                    "Rotation": {
-                                        "Pitch": 0.0,
-                                        "Roll": 0.0,
-                                        "Yaw": 0.0
-                                    },
-                                    "Scale": {
-                                        "X": 1.0,
-                                        "Y": 1.0,
-                                        "Z": 1.0
-                                    }
-                                },
-                                "bAutoActivate": true,
-                                "bCastShadows": true,
-                                "bHiddenInGame": false,
-                                "bVisible": true
-                            }
-                        },
-                        {
-                            "Class": "UBillboardComponent",
-                            "DefaultSubobjectName": "UBillboardComponent",
-                            "Material": {
-                                "Base": "BillboardMaterial",
-                                "Instance": {
-                                    "BaseColor": {
-                                        "W": 1.0,
-                                        "X": 1.0,
-                                        "Y": 1.0,
-                                        "Z": 1.0
-                                    },
-                                    "BlendState": "AlphaBlend",
-                                    "FlipNormalY": false,
-                                    "PSOType": 12,
-                                    "Properties": {},
-                                    "SamplerState": "LinearClamp",
-                                    "Shininess": 32.0,
-                                    "SpecularColor": {
-                                        "X": 1.0,
-                                        "Y": 1.0,
-                                        "Z": 1.0
-                                    },
-                                    "Textures": [
-                                        "Engine/Icons/Directional.png"
-                                    ],
-                                    "UVScrollSpeed": [
-                                        0.0,
-                                        0.0
-                                    ]
-                                }
-                            },
-                            "Name": "UBillboardComponent",
-                            "Parent": "UDirectionalLightComponent",
-                            "Properties": {
-                                "Transform": {
-                                    "Location": {
-                                        "X": 0.0,
-                                        "Y": 0.0,
-                                        "Z": 0.0
-                                    },
-                                    "Rotation": {
-                                        "Pitch": 0.0,
-                                        "Roll": 0.0,
-                                        "Yaw": 0.0
-                                    },
-                                    "Scale": {
-                                        "X": 1.0,
-                                        "Y": 1.0,
-                                        "Z": 1.0
-                                    }
-                                },
-                                "bAutoActivate": true,
-                                "bBlockComponent": false,
-                                "bCastShadow": false,
-                                "bGenerateOverlapEvents": true,
-                                "bHiddenInGame": true,
-                                "bReceiveShadow": false,
-                                "bReceivesDecals": true,
-                                "bVisible": true
-                            }
-                        },
-                        {
-                            "Class": "UStaticMeshComponent",
-                            "DefaultSubobjectName": "UArrowComponent",
-                            "Name": "UArrowComponent",
-                            "OverrideMaterials": [
-                                {
-                                    "Asset": "EditorArrowMaterial"
-                                }
-                            ],
-                            "Parent": "UDirectionalLightComponent",
-                            "Properties": {
-                                "StaticMesh": "Arrow",
-                                "Transform": {
-                                    "Location": {
-                                        "X": 0.0,
-                                        "Y": 0.0,
-                                        "Z": 0.0
-                                    },
-                                    "Rotation": {
-                                        "Pitch": 90.0,
-                                        "Roll": 0.0,
-                                        "Yaw": 0.0
-                                    },
-                                    "Scale": {
-                                        "X": 0.30000001192092896,
-                                        "Y": 0.30000001192092896,
-                                        "Z": 0.5
-                                    }
-                                },
-                                "bAutoActivate": true,
-                                "bBlockComponent": false,
-                                "bCastShadow": false,
-                                "bGenerateOverlapEvents": true,
-                                "bHiddenInGame": false,
-                                "bReceiveShadow": false,
-                                "bReceivesDecals": true,
-                                "bVisible": true
-                            }
-                        }
-                    ],
-                    "Name": "ADirectionalLightActor_1",
                     "ParentActor": "",
                     "ParentComponent": "",
                     "Properties": {

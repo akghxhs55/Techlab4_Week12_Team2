@@ -36,7 +36,8 @@ inline void ApplyViewportCameraMovement(FViewportCameraState& Camera,
 	if (Input.bCaptured && Camera.bPerspective)
 	{
 		Camera.Rotation.Yaw += Input.MouseX * MouseSensitivity;
-		Camera.Rotation.Pitch += Input.MouseY * MouseSensitivity;
+		// 위아래로 뒤집히지 않게 Pitch를 ±90도로 제한한다.
+		Camera.Rotation.Pitch = FMath::Clamp(Camera.Rotation.Pitch + Input.MouseY * MouseSensitivity, -90.0f, 90.0f);
 	}
 
     if (Input.bLeftDrag && !Input.bCaptured)

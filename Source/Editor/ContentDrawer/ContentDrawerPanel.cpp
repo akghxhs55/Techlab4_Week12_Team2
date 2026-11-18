@@ -1101,6 +1101,10 @@ void FContentDrawerPanel::RenderContents()
 					{
 						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(ParticleSystemIconPath);
 					}
+					else if (Path.extension() == ".scene")
+					{
+						Thumbnail = UAssetManager::GetAssetByPath<UTexture2D>(SceneIconPath);
+					}
 
 					if (MeshThumbId == ImTextureID_Invalid && Thumbnail == nullptr)
 					{

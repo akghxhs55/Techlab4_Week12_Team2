@@ -180,6 +180,36 @@ void FSceneRenderer::InitDynamicShadows(const FSceneRenderOptions& Options)
 
 	// Unlit은 조명을 계산하지 않으므로 그림자도 만들지 않는다 (언리얼 EngineShowFlags.Lighting).
 	if (Options.LightingModel == ELightingModel::Unlit) return;
+
+	if (Options.DirectionalShadowMapSize > 0)
+		GShadowCVars.MaxCSMResolution = Options.DirectionalShadowMapSize;
+	if (Options.SpotShadowMapSize > 0 || Options.PointShadowMapSize > 0)
+		GShadowCVars.MaxResolution = std::max(Options.SpotShadowMapSize, Options.PointShadowMapSize);
+
+	switch (Options.PcfMode)
+	{
+	case EPcfMode::Off:
+		GShadowCVars.ShadowQuality = 1;
+		GShadowCVars.FilterMethod = 0;
+		break;
+	case EPcfMode::Sample8:
+		GShadowCVars.ShadowQuality = 2;
+		GShadowCVars.FilterMethod = 0;
+		break;
+	case EPcfMode::Sample16:
+		GShadowCVars.ShadowQuality = 3;
+		GShadowCVars.FilterMethod = 0;
+		break;
+	case EPcfMode::Sample32:
+		GShadowCVars.ShadowQuality = 4;
+		GShadowCVars.FilterMethod = 0;
+		break;
+	case EPcfMode::PCSS:
+		GShadowCVars.ShadowQuality = 4;
+		GShadowCVars.FilterMethod = 1;
+		break;
+	}
+
 	// r.ShadowQuality 0: 그림자를 끈다
 	if (GShadowCVars.ShadowQuality == 0) return;
 
@@ -240,7 +270,10 @@ void FSceneRenderer::AddInteractingPrimitives(FScene& Scene, FProjectedShadowInf
 	const float RadiusThresholdSquared = GShadowCVars.RadiusThreshold * GShadowCVars.RadiusThreshold;
 
 	// 그림자 카메라 프러스텀 안의 물체만 BVH에서 꺼낸다.
-	Scene.BVH.QueryCull(FrustumAllPlanesMask,
+	// Directional은 근평면(Planes[4], 빛 쪽)을 검사하지 않는다. 근평면 너머 Caster는 ShadowDepth에서 z = 0으로 붙여 그리므로,
+	// 낮은 각도에서 멀리 있는 높은 Caster가 작은 근거리 캐스케이드에서 빠지지 않는다 (UE도 CSM은 빛 쪽으로 무한히 늘린 볼륨으로 컬링).
+	const uint32 PlaneMask = Shadow.IsWholeSceneDirectionalShadow() ? (FrustumAllPlanesMask & ~(1u << 4)) : FrustumAllPlanesMask;
+	Scene.BVH.QueryCull(PlaneMask,
 		[&Frustum](const FBox& Bounds, uint32& Mask)
 		{
 			return static_cast<EBVHCullResult>(ClassifyBoxInFrustum(Bounds, Frustum, Mask));
@@ -396,6 +429,13 @@ void FSceneRenderer::RenderShadowProjection(const FProjectedShadowInfo& Shadow, 
 	Constants.MaxSoftKernelTexels = static_cast<float>(std::max(GShadowCVars.MaxSoftKernelSize, 1u));
 	// 투영 행렬의 가로 배율(M[1][0])은 Ortho면 2 / 폭, Perspective면 1 / tan(반각). 둘 다 2 / (배율 x 해상도)가 텍셀 하나의 크기다.
 	Constants.WorldTexelScale = 2.0f / std::max(std::abs(Shadow.ShadowProjection.M[1][0]) * Shadow.ResolutionX, 1.0e-6f);
+	if (Shadow.IsWholeSceneDirectionalShadow())
+	{
+		// 첫 캐스케이드의 텍셀 크기 기준. 먼 캐스케이드는 같은 월드 폭을 더 적은 텍셀로 덮는다.
+		const float FirstCascadeRadius = Proxy->GetShadowSplitBounds(View, 0, nullptr).Radius;
+		const float FirstCascadeTexel = 2.0f * FirstCascadeRadius / static_cast<float>(std::max(Shadow.ResolutionX, 1u));
+		Constants.MaxSoftKernelWorld = Constants.MaxSoftKernelTexels * FirstCascadeTexel;
+	}
 
 	// 캐스케이드는 알파로 섞는다. A 채널은 알파 자체가 그림자 값이라 Fade를 쓸 수 없어 덮어쓴다.
 	const bool bFade = bUseFadePlane && Channel < 3;

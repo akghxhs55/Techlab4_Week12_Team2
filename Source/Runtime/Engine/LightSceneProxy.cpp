@@ -125,8 +125,9 @@ bool FDirectionalLightSceneProxy::GetViewDependentWholeSceneProjectedShadowIniti
 	OutInitializer.Scales = FVector2(1.0f / R, 1.0f / R);
 	OutInitializer.SubjectBounds = FBoxSphereBounds(FVector::ZeroVector, FVector(R), R);
 	OutInitializer.WAxis = FVector4(0, 0, 0, 1);
-	// 구 뒤쪽(빛 쪽)으로 더 늘려 화면 밖에서 그림자를 드리우는 Caster도 담는다.
-	OutInitializer.MinLightW = -R * 2.0f;
+	// 구 뒤쪽(빛 쪽)으로 충분히 늘려 낮은 각도(Pitch 13도 등)에서 멀리 있는 Caster도 근거리 캐스케이드에서 잘리지 않게 담는다.
+	const float CasterBackDistance = std::max(R * 2.0f, Dir->GetDynamicShadowDistanceMovableLight() * 0.5f);
+	OutInitializer.MinLightW = -CasterBackDistance;
 	OutInitializer.MaxDistanceToCastInLightW = R;
 	OutInitializer.bOnePassPointLightShadow = false;
 	return true;

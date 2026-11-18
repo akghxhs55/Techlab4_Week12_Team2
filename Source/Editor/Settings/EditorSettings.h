@@ -18,7 +18,7 @@ struct FEditorSettings
 	// Toggles
 	bool bDrawPrimitives = true;
 	bool bCacheShadows = true; // r.Shadow.CacheWholeSceneShadows
-	EPcfMode PcfMode = EPcfMode::Sample8;
+	EPcfMode PcfMode = EPcfMode::PCSS;
 	bool bDrawBoundingBox = false;
 	bool bShowUUID = false;
 	// Debug Draw (UE show 플래그): PIE에서만 적용된다
@@ -59,7 +59,7 @@ struct FEditorSettings
     bool bViewLocationSaved[4]{};
     bool bViewRotationSaved[4]{};
 
-	int32 DirectionalShadowMapSizeLevel = 2;
+	int32 DirectionalShadowMapSizeLevel = 4;
 	int32 PointShadowMapSizeLevel = 2;
 	int32 SpotShadowMapSizeLevel = 2;
 

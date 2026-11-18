@@ -34,20 +34,20 @@ public:
 
 private:
 	UPROPERTY(EditAnywhere)
-	float AngularRadiusDegrees = 3.0f;
+	float AngularRadiusDegrees = 0.75f;
 
 	// 카메라에서 이 거리까지만 동적 그림자를 그린다. 0이면 동적 그림자를 끈다.
 	UPROPERTY(EditAnywhere)
-	float DynamicShadowDistanceMovableLight = 1000.0f;
+	float DynamicShadowDistanceMovableLight = 300.0f;
 	// 캐스케이드 개수 (1 ~ MaxDynamicShadowCascades)
 	UPROPERTY(EditAnywhere)
 	uint32 DynamicShadowCascades = 4;
 	// 1이면 균등 분할, 클수록 카메라 가까운 캐스케이드가 좁아진다.
 	UPROPERTY(EditAnywhere)
-	float CascadeDistributionExponent = 3.0f;
+	float CascadeDistributionExponent = 2.6f;
 	// 인접 캐스케이드와 섞는 구간의 비율 (캐스케이드 길이 기준)
 	UPROPERTY(EditAnywhere)
-	float CascadeTransitionFraction = 0.1f;
+	float CascadeTransitionFraction = 0.3f;
 	// 마지막 캐스케이드 끝에서 그림자를 서서히 끄는 구간의 비율
 	UPROPERTY(EditAnywhere)
 	float ShadowDistanceFadeoutFraction = 0.1f;
