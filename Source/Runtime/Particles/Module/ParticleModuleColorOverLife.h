@@ -22,7 +22,7 @@ private:
 
 	UPROPERTY(EditAnywhere)
 	FVectorDistribution ColorOverLife;   // RGB
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0, ClampMax=1, Delta=0.01))
 	FFloatDistribution  AlphaOverLife;   // A
 
 	UPROPERTY(EditAnywhere)

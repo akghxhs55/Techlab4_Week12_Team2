@@ -18,6 +18,6 @@ public:
 	FFloatDistribution& GetLifetime() { return Lifetime; }
 
 private:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	FFloatDistribution Lifetime;   // 0 이하면 죽지 않는다
 };

@@ -19,6 +19,7 @@ public:
 	virtual bool ConfirmClose() { return true; }
 	virtual bool HasFocusedSubWindow() const { return false; }
 	virtual void OnRender(bool bActive) = 0;
+	virtual bool HasUnsavedChanges() const { return false; }
 
 private:
 	bool bIsOpen = true;

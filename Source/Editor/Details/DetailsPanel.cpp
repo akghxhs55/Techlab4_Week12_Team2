@@ -385,8 +385,9 @@ namespace
 		return isChanged;
 	}
 
-	void DrawTextureSlot(UMaterial** MaterialPtr, int32 SlotIndex)
+	bool DrawTextureSlot(UMaterial** MaterialPtr, int32 SlotIndex)
 	{
+		bool bChanged = false;
 		const float ThumbnailSize = EditorStyle::Scale(64.0f);
 
 		UMaterial* Material = *MaterialPtr;
@@ -433,13 +434,14 @@ namespace
 				if (Material)
 				{
 					// 슬롯이 배열 범위 밖이면 그 자리까지 늘려 준다
-					while (static_cast<int32>(Material->Textures.Num()) <= SlotIndex)
+					while (Material->Textures.Num() <= SlotIndex)
 					{
 						Material->Textures.Add(nullptr);
 					}
 
 					Material->Textures[SlotIndex] = DroppedTexture;
 					Texture = DroppedTexture;
+					bChanged = true;
 				}
 			}
 			ImGui::EndDragDropTarget();
@@ -461,6 +463,8 @@ namespace
 		ImGui::EndGroup();
 
 		ImGui::PopID();
+
+		return bChanged;
 	}
 
 	FString GetAssetDisplayName(const FString& Path)
@@ -1290,24 +1294,32 @@ namespace
 		return static_cast<uint32>(Value);
 	}
 
-	bool DrawPropertyRow(UObject* Object, void* Container, const FProperty& Property, ImFont* CustomFont);
+	bool DrawPropertyRow(UObject* Object, void* Container, const FProperty& Property, ImFont* CustomFont, const FPropertyMeta* MetaOverride = nullptr);
+
+	TMap<const UScriptStruct*, FPropertyEditor::FStructDrawer>& GetStructDrawers()
+	{
+		static TMap<const UScriptStruct*, FPropertyEditor::FStructDrawer> Drawers;
+		return Drawers;
+	}
 
 	// 프로퍼티 타입에 맞는 위젯 하나를 그린다. 값이 바뀌면 true
 	// UE도 FProperty는 위젯을 모르고, 에디터(PropertyEditor 모듈)가 CastField로 타입을 보고 위젯을 고른다.
-	bool DrawPropertyValue(UObject* Object, const FProperty& Property, void* ValuePtr, const char* Label, ImFont* CustomFont)
+	bool DrawPropertyValue(UObject* Object, const FProperty& Property, void* ValuePtr, const char* Label, ImFont* CustomFont, const FPropertyMeta* MetaOverride = nullptr)
 	{
+		auto MetaOf = [MetaOverride](const FNumericProperty& Numeric) -> const FPropertyMeta& { return MetaOverride ? *MetaOverride : Numeric.Meta; };
+
 		if (const FFloatProperty* FloatProperty = CastField<FFloatProperty>(&Property))
 		{
 			float* Value = &FloatProperty->GetPropertyValue(ValuePtr);
-			const FDragSettings Drag = GetDragSettings(FloatProperty->Meta, 0.1f);
+			const FDragSettings Drag = GetDragSettings(MetaOf(*FloatProperty), 0.1f);
 			const bool bChanged = ImGui::DragFloat(Label, Value, Drag.Speed, Drag.Min, Drag.Max);
-			if (bChanged) ClampToMeta(Value, 1, FloatProperty->Meta);
+			if (bChanged) ClampToMeta(Value, 1, MetaOf(*FloatProperty));
 			return bChanged;
 		}
 		if (const FIntProperty* IntProperty = CastField<FIntProperty>(&Property))
 		{
 			int32* Value = &IntProperty->GetPropertyValue(ValuePtr);
-			const FPropertyMeta& Meta = IntProperty->Meta;
+			const FPropertyMeta& Meta = MetaOf(*IntProperty);
 			const FDragSettings Drag = GetDragSettings(Meta, 1.0f);
 			const bool bChanged = ImGui::DragInt(Label, Value, Drag.Speed, ToIntBound(Drag.Min), ToIntBound(Drag.Max));
 			if (bChanged && Meta.HasClamp())
@@ -1319,7 +1331,7 @@ namespace
 		if (const FUInt32Property* UIntProperty = CastField<FUInt32Property>(&Property))
 		{
 			uint32* Value = &UIntProperty->GetPropertyValue(ValuePtr);
-			const FPropertyMeta& Meta = UIntProperty->Meta;
+			const FPropertyMeta& Meta = MetaOf(*UIntProperty);
 			const FDragSettings Drag = GetDragSettings(Meta, 1.0f);
 			const uint32 Min = ToUIntBound(Drag.Min);
 			const uint32 Max = Drag.Min < Drag.Max ? ToUIntBound(Drag.Max) : UINT_MAX;
@@ -1333,9 +1345,9 @@ namespace
 		if (const FVectorProperty* VectorProperty = CastField<FVectorProperty>(&Property))
 		{
 			FVector& Value = VectorProperty->GetPropertyValue(ValuePtr);
-			const FDragSettings Drag = GetDragSettings(VectorProperty->Meta, 0.1f);
+			const FDragSettings Drag = GetDragSettings(MetaOf(*VectorProperty), 0.1f);
 			const bool bChanged = ImGui::DragFloat3(Label, Value.V, Drag.Speed, Drag.Min, Drag.Max);
-			if (bChanged) ClampToMeta(Value.V, 3, VectorProperty->Meta);
+			if (bChanged) ClampToMeta(Value.V, 3, MetaOf(*VectorProperty));
 			return bChanged;
 		}
 		if (const FRotatorProperty* RotatorProperty = CastField<FRotatorProperty>(&Property))
@@ -1343,10 +1355,10 @@ namespace
 			FRotator& Value = RotatorProperty->GetPropertyValue(ValuePtr);
 			// Transform의 Rotation과 같은 X/Y/Z 축 순서로 보여준다.
 			float Euler[3] = { Value.Roll, Value.Pitch, Value.Yaw };
-			const FDragSettings Drag = GetDragSettings(RotatorProperty->Meta, 0.1f);
+			const FDragSettings Drag = GetDragSettings(MetaOf(*RotatorProperty), 0.1f);
 			if (ImGui::DragFloat3(Label, Euler, Drag.Speed, Drag.Min, Drag.Max))
 			{
-				ClampToMeta(Euler, 3, RotatorProperty->Meta);
+				ClampToMeta(Euler, 3, MetaOf(*RotatorProperty));
 				Value.Roll = Euler[0];
 				Value.Pitch = Euler[1];
 				Value.Yaw = Euler[2];
@@ -1357,9 +1369,9 @@ namespace
 		if (const FVector4Property* Vector4Property = CastField<FVector4Property>(&Property))
 		{
 			FVector4& Value = Vector4Property->GetPropertyValue(ValuePtr);
-			const FDragSettings Drag = GetDragSettings(Vector4Property->Meta, 0.1f);
+			const FDragSettings Drag = GetDragSettings(MetaOf(*Vector4Property), 0.1f);
 			const bool bChanged = ImGui::DragFloat4(Label, &Value.X, Drag.Speed, Drag.Min, Drag.Max);
-			if (bChanged) ClampToMeta(&Value.X, 4, Vector4Property->Meta);
+			if (bChanged) ClampToMeta(&Value.X, 4, MetaOf(*Vector4Property));
 			return bChanged;
 		}
 		if (const FBoolProperty* BoolProperty = CastField<FBoolProperty>(&Property))
@@ -1457,7 +1469,7 @@ namespace
 
 			if (PropertyClass == UMaterial::StaticClass())
 			{
-				DrawTextureSlot(reinterpret_cast<UMaterial**>(ObjPtr), 0);
+				return DrawTextureSlot(reinterpret_cast<UMaterial**>(ObjPtr), 0);
 			}
 			else if (PropertyClass == UFont::StaticClass())
 			{
@@ -1485,6 +1497,14 @@ namespace
 			// USTRUCT: 구조체의 프로퍼티를 한 단계 들여 그린다. 컨테이너가 객체가 아니라 이 멤버의 주소다.
 			ImGui::Indent();
 			ImGui::PushID(Label);
+
+			if (const FPropertyEditor::FStructDrawer* Drawer = GetStructDrawers().Find(StructProperty->Struct))
+			{
+				const bool bCustomChanged = (*Drawer)(Object, ValuePtr, *StructProperty->Struct, StructProperty->Meta, CustomFont);
+				ImGui::PopID();
+				ImGui::Unindent();
+				return bCustomChanged;
+			}
 
 			TArray<const UStruct*> StructChain;
 			for (const UStruct* Struct = StructProperty->Struct; Struct; Struct = Struct->GetSuperStruct())
@@ -1519,7 +1539,7 @@ namespace
 
 	// 프로퍼티 한 줄: 라벨과 값 위젯. 값이 바뀌면 true
 	// Container는 프로퍼티를 가진 메모리 (UObject 멤버면 객체, USTRUCT 멤버면 그 구조체 값)
-	bool DrawPropertyRow(UObject* Object, void* Container, const FProperty& Property, ImFont* CustomFont)
+	bool DrawPropertyRow(UObject* Object, void* Container, const FProperty& Property, ImFont* CustomFont, const FPropertyMeta* MetaOverride)
 	{
 		void* ValuePtr = Property.ContainerPtrToValuePtr(Container);
 		const FString Label = "##" + Property.Name;
@@ -1546,7 +1566,7 @@ namespace
 
 		ImGui::SetNextItemWidth(-1.0f);
 
-		return DrawPropertyValue(Object, Property, ValuePtr, Label.c_str(), CustomFont);
+		return DrawPropertyValue(Object, Property, ValuePtr, Label.c_str(), CustomFont, MetaOverride);
 	}
 
 	// UClass에 등록된 프로퍼티 한 줄. 구조체 멤버 하나가 바뀌어도 객체에는 바깥 프로퍼티(구조체)가 바뀌었다고 알린다.
@@ -2813,6 +2833,32 @@ namespace
 // 보조 함수들이 이 파일의 익명 네임스페이스에 있어 구현은 옮기지 않고 넘겨 준다.
 namespace FPropertyEditor
 {
+	void RegisterStructDrawer(const UScriptStruct* Struct, FStructDrawer Drawer)
+	{
+		if (Struct && Drawer)
+		{
+			GetStructDrawers().Add(Struct, Drawer);
+		}
+	}
+
+	bool DrawStructMember(UObject* Owner, void* StructPtr, const UScriptStruct& Struct, const char* MemberName,
+		ImFont* CustomFont, const FPropertyMeta* MetaOverride)
+	{
+		const FProperty* Member = Struct.FindPropertyByName(MemberName);
+		if (!Member)
+		{
+			ImGui::TextDisabled("(Missing %s)", MemberName);
+			return false;
+		}
+
+		const bool bReadOnly = Member->HasAnyFlags(CPF_EditConst);
+		if (bReadOnly) ImGui::BeginDisabled();
+		const FPropertyMeta* EffectiveMeta = (MetaOverride && MetaOverride->IsSet()) ? MetaOverride : nullptr;
+		const bool bChanged = DrawPropertyRow(Owner, StructPtr, *Member, CustomFont, EffectiveMeta);
+		if (bReadOnly) ImGui::EndDisabled();
+		return bChanged;
+	}
+
 	bool DrawProperty(UObject* Object, const FProperty& Property, ImFont* CustomFont)
 	{
 		return ::DrawProperty(Object, Property, CustomFont);

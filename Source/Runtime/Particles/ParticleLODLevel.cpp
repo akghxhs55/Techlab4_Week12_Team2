@@ -5,6 +5,8 @@
 #include "Module/ParticleModuleRequired.h"
 #include "Module/ParticleModuleSpawn.h"
 #include "Module/ParticleModuleTypeDataBase.h"
+#include "Module/ParticleModuleEventGenerator.h"
+#include "Module/ParticleModuleEventReceiverBase.h"
 #include "Serialization/MemoryReader.h"
 #include "Serialization/MemoryWriter.h"
 #include "Serialization/StructuredArchive.h"
@@ -62,12 +64,23 @@ void UParticleLODLevel::UpdateModuleLists()
 {
 	SpawnModules.Empty();
 	UpdateModules.Empty();
+	EventGenerator = nullptr;
+	EventReceivers.Empty();
 
 	for (UParticleModule* Module : Modules)
 	{
 		// 비활성 모듈도 목록에 둔다. bEnabled는 실행 루프에서 검사
 		if (!Module)
 			continue;
+
+		if (!EventGenerator)
+		{
+			EventGenerator = Cast<UParticleModuleEventGenerator>(Module);
+		}
+		if (UParticleModuleEventReceiverBase* Receiver = Cast<UParticleModuleEventReceiverBase>(Module))
+		{
+			EventReceivers.Add(Receiver);
+		}
 
 		if (Module->IsSpawnModule())  SpawnModules.Add(Module);
 		if (Module->IsUpdateModule()) UpdateModules.Add(Module); 

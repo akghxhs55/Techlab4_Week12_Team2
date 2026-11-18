@@ -69,6 +69,9 @@ void FParticleMeshEmitterInstance::UpdateBoundingBox(float DeltaTime)
 		// 이번 프레임에 생성된 파티클은 위치처럼 회전도 건너뛴다
 		if (Particle->Flags & STATE_Particle_JustSpawned)
 			continue;
+		// 부모의 위치 적분과 같은 규칙으로 Freeze 계열은 회전하지 않는다
+		if (Particle->Flags & (STATE_Particle_Freeze | STATE_Particle_FreezeRotation))
+			continue;
 
 		FMeshRotationPayloadData& Payload = GetMeshRotationPayload(*Particle);
 		Payload.Rotation += Payload.RotationRate * DeltaTime;

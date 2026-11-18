@@ -4,11 +4,13 @@
 #include "Render/RenderCommand.h"
 #include "Render/Material.h"
 #include "Asset/AssetManager.h"
+#include "Particles/ParticleStats.h"
 
 FParticleSystemSceneProxy::FParticleSystemSceneProxy(UParticleSystemComponent* InComponent)
 	: FPrimitiveSceneProxy(InComponent)
 {
 	bCastsShadow = false;
+	bParticleSystem = true;
 }
 
 void FParticleSystemSceneProxy::UpdateRenderState()
@@ -39,6 +41,8 @@ void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, cons
 {
 	if (!View.bShowParticles)
 		return;
+
+	FScopeCycleCounter Timer{ TStatId{} };
 
 	// 프록시가 머티리얼 등록보다 먼저 만들어졌을 수 있다
 	if (!DefaultMaterial)
@@ -74,4 +78,5 @@ void FParticleSystemSceneProxy::GetDynamicMeshElements(FRenderQueue& Queue, cons
 		Context.EmitterIndex = EmitterIndex;
 		Data->Submit(Queue, Context);
 	}
+	BuildRenderDataMs = SmoothParticleStatMs(BuildRenderDataMs, Timer.Finish());
 }

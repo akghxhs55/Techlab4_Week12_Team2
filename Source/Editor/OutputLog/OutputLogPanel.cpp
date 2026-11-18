@@ -11,9 +11,13 @@
 #include "Components/SkinnedMeshComponent.h"
 #include "Components/ParticleSystemComponent.h"
 #include "Particles/ParticleEmitterInstance.h"
+#include "Particles/ParticleTypes.h"
 #include "UObject/UObjectIterator.h"
 #include "Engine/World.h"
+#include "GameFramework/Actor.h"
 #include <format>
+#include <memory>
+#include <utility>
 
 #include <algorithm>
 #include <cctype>
@@ -918,6 +922,112 @@ void FOutputLogPanel::RegisterCommands()
 			return true;
 		});
 
+	Add("p.LogEvents", "p.LogEvents [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, UParticleSystemComponent::bLogEvents, bOn)) return false;
+			UParticleSystemComponent::bLogEvents = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.LogEvents = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	Add("p.ShowCollisions", "p.ShowCollisions [0|1]", [](const TArray<FString>& Args, const FString&)
+		{
+			bool bOn = false;
+			if (!ParseToggle(Args, UParticleSystemComponent::bShowCollisions, bOn)) return false;
+			UParticleSystemComponent::bShowCollisions = bOn;
+			FLog::Log(ELogVerbosity::Info, "p.ShowCollisions = {}", bOn ? 1 : 0);
+			return true;
+		});
+
+	// 디버그: 모든 파티클 컴포넌트의 OnParticleCollide에 테스트 콜백을 건다
+	//  log            : 30번째 충돌마다 로그
+	//  clear-template : 첫 충돌 콜백 안에서 SetTemplate(nullptr) (콜백 중 컴포넌트 변경이 안전한지)
+	//  off            : 건 콜백 해제
+	Add("p.BindCollide", "p.BindCollide <log|clear-template|off>", [](const TArray<FString>& Args, const FString&)
+		{
+			if (Args.Num() != 2) return false;
+			static TArray<std::pair<UParticleSystemComponent*, FDelegateHandle>> Bound;
+
+			// 이미 건 것은 먼저 해제한다 (살아 있는 컴포넌트만)
+			for (const auto& [PSC, Handle] : Bound)
+			{
+				for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+				{
+					if (*It == PSC) { PSC->OnParticleCollide.Remove(Handle); break; }
+				}
+			}
+			Bound.Empty();
+			if (EqualsIgnoreCase(Args[1], "OFF"))
+			{
+				FLog::Log(ELogVerbosity::Info, "p.BindCollide off");
+				return true;
+			}
+
+			const bool bLog = EqualsIgnoreCase(Args[1], "LOG");
+			if (!bLog && !EqualsIgnoreCase(Args[1], "CLEAR-TEMPLATE")) return false;
+
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				FDelegateHandle Handle = 0;
+				if (bLog)
+				{
+					auto Counter = std::make_shared<int32>(0);
+					Handle = PSC->OnParticleCollide.Add([Counter](UParticleSystemComponent* Source, const FParticleEventCollisionData& Event)
+						{
+							if ((*Counter)++ % 30 != 0) return;
+							FLog::Log(ELogVerbosity::Info, "OnParticleCollide #{} '{}' at ({:.0f}, {:.0f}, {:.0f}) hit {}",
+								*Counter, Event.EventName.ToString(), Event.Location.X, Event.Location.Y, Event.Location.Z,
+								Event.HitActor ? Event.HitActor->GetName() : FString("None"));
+						});
+				}
+				else
+				{
+					Handle = PSC->OnParticleCollide.Add([](UParticleSystemComponent* Source, const FParticleEventCollisionData&)
+						{
+							if (Source && Source->GetTemplate())
+							{
+								FLog::Log(ELogVerbosity::Info, "OnParticleCollide: SetTemplate(nullptr) inside callback");
+								Source->SetTemplate(nullptr);
+							}
+						});
+				}
+				Bound.Add({ PSC, Handle });
+			}
+			FLog::Log(ELogVerbosity::Info, "p.BindCollide {}: {} components", Args[1], Bound.Num());
+			return true;
+		});
+
+	// 디버그: 살아 있는 모든 파티클의 Freeze 플래그를 켜고 끈다 (Freeze 처리 확인용)
+	Add("p.Freeze", "p.Freeze <0|1>", [](const TArray<FString>& Args, const FString&)
+		{
+			if (Args.Num() != 2 || (Args[1] != "0" && Args[1] != "1")) return false;
+			const bool bFreeze = Args[1] == "1";
+
+			int32 Count = 0;
+			for (TObjectIterator<UParticleSystemComponent> It; It; ++It)
+			{
+				UParticleSystemComponent* PSC = *It;
+				if (!PSC || !PSC->IsRegistered()) continue;
+				for (FParticleEmitterInstance* Instance : PSC->GetEmitterInstances())
+				{
+					if (!Instance) continue;
+					for (int32 i = 0; i < Instance->ActiveParticles; ++i)
+					{
+						uint8* Base = Instance->ParticleData + Instance->ParticleIndices[i] * Instance->ParticleStride;
+						FBaseParticle& Particle = *reinterpret_cast<FBaseParticle*>(Base);
+						if (bFreeze) Particle.Flags |= STATE_Particle_Freeze;
+						else Particle.Flags &= ~STATE_Particle_Freeze;
+						++Count;
+					}
+				}
+			}
+			FLog::Log(ELogVerbosity::Info, "p.Freeze {}: {} particles", bFreeze ? 1 : 0, Count);
+			return true;
+		});
+
 	// 등록된 모든 파티클 컴포넌트 (에디터·PIE 월드 모두)
 	Add("p.Particles", "p.Particles <Activate|Deactivate>", [](const TArray<FString>& Args, const FString&)
 		{
@@ -961,6 +1071,13 @@ void FOutputLogPanel::RegisterCommands()
 	RegisterSuggestion("CVar", "p.LogBursts", "p.LogBursts", "[0|1] Log each particle burst", true);
 	RegisterSuggestion("CVar", "p.ShowLOD", "p.ShowLOD", "[0|1] Draw LOD distance spheres for all particles", true);
 	RegisterSuggestion("Cmd", "p.LODInfo", "p.LODInfo", "Print LOD, camera distance, particle count");
+	RegisterSuggestion("CVar", "p.LogEvents", "p.LogEvents", "[0|1] Log particle event counts (needs EventGenerator)", true);
+	RegisterSuggestion("CVar", "p.ShowCollisions", "p.ShowCollisions", "[0|1] Draw particle collision points and normals", true);
+	RegisterSuggestion("Cmd", "p.BindCollide log", "p.BindCollide log", "Log OnParticleCollide callbacks");
+	RegisterSuggestion("Cmd", "p.BindCollide clear-template", "p.BindCollide clear-template", "SetTemplate(nullptr) inside the callback");
+	RegisterSuggestion("Cmd", "p.BindCollide off", "p.BindCollide off", "Remove test callbacks");
+	RegisterSuggestion("Cmd", "p.Freeze 1", "p.Freeze 1", "Freeze all live particles in place");
+	RegisterSuggestion("Cmd", "p.Freeze 0", "p.Freeze 0", "Unfreeze all live particles");
 	RegisterSuggestion("Cmd", "p.Particles Activate", "p.Particles Activate", "Activate all particle components");
 	RegisterSuggestion("Cmd", "p.Particles Deactivate", "p.Particles Deactivate", "Stop spawning on all particle components");
 }

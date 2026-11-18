@@ -575,6 +575,83 @@ bool UWorld::SweepSingle(const FRay& WorldRay, float MaxDistance, float Radius, 
 	return OutHit.bBlockingHit;
 }
 
+void UWorld::GatherSweepCandidates(const FBox& Bounds, const AActor* IgnoreActor, TArray<FPrimitiveSceneProxy*>& OutCandidates)
+{
+	OutCandidates.Reset();
+	// 이번 프레임 한 번만. 파티클마다 부르지 않는다
+	Scene.UpdateAllTransforms();
+
+	Scene.BVH.Query(
+		[&Bounds](const FBox& NodeBounds)
+		{
+			return NodeBounds.Min.X <= Bounds.Max.X && NodeBounds.Max.X >= Bounds.Min.X &&
+				NodeBounds.Min.Y <= Bounds.Max.Y && NodeBounds.Max.Y >= Bounds.Min.Y &&
+				NodeBounds.Min.Z <= Bounds.Max.Z && NodeBounds.Max.Z >= Bounds.Min.Z;
+		},
+		[&](FPrimitiveSceneProxy* Proxy)
+		{
+			// SweepSingle의 메시 경로와 같은 조건. 메시가 없는 프록시(파티클, 빌보드)는 제외
+			UPrimitiveComponent* Component = Proxy ? Proxy->GetComponent() : nullptr;
+			if (!Component || !Proxy->GetMesh() || !Component->IsShown(true))
+				return;
+			const AActor* Owner = Component->GetOwner();
+			if (!Owner || Owner == IgnoreActor || !Owner->GetActorEnableCollision() || Owner->GetWorld() != this)
+				return;
+			OutCandidates.Add(Proxy);
+		});
+}
+
+bool UWorld::SweepAgainstCandidates(const TArray<FPrimitiveSceneProxy*>& Candidates, const FRay& WorldRay,
+	float MaxDistance, float Radius, FHitResult& OutHit)
+{
+	OutHit = FHitResult(1.0f);
+	if (Candidates.IsEmpty() || MaxDistance <= 0.0f)
+		return false;
+
+	const FVector Extent(Radius, Radius, Radius);
+	float NearestT = MaxDistance;
+	for (FPrimitiveSceneProxy* Proxy : Candidates)
+	{
+		FAABB Bounds = Proxy->GetBounds();
+		Bounds.Extent += Extent;
+		const FVector Min = Bounds.Center - Bounds.Extent;
+		const FVector Max = Bounds.Center + Bounds.Extent;
+
+		float T = NearestT;
+		if (!RayIntersectsAABB(WorldRay, Min, Max, T) || T > NearestT)
+			continue;
+
+		// 시작점이 이미 박스 안 → 법선을 믿을 수 없으므로 호출자가 건너뛰게 표시
+		const FVector& O = WorldRay.Origin;
+		const bool bInside = O.X > Min.X && O.X < Max.X && O.Y > Min.Y && O.Y < Max.Y && O.Z > Min.Z && O.Z < Max.Z;
+
+		const FVector Point = WorldRay.Origin + WorldRay.Direction * T;
+		const FVector Offset = Point - Bounds.Center;
+		const float X = Bounds.Extent.X > 0.0f ? Offset.X / Bounds.Extent.X : 0.0f;
+		const float Y = Bounds.Extent.Y > 0.0f ? Offset.Y / Bounds.Extent.Y : 0.0f;
+		const float Z = Bounds.Extent.Z > 0.0f ? Offset.Z / Bounds.Extent.Z : 0.0f;
+		const float AX = std::abs(X), AY = std::abs(Y), AZ = std::abs(Z);
+		const FVector Normal = AX >= AY && AX >= AZ ? FVector(X >= 0.0f ? 1.0f : -1.0f, 0.0f, 0.0f)
+			: AY >= AZ ? FVector(0.0f, Y >= 0.0f ? 1.0f : -1.0f, 0.0f)
+			: FVector(0.0f, 0.0f, Z >= 0.0f ? 1.0f : -1.0f);
+		// 면에서 멀어지는 방향이면 이미 빠져나가는 중
+		if (!bInside && Normal.Dot(WorldRay.Direction) > 0.0f)
+			continue;
+
+		NearestT = T;
+		OutHit.bBlockingHit = true;
+		OutHit.bStartPentrating = bInside;
+		OutHit.HitComponent = Proxy->GetComponent();
+		OutHit.Distance = T;
+		OutHit.Time = T / MaxDistance;
+		OutHit.ImpactPoint = Point;
+		OutHit.Location = Point;
+		OutHit.ImpactNormal = Normal;
+		OutHit.Normal = Normal;
+	}
+	return OutHit.bBlockingHit;
+}
+
 bool UWorld::LineTraceSingle(const FRay& WorldRay, FHitResult& OutHit,
 	FBillboardTraceTransform ResolveBillboard, const void* ViewContext)
 {

@@ -459,7 +459,7 @@ void UAssetManager::CreateParticleMaterial()
 			Mat->SamplerState = ESamplerState::LinearClamp;
 			RegisterAsset(Name, Mat);
 		};
-	MakeSpriteMaterial(EPSOType::Particle_Additive, EBlendState::Additive, "ParticleSpriteAdditive");
+	MakeSpriteMaterial(EPSOType::Particle_Additive, EBlendState::ParticleAdditive, "ParticleSpriteAdditive");
 	MakeSpriteMaterial(EPSOType::Particle_AlphaBlend, EBlendState::AlphaBlend, "ParticleSpriteAlphaBlend");
 
 	// 빔, 리본용. U(길이 방향)는 반복, V(폭 방향)는 가장자리가 번지지 않게 Clamp
@@ -468,7 +468,7 @@ void UAssetManager::CreateParticleMaterial()
 	BeamMat->PSOType = EPSOType::Particle_Additive;
 	BeamMat->Shader = FRenderResourceManager::GetShaderProgram("EngineResources/Shaders/ParticleSpriteShader.hlsl");
 	BeamMat->Textures.Add(GetAssetByPath<UTexture2D>("Engine/Textures/BeamGlow.png"));
-	BeamMat->BlendState = EBlendState::Additive;
+	BeamMat->BlendState = EBlendState::ParticleAdditive;
 	BeamMat->DepthStencilState = EDepthStencilState::ReadOnly;
 	BeamMat->SamplerState = ESamplerState::LinearWrapUClampV;
 	RegisterAsset("ParticleBeamAdditive", BeamMat);
@@ -488,7 +488,7 @@ void UAssetManager::CreateParticleMaterial()
 			RegisterAsset(Name, Mat);
 		};
 	MakeMeshMaterial(EPSOType::StaticMesh_Translucent, EBlendState::AlphaBlend, "ParticleMeshTranslucent");
-	MakeMeshMaterial(EPSOType::StaticMesh_Additive, EBlendState::Additive, "ParticleMeshAdditive");
+	MakeMeshMaterial(EPSOType::StaticMesh_Additive, EBlendState::ParticleAdditive, "ParticleMeshAdditive");
 }
 
 void UAssetManager::CreateEditorArrowMaterial() {

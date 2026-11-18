@@ -2,11 +2,13 @@
 #include "ParticleSystemDetailsPanel.h"
 
 #include "Editor/Details/PropertyEditor.h"
+#include "Editor/ParticleSystemEditor/DistributionCustomization.h"
 #include "Particles/ParticleModule.h"
 
 FParticleSystemDetailsPanel::FParticleSystemDetailsPanel(FParticleSystemEditor& InEditor)
 	: FParticleSystemEditorPanel(InEditor, "Details")
 {
+	RegisterDistributionCustomizations();
 }
 
 void FParticleSystemDetailsPanel::DrawContent()

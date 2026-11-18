@@ -42,6 +42,7 @@ void FViewportsPanel::DrawShowMenu()
             { "Light", "stat light", EStatFlags::Light },
             { "Decal", "stat decal", EStatFlags::Decal },
             { "Skinning", "stat skinning", EStatFlags::Skinning },
+            { "Particle", "stat particle", EStatFlags::Particle },
         };
         FString Message;
         if (IconMenuItem(nullptr, "Hide All", false, EIndicator::None))
@@ -69,7 +70,7 @@ void FViewportsPanel::DrawShowMenu()
     Flag("Bounds", "Bounding Boxes", Settings.bDrawBoundingBox);
     Flag("Decals", "Decals", Settings.bDrawDecals);
     Flag("Grid", "Grid", Settings.bDrawBatchLine);
-    Flag("Cascade", "Particles", Settings.bShowParticles);
+    Flag("Particles", "Particles", Settings.bShowParticles);
     Flag("SkeletalMesh", "Skeletal Meshes", Settings.bShowSkeletalMesh);
     Flag("StaticMesh", "Static Meshes", Settings.bDrawPrimitives);
     SectionHeader("Developer");

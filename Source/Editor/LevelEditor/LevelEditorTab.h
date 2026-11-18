@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Core/Delegate/Delegate.h"
+#include "Editor/EditorUI/BottomDrawerBar.h"
 #include "Editor/EditorUI/EditorTab.h"
 #include "Editor/LevelEditor/LevelEditorToolbar.h"
 #include "Runtime/Asset/FbxImporter/FbxMeshBake.h"
@@ -15,7 +16,7 @@ public:
 
 	const char* GetTabName() const override { return TabName.c_str(); }
 	bool CanDetach() const override { return false; }
-	bool HasFocusedSubWindow() const override { return bDrawerFocused || EditorDock::HasFocusedPanel(Panels); }
+	bool HasFocusedSubWindow() const override { return BottomBar.IsFocused() || EditorDock::HasFocusedPanel(Panels); }
 	void DrawMenuBar() override;
 
 	TDelegate<> OnNewScene;
@@ -60,21 +61,10 @@ public:
 	void UpdateTabName(std::string_view InPath);
 	void SetDrawerPanels(FContentDrawerPanel* InContentDrawer, FOutputLogPanel* InOutputLog)
 	{
-		DrawerContentPanel = InContentDrawer;
-		DrawerLogPanel = InOutputLog;
+		BottomBar.SetPanels(InContentDrawer, InOutputLog);
 	}
 
 private:
-	enum class EBottomDrawer
-	{
-		None,
-		ContentDrawer,
-		OutputLog
-	};
-
-	void DrawStatusBar(float Height, ImVec2& OutBarMin, ImVec2& OutBarMax, bool& OutHovered);
-	void DrawBottomDrawerOverlay(const ImVec2& TabWinPos, const ImVec2& BarMin, const ImVec2& BarMax, bool bBarHovered);
-
 	std::function<bool()> IsPackaging;
 	std::function<bool()> CanUndoQuery;
 	std::function<bool()> CanRedoQuery;
@@ -82,14 +72,7 @@ private:
 	std::function<const char*()> GetRedoLabelQuery;
 	FLevelEditorToolbar Toolbar;
 	TArray<TUniquePtr<IEditorPanel>> Panels;
-	FContentDrawerPanel* DrawerContentPanel = nullptr;
-	FOutputLogPanel* DrawerLogPanel = nullptr;
-	EBottomDrawer ActiveDrawer = EBottomDrawer::None;
-	float DrawerHeight = 480.0f;
-	bool bDrawerOpenedThisFrame = false;
-	bool bResizingDrawer = false;
-	bool bDrawerFocused = false;
-	char StatusCmdBuf[256] = {};
+	FBottomDrawerBar BottomBar;
 	bool bUseDockSpace = true;
 	bool bPassthruCentralNode = false;
 

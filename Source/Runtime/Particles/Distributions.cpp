@@ -1,34 +1,10 @@
 #include "EnginePCH.h"
 #include "Distributions.h"
 #include "Math/RandomStream.h"
+#include "Curves/CurveKeyUtils.h"
 #include <algorithm>
 #include <functional>
 #include <cassert>
-
-// 두 키 사이 구간 하나를 보간
-static float EvalCurveSegment(const FFloatCurveKey& LeftKey, const FFloatCurveKey& RightKey, float InTime)
-{
-	const float Length = RightKey.Time - LeftKey.Time;
-	if (Length <= 0.0001f) return LeftKey.Value;
-	const float T = std::clamp((InTime - LeftKey.Time) / Length, 0.0f, 1.0f);
-	if (LeftKey.InterpMode == ECurveInterpMode::Constant) return LeftKey.Value;
-	if (LeftKey.InterpMode == ECurveInterpMode::Linear)   return LeftKey.Value + (RightKey.Value - LeftKey.Value) * T;
-	const float T2 = T * T, T3 = T2 * T;   // Cubic (Hermite)
-	return (2 * T3 - 3 * T2 + 1) * LeftKey.Value + (T3 - 2 * T2 + T) * LeftKey.LeaveTangent * Length +
-		(-2 * T3 + 3 * T2) * RightKey.Value + (T3 - T2) * RightKey.ArriveTangent * Length;
-}
-
-// 키 배열 전체에서 InTime 값을 구함. 키는 시간순 정렬돼 있어야 한다.
-static float EvaluateCurveKeys(const TArray<FFloatCurveKey>& Keys, float InTime)
-{
-	if (Keys.IsEmpty()) return 0.0f;
-	if (InTime <= Keys[0].Time)     return Keys[0].Value;      // 첫 키보다 앞
-	if (InTime >= Keys.Last().Time) return Keys.Last().Value;  // 마지막 키보다 뒤
-	// InTime보다 시간이 큰 첫 키 = 오른쪽 키, 그 바로 앞 = 왼쪽 키
-	const auto Right = std::upper_bound(Keys.begin(), Keys.end(), InTime,
-		[](float Time, const FFloatCurveKey& Key) { return Time < Key.Time; });
-	return EvalCurveSegment(*(Right - 1), *Right, InTime);
-}
 
 // 칸 하나에 들어갈 수 있는 최대 숫자 개수
 static constexpr int32 MaxValuesPerEntry = 6;
@@ -65,8 +41,7 @@ static constexpr int32 CurveBakeSampleCount = 32;
 void FFloatDistribution::Bake()
 {
 	// 커브는 키가 시간순이어야 구간 찾기가 맞으므로 먼저 정렬한다.
-	std::stable_sort(CurveKeys.begin(), CurveKeys.end(),
-		[](const FFloatCurveKey& A, const FFloatCurveKey& B) { return A.Time < B.Time; });
+	CurveKeyUtils::SortKeys(CurveKeys);
 
 	// 키가 0개/1개인 커브는 상수와 같다.
 	EDistributionMode BakeMode = Mode;
@@ -95,7 +70,7 @@ void FFloatDistribution::Bake()
 		// 첫 키 ~ 마지막 키 구간을 일정 간격 32칸으로 샘플링
 		BuildLookupTable(LookupTable, ERawDistributionOperation::None, 1, CurveBakeSampleCount,
 			CurveKeys[0].Time, CurveKeys.Last().Time,
-			[this](float Time, float* Out) { Out[0] = EvaluateCurveKeys(CurveKeys, Time); });
+			[this](float Time, float* Out) { Out[0] = CurveKeyUtils::Evaluate(CurveKeys, Time); });
 		break;
 	}
 }
@@ -164,9 +139,9 @@ void FVectorDistribution::Bake()
 
 		BuildLookupTable(LookupTable, ERawDistributionOperation::None, 3, EntryCount, MinTime, MaxTime,
 			[this](float Time, float* Out) {
-				Out[0] = EvaluateCurveKeys(CurveKeysX, Time);
-				Out[1] = EvaluateCurveKeys(CurveKeysY, Time);
-				Out[2] = EvaluateCurveKeys(CurveKeysZ, Time);
+				Out[0] = CurveKeyUtils::Evaluate(CurveKeysX, Time);
+				Out[1] = CurveKeyUtils::Evaluate(CurveKeysY, Time);
+				Out[2] = CurveKeyUtils::Evaluate(CurveKeysZ, Time);
 			});
 		break;
 	}

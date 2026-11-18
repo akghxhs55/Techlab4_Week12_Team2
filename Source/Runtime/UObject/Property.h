@@ -39,6 +39,7 @@ struct FPropertyMeta
     float Delta = 0.0f;        // 드래그 1픽셀당 변화량. 0이면 위젯 기본값
 
     bool HasClamp() const { return ClampMin > -FLT_MAX || ClampMax < FLT_MAX; }
+    bool IsSet() const { return HasClamp() || UIMin > -FLT_MAX || UIMax < FLT_MAX || Delta > 0.0f; }
 };
 
 // 멤버 변수 하나의 리플렉션 정보 (UE: UnrealType.h의 FProperty)
@@ -227,6 +228,7 @@ class FStructProperty : public FProperty
 
 public:
     UScriptStruct* Struct = nullptr;
+    FPropertyMeta Meta;
 
     void SerializeItem(FStructuredArchive::FSlot Slot, void* Value) const override;
 };
@@ -313,4 +315,5 @@ struct TPropertyTypeFor<TArray<T>>
 
 // meta를 쓸 수 있는 타입. KHT가 만든 static_assert가 이걸로 검사한다.
 template <typename T>
-constexpr bool TSupportsNumericMeta = std::is_base_of_v<FNumericProperty, typename TPropertyTypeFor<T>::Type>;
+constexpr bool TSupportsNumericMeta = std::is_base_of_v<FNumericProperty, typename TPropertyTypeFor<T>::Type>
+    || std::is_same_v<typename TPropertyTypeFor<T>::Type, FStructProperty>;

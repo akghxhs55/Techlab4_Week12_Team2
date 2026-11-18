@@ -23,6 +23,7 @@ public:
 	virtual void GetDynamicMeshElements(FRenderQueue& Queue, const FViewContext& View);
 
 	bool IsSkinned() const { return bSkinned; }
+	bool IsParticleSystem() const { return bParticleSystem; }
 	
 	void UpdateTransform();
 	void OnMeshRenderDataChanged();
@@ -47,6 +48,7 @@ public:
 	bool bReceivesDecals = true;
 protected:
 	bool bSkinned = false;
+	bool bParticleSystem = false;
 	TSharedPtr<const FMeshRenderState> RenderState;
 	void UpdateCommonFlags();
 private:

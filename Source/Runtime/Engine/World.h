@@ -97,6 +97,13 @@ public:
 	bool SweepSingle(const FRay& WorldRay, float MaxDistance, float Radius, FHitResult& OutHit, AActor* IgnoreActor = nullptr,
 		bool bBlockingOnly = false);
 
+	// 파티클 충돌용. 에미터마다 한 번 Bounds와 겹치는 메시 프록시를 모아 두고,
+	// 파티클마다는 그 후보에만 SweepAgainstCandidates로 검사한다 (BVH 순회·트랜스폼 갱신을 파티클 수만큼 하지 않는다)
+	void GatherSweepCandidates(const FBox& Bounds, const AActor* IgnoreActor, TArray<FPrimitiveSceneProxy*>& OutCandidates);
+	// SweepSingle의 메시 경로와 같은 판정(반지름만큼 키운 AABB). 시작점이 이미 안이면 bStartPentrating
+	static bool SweepAgainstCandidates(const TArray<FPrimitiveSceneProxy*>& Candidates, const FRay& WorldRay,
+		float MaxDistance, float Radius, FHitResult& OutHit);
+
 	void BeginPlay();
 	void EndPlay();
 	bool HasBegunPlay() const { return bBegunPlay; }

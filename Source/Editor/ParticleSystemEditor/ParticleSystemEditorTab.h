@@ -16,6 +16,7 @@ protected:
 	bool DrawFileMenuItems() override;
 
 private:
+	void DrawSimulationControls() const;
 	void DrawLODTabs(const UParticleSystem& System) const;
 	void DrawLODDistance(const UParticleSystem& System) const;
 	void DrawOrbitControls(float RightPadding) const;

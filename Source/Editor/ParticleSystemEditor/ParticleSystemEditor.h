@@ -22,9 +22,16 @@ public:
 	const char* GetEditorTypeName() const override { return "ParticleSystem"; }
 
 	void SetViewportState(uint32 Width, uint32 Height, const FViewportCameraInput& Input);
-	void FocusPreview() const;
+	void FocusPreview();
 
-	void RestartSimulation() const;
+	void RestartSimulation();
+
+	bool IsSimulationPaused() const { return bSimulationPaused; }
+	void SetSimulationPaused(bool bPaused) { bSimulationPaused = bPaused; }
+	void ToggleSimulationPaused() { bSimulationPaused = !bSimulationPaused; }
+	void StepSimulation(float StepSeconds = 1.0f / 60.0f);
+	float GetSimulationSpeed() const { return SimulationSpeed; }
+	void SetSimulationSpeed(float InSpeed);
 
 	UObject* GetSelectedObject() const; // Emitter가 선택되어 있으면 Emitter를, Module이 선택되어 있으면 Module을 반환
 
@@ -60,6 +67,10 @@ public:
 	float GetOrbitSpeed() const { return OrbitSpeed; }
 	void SetOrbitSpeed(float InDegreesPerSecond) { OrbitSpeed = InDegreesPerSecond; }
 
+	bool IsStatsOverlayEnabled() const { return bShowStats; }
+	void SetStatsOverlayEnabled(bool bEnabled) { bShowStats = bEnabled; }
+	UParticleSystemComponent* GetPreviewComponent() const { return PreviewComponent; }
+
 	void NotifyPropertyEdited();
 	void NotifyStructureChanged();
 
@@ -82,7 +93,7 @@ private:
 	int32 GetSelectedModuleSlot() const;
 	void ResolveSelectedModule(int32 Slot);
 	void ClampCurrentLOD();
-	void ApplyPreviewLOD() const;
+	void ApplyPreviewLOD();
 	void UpdateOrbitPreview(float DeltaTime);
 
 	UParticleSystem* OriginalAsset = nullptr;
@@ -105,6 +116,12 @@ private:
 	float OrbitRadius = 100.0f;
 	float OrbitSpeed = 180.0f;
 	float OrbitAngle = 0.0f;
+
+	bool bShowStats = false;
+
+	bool bSimulationPaused = false;
+	float SimulationSpeed = 1.0f;
+	float PendingStepTime = 0.0f;
 
 	bool bUnsavedPromptRequested = false;
 	bool bCloseConfirmed = false;

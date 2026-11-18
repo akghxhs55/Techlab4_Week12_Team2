@@ -29,6 +29,7 @@ class UParticleModuleSpawn : public UParticleModule
 public:
 	UParticleModuleSpawn();
 
+	EModuleType GetModuleType() const override { return EPMT_Spawn; }
 	void BakeDistributions() override;
 
 	float GetSpawnRate(float EmitterTime, FRandomStream& Random) const;
@@ -42,9 +43,9 @@ public:
 	void ClearBursts() { BurstList.Empty(); }
 
 private:
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	FFloatDistribution Rate;        // 초당 생성 수
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, meta=(ClampMin=0))
 	FFloatDistribution RateScale;   // Rate에 곱하는 배율
 	UPROPERTY(EditAnywhere)
 	TArray<FParticleBurst> BurstList;

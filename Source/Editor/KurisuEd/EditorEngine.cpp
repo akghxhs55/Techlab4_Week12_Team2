@@ -749,12 +749,27 @@ void UEditorEngine::Tick(const float DeltaTime)
 		}
 		ViewportsPanel->SetSplitRatio(ViewportSplitRatio);
 
+		bool bSlotActives[4]{};
 		for (int32 i = 0; i < 4; ++i)
 		{
 			const bool bSlotActive = (ViewportLayoutMode == ELayoutMode::Single)
 				? (i == SingleViewportIndex)
 				: i < GetLayoutPaneCount(ViewportLayoutMode);
+			bSlotActives[i] = bSlotActive;
 			ViewportsPanel->SetView(i, ViewRects[i], bSlotActive);
+		}
+
+		const int32 CurrentActiveViewIndex = ViewportsPanel->GetActiveViewIndex();
+		if (CurrentActiveViewIndex < 0 || CurrentActiveViewIndex >= 4 || !bSlotActives[CurrentActiveViewIndex])
+		{
+			for (int32 i = 0; i < 4; ++i)
+			{
+				if (bSlotActives[i])
+				{
+					ViewportsPanel->SetActiveViewIndex(i);
+					break;
+				}
+			}
 		}
 
 		// 마우스 호버 감지

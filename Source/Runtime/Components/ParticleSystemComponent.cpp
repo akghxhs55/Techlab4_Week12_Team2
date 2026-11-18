@@ -6,11 +6,17 @@
 #include "Particles/ParticleMeshEmitterInstance.h"
 #include "Render/Mesh.h"
 #include "Particles/ParticleHelper.h"
+#include "Particles/ParticleStats.h"
 #include "Render/LineBatcher.h"
 #include "UObject/UObjectIterator.h"
 #include "Engine/Scene.h"
 #include "Engine/World.h"
 #include "Engine/ParticleSystemSceneProxy.h"
+#include "Particles/ParticleLODLevel.h"
+#include "Particles/Module/ParticleModuleEventReceiverBase.h"
+#include "UObject/UObjectHash.h"
+#include "GameFramework/Actor.h"
+#include "Components/PrimitiveComponent.h"
 
 UParticleSystemComponent::UParticleSystemComponent()
 {
@@ -62,6 +68,7 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 	{
 		Template = InTemplate;
 	}
+	InitializedTemplate = Template;
 	if (!Template)
 		return;
 
@@ -75,6 +82,10 @@ void UParticleSystemComponent::InitializeSystem(UParticleSystem* InTemplate)
 		}
 	}
 	bWasCompleted = false;
+
+	// 이전 템플릿에서 쌓인 이벤트와 로그 누적이 새 템플릿 이름으로 찍히지 않게 비운다
+	ClearEvents();
+	ResetEventLog();
 
 	// 새 인스턴스는 LOD 0으로 시작하므로 지금 LOD를 다시 적용한다 (DirectSet 값, 미리보기 유지)
 	ApplyLODLevel(IsPreviewLODActive() ? PreviewLODOverride : LODLevel);
@@ -106,7 +117,8 @@ void UParticleSystemComponent::SetTemplate(UParticleSystem* NewTemplate)
 
 void UParticleSystemComponent::ActivateSystem(bool bReset)
 {
-	if (EmitterInstances.IsEmpty() || bReset)
+	// 인스턴스가 다른 템플릿으로 만들어졌으면(씬 로드로 Template만 바뀐 경우 등) 다시 만든다
+	if (EmitterInstances.IsEmpty() || bReset || InitializedTemplate != Template)
 	{
 		InitializeSystem();
 	}
@@ -159,6 +171,7 @@ void UParticleSystemComponent::SendRenderDynamicData()
 	if (!Proxy)
 		return;
 
+	FScopeCycleCounter Timer{ TStatId{} };
 	TArray<TUniquePtr<FDynamicEmitterDataBase>>& RenderData = Proxy->GetDynamicEmitterData();
 	if (RenderData.Num() != EmitterInstances.Num())
 	{
@@ -172,11 +185,25 @@ void UParticleSystemComponent::SendRenderDynamicData()
 		else
 			RenderData[Index].reset();
 	}
+	SendRenderDataMs = SmoothParticleStatMs(SendRenderDataMs, Timer.Finish());
 }
 
 void UParticleSystemComponent::TickComponent(float DeltaTime)
 {
 	Super::TickComponent(DeltaTime);
+
+	// 이벤트 버퍼는 여기서 비우지 않는다. 지난 Tick의 배달 중에 생긴 이벤트(Receiver가 생성한 파티클의 Spawn 등)가
+	// 이번 Tick에 이어서 배달돼야 한다. 배달한 이벤트는 DispatchEvents가 버퍼에서 꺼낸다
+
+	// 디버그 충돌 표시는 잠깐 남겼다가 사라진다
+	for (int32 i = DebugCollisions.Num() - 1; i >= 0; --i)
+	{
+		DebugCollisions[i].TimeLeft -= DeltaTime;
+		if (DebugCollisions[i].TimeLeft <= 0.0f)
+		{
+			DebugCollisions.RemoveAt(static_cast<uint32>(i));
+		}
+	}
 
 	if (EmitterInstances.IsEmpty())
 		return;
@@ -195,12 +222,238 @@ void UParticleSystemComponent::TickComponent(float DeltaTime)
 	}
 	bWasCompleted = bAllComplete;
 
+	if (bLogEvents)
+	{
+		LogEventCounts(DeltaTime);
+	}
+
+	// 모든 에미터 Tick이 끝난 뒤에 배달한다. 순회 중인 파티클 배열을 Receiver가 건드리지 않게
+	// Receiver가 ForceSpawn으로 만드는 파티클 비용도 여기 포함된다.
+	// BroadcastGameEvents는 콜백이 이 컴포넌트를 파괴할 수 있어 재지 않는다
+	FScopeCycleCounter DispatchTimer{ TStatId{} };
+	const int32 Delivered = DispatchEvents();
+	EventDispatchMs = SmoothParticleStatMs(EventDispatchMs, DispatchTimer.Finish());
+	if (bLogEvents && Delivered > 0)
+	{
+		LoggedEventCounts["Delivered"] += Delivered;
+	}
+
 	// 바운드는 Transform이 바뀔 때만 갱신되므로 매 프레임 요청
 	if (FPrimitiveSceneProxy* Proxy = GetSceneProxy())
 	{
 		Proxy->GetScene()->MarkDirty(Proxy);
 	}
 	SendRenderDynamicData();
+
+	// 게임 코드 콜백은 반드시 맨 마지막. 콜백이 이 컴포넌트를 바꾸거나 파괴할 수 있다
+	BroadcastGameEvents();
+}
+
+void UParticleSystemComponent::BroadcastGameEvents()
+{
+	const bool bScripts = GetOwner() != nullptr;
+	if (DispatchingCollisionEvents.IsEmpty() && DispatchingSpawnEvents.IsEmpty() &&
+		DispatchingDeathEvents.IsEmpty() && DispatchingBurstEvents.IsEmpty())
+		return;
+	if (!bScripts && !OnParticleSpawn.IsBound() && !OnParticleDeath.IsBound() &&
+		!OnParticleCollide.IsBound() && !OnParticleBurst.IsBound())
+		return;
+
+	// 콜백이 SetTemplate·Deactivate(이벤트 버퍼를 비움)나 액터 파괴를 할 수 있으므로
+	// 보낼 목록을 지역 복사본으로 옮기고, 콜백마다 이 컴포넌트가 아직 살아 있는지 확인한다
+	const TArray<FParticleEventSpawnData> Spawns = DispatchingSpawnEvents;
+	const TArray<FParticleEventDeathData> Deaths = DispatchingDeathEvents;
+	const TArray<FParticleEventCollisionData> Collisions = DispatchingCollisionEvents;
+	const TArray<FParticleEventBurstData> Bursts = DispatchingBurstEvents;
+
+	UParticleSystemComponent* Self = this;
+	auto IsAlive = [Self]()
+		{
+			uint32 UUID = 0;
+			return TryGetLiveObjectUUID(Self, nullptr, UUID);
+		};
+
+	// 닿은 대상도 앞선 콜백이 파괴할 수 있다(파괴는 즉시 delete). 지금은 모두 살아 있으므로 UUID를 적어 두고,
+	// 콜백마다 같은 객체가 아직 살아 있는지 확인해 죽었으면 nullptr로 넘긴다. 같은 주소에 새 객체가 생겨도 UUID로 구분된다
+	struct FHitIds { uint32 Actor = 0; uint32 Component = 0; };
+	TArray<FHitIds> HitIds;
+	HitIds.Reserve(Collisions.Num());
+	for (const FParticleEventCollisionData& Event : Collisions)
+	{
+		FHitIds Ids;
+		if (!Event.HitActor || !TryGetLiveObjectUUID(Event.HitActor, nullptr, Ids.Actor)) Ids.Actor = 0;
+		if (!Event.HitComponent || !TryGetLiveObjectUUID(Event.HitComponent, nullptr, Ids.Component)) Ids.Component = 0;
+		HitIds.Add(Ids);
+	}
+	auto IsSameLive = [](const UObject* Object, uint32 ExpectedUUID)
+		{
+			uint32 UUID = 0;
+			return ExpectedUUID != 0 && TryGetLiveObjectUUID(Object, nullptr, UUID) && UUID == ExpectedUUID;
+		};
+
+	for (int32 i = 0; i < Collisions.Num(); ++i)
+	{
+		FParticleEventCollisionData Event = Collisions[i];
+		if (!IsSameLive(Event.HitActor, HitIds[i].Actor)) Event.HitActor = nullptr;
+		if (!IsSameLive(Event.HitComponent, HitIds[i].Component)) Event.HitComponent = nullptr;
+
+		OnParticleCollide.Broadcast(this, Event);
+		if (!IsAlive()) return;
+		// 델리게이트가 파괴했을 수 있으므로 Lua에 넘기기 직전에 한 번 더 확인한다
+		if (!IsSameLive(Event.HitActor, HitIds[i].Actor)) Event.HitActor = nullptr;
+		// 소유 액터의 스크립트(Lua)에 OnParticleCollide(닿은 액터)로 넘긴다
+		if (AActor* Owner = GetOwner())
+		{
+			Owner->CallScripts("OnParticleCollide", Event.HitActor);
+			if (!IsAlive()) return;
+		}
+	}
+	for (const FParticleEventSpawnData& Event : Spawns)
+	{
+		OnParticleSpawn.Broadcast(this, Event);
+		if (!IsAlive()) return;
+	}
+	for (const FParticleEventDeathData& Event : Deaths)
+	{
+		OnParticleDeath.Broadcast(this, Event);
+		if (!IsAlive()) return;
+	}
+	for (const FParticleEventBurstData& Event : Bursts)
+	{
+		OnParticleBurst.Broadcast(this, Event);
+		if (!IsAlive()) return;
+	}
+}
+
+bool UParticleSystemComponent::bLogEvents = false;
+bool UParticleSystemComponent::bShowCollisions = false;
+
+void UParticleSystemComponent::AddDebugCollision(const FVector& WorldLocation, const FVector& WorldNormal)
+{
+	// 파티클이 많아도 선이 넘치지 않게 개수를 제한한다
+	constexpr int32 MaxDebugCollisions = 256;
+	if (DebugCollisions.Num() >= MaxDebugCollisions)
+		return;
+	DebugCollisions.Add({ WorldLocation, WorldNormal, 0.5f });
+}
+
+int32 UParticleSystemComponent::GetEmitterIndex(const FParticleEmitterInstance* Instance) const
+{
+	for (int32 i = 0; i < EmitterInstances.Num(); ++i)
+	{
+		if (EmitterInstances[i] == Instance)
+			return i;
+	}
+	return -1;
+}
+
+int32 UParticleSystemComponent::DispatchEvents()
+{
+	// 지난 Tick에 배달한 목록이 이번 Tick의 델리게이트로 다시 나가지 않게 먼저 비운다
+	DispatchingSpawnEvents.Reset();
+	DispatchingDeathEvents.Reset();
+	DispatchingCollisionEvents.Reset();
+	DispatchingBurstEvents.Reset();
+
+	if (SpawnEvents.IsEmpty() && DeathEvents.IsEmpty() && CollisionEvents.IsEmpty() && BurstEvents.IsEmpty())
+		return 0;
+
+	// 배달할 목록을 꺼내고 버퍼를 비운다. 배달 중에 새로 생긴 이벤트는 버퍼에 쌓여 다음 Tick에 배달된다
+	// (A → B → C 연쇄가 한 프레임에 한 단계씩만 진행되어, 서로를 계속 부르는 설정이어도 한 프레임에 끝난다)
+	DispatchingSpawnEvents = SpawnEvents;
+	DispatchingDeathEvents = DeathEvents;
+	DispatchingCollisionEvents = CollisionEvents;
+	DispatchingBurstEvents = BurstEvents;
+	ClearEvents();
+
+	int32 Delivered = 0;
+	for (FParticleEmitterInstance* Instance : EmitterInstances)
+	{
+		// 꺼진 LOD 레벨이면 이 에미터는 이벤트를 받지 않는다
+		if (!Instance || !Instance->CurrentLODLevel || !Instance->CurrentLODLevel->IsEnabled())
+			continue;
+
+		// 먼 LOD에서 Receiver를 끄면 그 에미터는 이벤트를 받지 않는다
+		for (UParticleModuleEventReceiverBase* Receiver : Instance->CurrentLODLevel->GetEventReceivers())
+		{
+			if (!Receiver || !Receiver->IsEnabled())
+				continue;
+
+			auto Deliver = [&](const auto& Events)
+				{
+					for (const auto& Event : Events)
+					{
+						if (Receiver->WillProcessEvent(Event))
+						{
+							Receiver->ProcessEvent(*Instance, Event);
+							++Delivered;
+						}
+					}
+				};
+			Deliver(DispatchingSpawnEvents);
+			Deliver(DispatchingDeathEvents);
+			Deliver(DispatchingCollisionEvents);
+			Deliver(DispatchingBurstEvents);
+		}
+	}
+	return Delivered;
+}
+
+void UParticleSystemComponent::ClearEvents()
+{
+	SpawnEvents.Reset();
+	DeathEvents.Reset();
+	CollisionEvents.Reset();
+	BurstEvents.Reset();
+}
+
+void UParticleSystemComponent::LogEventCounts(float DeltaTime)
+{
+	// 종류:이름 별로 1초 동안 누적 (같은 종류라도 Generator 설정마다 이름이 다르다)
+	auto Count = [this](const char* TypeName, const FParticleEventData& Event)
+		{
+			const FString Name = Event.EventName.IsNone() ? FString("None") : Event.EventName.ToString();
+			++LoggedEventCounts[FString(TypeName) + ":" + Name];
+		};
+	for (const FParticleEventSpawnData& Event : SpawnEvents) Count("Spawn", Event);
+	for (const FParticleEventDeathData& Event : DeathEvents) Count("Death", Event);
+	for (const FParticleEventCollisionData& Event : CollisionEvents) Count("Collision", Event);
+	for (const FParticleEventBurstData& Event : BurstEvents) Count("Burst", Event);
+
+	// 1초에 한 번, 그 프레임 충돌 하나의 내용도 보여 준다 (위치·법선 확인용)
+	if (!CollisionEvents.IsEmpty())
+	{
+		LastLoggedCollision = CollisionEvents[0];
+		bHasLoggedCollision = true;
+	}
+
+	EventLogTimer += DeltaTime;
+	if (EventLogTimer < 1.0f)
+		return;
+
+	FString Summary;
+	for (const auto& [Key, Value] : LoggedEventCounts)
+	{
+		Summary += (Summary.empty() ? "" : ", ") + Key + " " + std::to_string(Value);
+	}
+	KRS_LOG(Info, "Particle events / {:.1f}s ({}): {}", EventLogTimer,
+		Template ? Template->GetAssetPath() : FString("None"), Summary.empty() ? FString("none") : Summary);
+
+	if (bHasLoggedCollision)
+	{
+		const FParticleEventCollisionData& Hit = LastLoggedCollision;
+		KRS_LOG(Info, "  sample collision '{}': emitter {} at ({:.0f}, {:.0f}, {:.0f}) normal ({:.0f}, {:.0f}, {:.0f}) t {:.2f}",
+			Hit.EventName.ToString(), Hit.EmitterIndex, Hit.Location.X, Hit.Location.Y, Hit.Location.Z,
+			Hit.Normal.X, Hit.Normal.Y, Hit.Normal.Z, Hit.Time);
+	}
+	ResetEventLog();
+}
+
+void UParticleSystemComponent::ResetEventLog()
+{
+	EventLogTimer = 0.0f;
+	LoggedEventCounts.clear();
+	bHasLoggedCollision = false;
 }
 
 void UParticleSystemComponent::SetLODLevel(int32 InLODLevel)
@@ -344,6 +597,25 @@ void UParticleSystemComponent::ApplyLODLevel(int32 InLODLevel)
 	}
 }
 
+void UParticleSystemComponent::Serialize(FStructuredArchive::FRecord Record)
+{
+	Super::Serialize(Record);
+
+	// 액터 생성자가 기본 템플릿으로 인스턴스를 만들고, 씬 로드는 SpawnActor(등록·활성화) 뒤에 속성을 읽는다.
+	// 그대로 두면 Template만 바뀌고 옛 템플릿의 에미터가 계속 도므로, SetTemplate과 같은 규칙으로 다시 시작한다
+	if (Record.GetUnderlyingArchive().IsLoading() && InitializedTemplate != Template)
+	{
+		if (IsRegistered() && (IsActive() || IsAutoActivate()))
+		{
+			ActivateSystem(true);
+		}
+		else
+		{
+			InitializeSystem();
+		}
+	}
+}
+
 FPrimitiveSceneProxy* UParticleSystemComponent::CreateSceneProxy()
 {
 	return new FParticleSystemSceneProxy(this);
@@ -404,6 +676,22 @@ void DrawParticleSystems(UWorld* World, FLineBatcher* LineBatcher, const AActor*
 					LineBatcher->AddLine(P - FVector(0, HalfLength, 0), P + FVector(0, HalfLength, 0), Color);
 					LineBatcher->AddLine(P - FVector(0, 0, HalfLength), P + FVector(0, 0, HalfLength), Color);
 				});
+		}
+
+		// 충돌 지점(빨간 십자)과 법선(초록 선)
+		if (UParticleSystemComponent::bShowCollisions)
+		{
+			const FVector4 HitColor(1.0f, 0.2f, 0.2f, 1.0f);
+			const FVector4 NormalColor(0.2f, 1.0f, 0.3f, 1.0f);
+			constexpr float Cross = 4.0f;
+			constexpr float NormalLength = 20.0f;
+			for (const UParticleSystemComponent::FDebugCollision& Hit : PSC->GetDebugCollisions())
+			{
+				const FVector& P = Hit.Location;
+				LineBatcher->AddLine(P - FVector(Cross, 0, 0), P + FVector(Cross, 0, 0), HitColor);
+				LineBatcher->AddLine(P - FVector(0, Cross, 0), P + FVector(0, Cross, 0), HitColor);
+				LineBatcher->AddLine(P, P + Hit.Normal * NormalLength, NormalColor);
+			}
 		}
 	}
 }
