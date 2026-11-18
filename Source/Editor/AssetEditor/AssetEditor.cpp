@@ -2,7 +2,9 @@
 #include "Editor/AssetEditor/AssetEditor.h"
 #include "Editor/AssetEditor/AssetEditorTab.h"
 #include "Editor/AssetEditor/EditorManager.h"
+#include "Editor/KurisuEd/Editor.h"
 #include "Editor/KurisuEd/EditorEngine.h"
+#include "Launch/LaunchEngineLoop.h"
 #include "Engine/World.h"
 #include "Render/Renderer.h"
 #include "Render/SceneRenderer.h"
@@ -161,11 +163,43 @@ FAssetEditorViewportClient::FAssetEditorViewportClient(FAssetEditor& InAssetEdit
 	EngineShowFlags.bEnableFXAA = true;
 	EngineShowFlags.bShowVignette = false;
 	EngineShowFlags.bShowCameraOverlay = false;
+
+	GridRenderer.Init(GEditor ? GEditor->GetEngineLoop().GetRenderer() : nullptr);
+}
+
+void FAssetEditorViewportClient::Draw(FRenderer* Renderer)
+{
+	EngineShowFlags.LightingModel = (ViewportMode == EViewportMode::Unlit)
+		? ELightingModel::Unlit
+		: ELightingModel::Gouraud;
+	EngineShowFlags.bShowWorldNormal = IsWorldNormal();
+	EngineShowFlags.bUsePreviewSkybox = AssetEditor.UsesPreviewSkybox();
+	FEditorViewportClient::Draw(Renderer);
 }
 
 // 미리보기 씬 위에 에디터가 주는 선과 기즈모를 올린다. 씬은 기반 클래스의 Draw가 그린다.
 void FAssetEditorViewportClient::Draw(const FSceneView* View, FScenePassCallbacks& Callbacks)
 {
+	if (AssetEditor.IsGridVisible() && View && ViewTargets.SceneColor)
+	{
+		const FSceneView& SceneView = *View;
+		const FViewportSettings ViewportSetting{ 0, 0, ViewTargets.SceneColor->GetWidth(), ViewTargets.SceneColor->GetHeight(), 0.0f, 1.0f };
+		Callbacks.Overlays.EditorGrid = [this, &SceneView, ViewportSetting]
+		{
+			EGridPlane GridPlane = EGridPlane::XY;
+			switch (ViewportType)
+			{
+			case ELevelViewportType::Front:
+			case ELevelViewportType::Back: GridPlane = EGridPlane::YZ; break;
+			case ELevelViewportType::Right:
+			case ELevelViewportType::Left: GridPlane = EGridPlane::XZ; break;
+			default: break;
+			}
+			GridRenderer.OnRenderGrid(SceneView.ViewProjectionMatrix, SceneView.ViewLocation,
+				SceneView.ViewForward, GridPlane, 1.0f, SceneView.bIsPerspective, ViewportSetting);
+		};
+	}
+
 	// 선은 미리보기 월드의 LineBatcher로 그리고, 기즈모는 에디터가 가진 기즈모가 스스로 그린다.
 	FLineBatcher* LineBatcher = GetWorld()->LineBatcher.get();
 

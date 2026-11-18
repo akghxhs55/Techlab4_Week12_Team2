@@ -32,6 +32,7 @@ struct FSceneRenderOptions
 	bool bShowCameraOverlay = true;
 	bool bShowSkeletalMesh = true;
 	bool bShowParticles = true;
+	bool bUsePreviewSkybox = false;
 
 	ELightingModel LightingModel = ELightingModel::Gouraud;
 };

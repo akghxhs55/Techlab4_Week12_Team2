@@ -50,17 +50,4 @@ float GpuSkinWeightForBone(uint4 BlendIndices, float4 BlendWeights, uint Bone)
     return dot(BlendWeights, float4(BlendIndices == Bone));
 }
 
-// 0은 어두운 회색, 0보다 크면 파랑(작음), 초록(0.5), 빨강(1).
-// SkeletalMeshObject.cpp의 WeightToColor와 같은 값이므로 함께 고친다
-float3 GpuSkinWeightColor(float Weight)
-{
-    if (Weight <= 0.0f)
-        return float3(0.08f, 0.08f, 0.10f);
-    const float T = min(Weight, 1.0f);
-    const float3 Low = float3(0.0f, 0.2f, 1.0f);
-    const float3 Mid = float3(0.0f, 1.0f, 0.2f);
-    const float3 High = float3(1.0f, 0.1f, 0.0f);
-    return T < 0.5f ? lerp(Low, Mid, T * 2.0f) : lerp(Mid, High, T * 2.0f - 1.0f);
-}
-
 #endif

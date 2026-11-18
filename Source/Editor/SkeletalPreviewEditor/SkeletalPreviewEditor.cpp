@@ -56,16 +56,23 @@ void FSkeletalPreviewEditor::Tick(float DeltaTime)
 	// 뷰포트가 보이면 카메라 이동을 적용
 	if (bViewportVisible && !IsViewportInteractionBusy() && !PointerInput.bMouseDown)
 	{
+		FViewportCameraInput AdjustedCameraInput = CameraInput;
+		if (AdjustedCameraInput.bCaptured && AdjustedCameraInput.Wheel != 0.0f)
+		{
+			CameraSpeed = FMath::Clamp(CameraSpeed * powf(1.2f, AdjustedCameraInput.Wheel / 120.0f), 0.1f, 150.0f);
+			AdjustedCameraInput.Wheel = 0.0f;
+		}
 		FViewportCameraState Camera{
 			.Location = ViewportClient->GetViewLocation(),
 			.Rotation = ViewportClient->GetViewRotation(),
 			.OrthoWidth = ViewportClient->GetOrthoWidth(),
 			.ViewWidth = static_cast<float>(ViewportWidth),
-			.bPerspective = true
+			.bPerspective = ViewportClient->IsPerspective()
 		};
-		ApplyViewportCameraMovement(Camera, CameraInput, DeltaTime, CameraSpeed, 0.2f);
+		ApplyViewportCameraMovement(Camera, AdjustedCameraInput, DeltaTime, CameraSpeed, 0.2f);
 		ViewportClient->SetViewLocation(Camera.Location);
 		ViewportClient->SetViewRotation(Camera.Rotation);
+		ViewportClient->SetOrthoWidth(Camera.OrthoWidth);
 	}
 
 	TickBeforeWorld(DeltaTime);              // Animation 에디터: 재생 시간 진행 후 포즈 적용
@@ -87,6 +94,69 @@ void FSkeletalPreviewEditor::RefreshHeatmap()
 	if (MeshComponent)
 	{
 		MeshComponent->SetDebugWeightBone(bShowWeightHeatmap ? SelectedBoneIndex : -1);
+	}
+}
+
+void FSkeletalPreviewEditor::SetBoneVisualizerVisible(bool bVisible)
+{
+	bShowBoneVisualizer = bVisible;
+	if (!bVisible)
+	{
+		BoneDrawMode = EBoneDrawMode::None;
+	}
+	else if (BoneDrawMode == EBoneDrawMode::None)
+	{
+		BoneDrawMode = EBoneDrawMode::AllHierarchy;
+	}
+}
+
+void FSkeletalPreviewEditor::SetBoneDrawMode(EBoneDrawMode Mode)
+{
+	BoneDrawMode = Mode;
+	bShowBoneVisualizer = (Mode != EBoneDrawMode::None);
+}
+
+void FSkeletalPreviewEditor::SetMeshVisible(bool bVisible)
+{
+	bShowMesh = bVisible;
+	if (MeshComponent)
+	{
+		MeshComponent->SetVisibility(bShowMesh);
+	}
+}
+
+bool FSkeletalPreviewEditor::ShouldDisplayBone(int32 BoneIndex) const
+{
+	if (!Mesh || BoneIndex < 0 || BoneIndex >= Mesh->GetRefSkeleton().Num())
+	{
+		return false;
+	}
+
+	switch (BoneDrawMode)
+	{
+	case EBoneDrawMode::AllHierarchy:
+		return true;
+	case EBoneDrawMode::SelectedOnly:
+		return SelectedBoneIndex >= 0 && BoneIndex == SelectedBoneIndex;
+	case EBoneDrawMode::SelectedAndParents:
+	{
+		if (SelectedBoneIndex < 0)
+		{
+			return false;
+		}
+		const TArray<FBoneInfo>& Bones = Mesh->GetRefSkeleton();
+		for (int32 P = SelectedBoneIndex; P >= 0 && P < Bones.Num(); P = Bones[P].ParentIndex)
+		{
+			if (P == BoneIndex)
+			{
+				return true;
+			}
+		}
+		return false;
+	}
+	case EBoneDrawMode::None:
+	default:
+		return false;
 	}
 }
 
@@ -148,6 +218,7 @@ bool FSkeletalPreviewEditor::InitializePreview()
 	MeshComponent = Cast<USkeletalMeshComponent>(PreviewScene.AddComponent(USkeletalMeshComponent::StaticClass()));
 	if (!MeshComponent) return false;
 	MeshComponent->SetSkeletalMesh(Mesh);
+	MeshComponent->SetVisibility(bShowMesh);
 	MeshComponent->RefreshBoneTransformsNow();
 
 	const FBox& MeshBox = LODs[0].BindAABB;                       // 멤버였던 MeshBox
@@ -231,7 +302,7 @@ void FSkeletalPreviewEditor::UpdateBonePicking()
 	if (!CanProcessViewportInput() || // 공통 뷰포트 입력 조건을 만족하지 않으면 입력을 무시
 		!Mesh || // 스켈레탈 메시가 없으면 입력을 무시
 		!MeshComponent || // 프리뷰 메시 컴포넌트가 없으면 입력을 무시
-		!bShowBoneVisualizer || // 본 시각화가 꺼져 있으면 입력을 무시
+		!IsBoneVisualizerVisible() || // 본 시각화가 꺼져 있으면 입력을 무시
 		!PointerInput.bHovered || // 마우스가 뷰포트 위에 없으면 입력을 무시
 		!PointerInput.bMousePressed || // 좌클릭이 시작된 프레임이 아니면 입력을 무시
 		PointerInput.bCancel || // 취소 입력이 들어오면 입력을 무시
@@ -293,6 +364,10 @@ int32 FSkeletalPreviewEditor::PickBone(const FVector2& MousePosition) const
 	// Joint 후보 중 카메라에 가장 가까운 Joint를 선택합니다.
 	for (int32 Index = 0; Index < Bones.Num(); ++Index)
 	{
+		if (!ShouldDisplayBone(Index))
+		{
+			continue;
+		}
 		const FVector4& Clip = ClipPositions[Index];
 		if (Clip.W < 0.0001f || Clip.Z < 0.0f || Clip.Z > Clip.W)
 		{
@@ -313,6 +388,10 @@ int32 FSkeletalPreviewEditor::PickBone(const FVector2& MousePosition) const
 	{
 		const int32 ParentIndex = Bones[Index].ParentIndex;
 		if (ParentIndex < 0 || ParentIndex >= Bones.Num())
+		{
+			continue;
+		}
+		if (!ShouldDisplayBone(Index) || (BoneDrawMode != EBoneDrawMode::SelectedOnly && !ShouldDisplayBone(ParentIndex)))
 		{
 			continue;
 		}
@@ -343,7 +422,7 @@ int32 FSkeletalPreviewEditor::PickBone(const FVector2& MousePosition) const
 
 void FSkeletalPreviewEditor::OnRenderLine(FLineBatcher& LineBatcher)
 {
-	if (!bShowBoneVisualizer)
+	if (!IsBoneVisualizerVisible())
 	{
 		return;
 	}
@@ -373,6 +452,11 @@ void FSkeletalPreviewEditor::OnRenderLine(FLineBatcher& LineBatcher)
 	// Bone 시각화 그리기
 	for (int32 Index = 0; Index < Bones.Num(); ++Index)
 	{
+		if (!ShouldDisplayBone(Index))
+		{
+			continue;
+		}
+
 		const FVector4 Color = Index == SelectedBoneIndex
 			? FVector4(1.0f, 1.0f, 0.0f, 1.0f)
 			: BoneVisualizerColor;
@@ -383,7 +467,8 @@ void FSkeletalPreviewEditor::OnRenderLine(FLineBatcher& LineBatcher)
 		const int32 ParentIndex = Bones[Index].ParentIndex;
 
 		// 부모가 있다면, 부모에서 자식으로 이어지는 Bone을 그리기
-		if (ParentIndex >= 0 && ParentIndex < Bones.Num())
+		if (ParentIndex >= 0 && ParentIndex < Bones.Num() &&
+			(BoneDrawMode == EBoneDrawMode::SelectedOnly || ShouldDisplayBone(ParentIndex)))
 		{
 			FVector4 BoneColor = BoneVisualizerColor;
 			if (Index == SelectedBoneIndex)

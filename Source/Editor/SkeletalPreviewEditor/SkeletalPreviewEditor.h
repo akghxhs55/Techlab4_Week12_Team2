@@ -7,6 +7,14 @@ class USkeletalMesh;
 class USkeletalMeshComponent;
 class FLineBatcher;
 
+enum class EBoneDrawMode : uint8
+{
+	AllHierarchy,
+	SelectedOnly,
+	SelectedAndParents,
+	None
+};
+
 struct FEditorBoneItem
 {
 	int32 BoneIndex;
@@ -40,10 +48,13 @@ public:
 	void OnRenderLine(FLineBatcher& LineBatcher) override;
 
 	void FocusMesh();
-	void SetCameraSpeed(float Speed) { CameraSpeed = FMath::Clamp(Speed, 1.0f, 150.0f); }
+	void SetCameraSpeed(float Speed) { CameraSpeed = FMath::Clamp(Speed, 0.1f, 150.0f); }
 	void SelectBone(int32 BoneIndex);        // 선택만 바꾸고 OnBoneSelected() 호출
-	void SetBoneVisualizerVisible(bool bVisible) { bShowBoneVisualizer = bVisible; }
+	void SetBoneVisualizerVisible(bool bVisible);
+	void SetBoneDrawMode(EBoneDrawMode Mode);
 	void SetBoneVisualizerColor(const FVector4& Color) { BoneVisualizerColor = Color; }
+	void SetMeshVisible(bool bVisible);
+	void SetGridVisible(bool bVisible) { bShowGrid = bVisible; }
 	void SetViewportState(uint32 Width, uint32 Height, const FViewportCameraInput& Input, const FViewportPointerInput& InPointer = {});
 
 	USkeletalMesh* GetMesh() const { return Mesh; }
@@ -52,8 +63,11 @@ public:
 	const TArray<int32>& GetRootBoneIndices() const { return RootBoneIndices; }
 	const TArray<FEditorBoneItem>& GetBoneItems() const { return BoneItems; }
 	int32 GetSelectedBoneIndex() const { return SelectedBoneIndex; }
-	bool IsBoneVisualizerVisible() const { return bShowBoneVisualizer; }
+	bool IsBoneVisualizerVisible() const { return bShowBoneVisualizer && BoneDrawMode != EBoneDrawMode::None; }
+	EBoneDrawMode GetBoneDrawMode() const { return BoneDrawMode; }
 	const FVector4& GetBoneVisualizerColor() const { return BoneVisualizerColor; }
+	bool IsMeshVisible() const { return bShowMesh; }
+	bool IsGridVisible() const override { return bShowGrid; }
 
 	void SetWeightHeatmap(bool bEnable);
 	bool IsWeightHeatmapEnabled() const { return bShowWeightHeatmap; }
@@ -93,7 +107,11 @@ protected:
 	float BoneSphereSize = 0.0f;
 	FVector4 BoneVisualizerColor = FVector4(0.0f, 0.0f, 0.0f, 1.0f);
 	bool bShowBoneVisualizer = true;
+	EBoneDrawMode BoneDrawMode = EBoneDrawMode::AllHierarchy;
+	bool bShowMesh = true;
+	bool bShowGrid = true;
 
 private:
 	void BuildBoneItems();
+	bool ShouldDisplayBone(int32 BoneIndex) const;
 };

@@ -12,7 +12,7 @@ void FSkeletalMeshSettingsPanel::DrawContent()
 	float CameraSpeed = Editor.GetCameraSpeed();
 	ImGui::TextUnformatted("Camera Speed");
 	ImGui::SetNextItemWidth(-FLT_MIN);
-	if (ImGui::SliderFloat("##CameraSpeed", &CameraSpeed, 1.0f, 150.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp))
+	if (ImGui::SliderFloat("##CameraSpeed", &CameraSpeed, 0.1f, 150.0f, "%.1f", ImGuiSliderFlags_AlwaysClamp))
 	{
 		Editor.SetCameraSpeed(CameraSpeed);
 	}

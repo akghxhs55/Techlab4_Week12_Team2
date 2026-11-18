@@ -1,5 +1,6 @@
 #include "EnginePCH.h"
 #include "Editor/SkeletalMeshEditor/SkeletalMeshEditor.h"
+#include "Editor/AssetEditor/EditorManager.h"
 #include "SkeletalMeshEditorTab.h"
 #include "Components/SkeletalMeshComponent.h"
 #include "Render/SkeletalMesh.h"
@@ -53,9 +54,18 @@ void FSkeletalMeshEditor::SetGizmoSpace(EGizmoSpace Space)
 	SyncBoneGizmo();
 }
 
+void FSkeletalMeshEditor::OpenAnimationAsset(const FString& InAssetPath)
+{
+	if (!InAssetPath.empty())
+	{
+		EditorManager.OpenEditor(InAssetPath);
+	}
+}
+
 void FSkeletalMeshEditor::SyncBoneGizmo()
 {
-	if (!MeshComponent || !BoneGizmoTarget || SelectedBoneIndex < 0 || SelectedBoneIndex >= BoneItems.Num())
+	if (!MeshComponent || !BoneGizmoTarget || SelectedBoneIndex < 0 || SelectedBoneIndex >= BoneItems.Num() ||
+		BoneDrawMode == EBoneDrawMode::None)
 	{
 		BoneGizmo.SetTarget(nullptr);
 		return;

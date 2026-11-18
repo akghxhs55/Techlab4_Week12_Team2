@@ -140,6 +140,12 @@ void FRenderer::InitScenePasses()
 		KRS_LOG(Warning, "Skybox panorama not loaded");
 		Skybox.reset();
 	}
+	PreviewSkybox = MakeUnique<FSkyboxRenderer>();
+	if (!PreviewSkybox->Init(FPaths::EngineFileUtf8("EngineResources/SkySphere/PreViewer.hdr")))
+	{
+		KRS_LOG(Warning, "Preview skybox panorama not loaded");
+		PreviewSkybox.reset();
+	}
 	HeightFog = MakeUnique<FHeightFogRenderer>();
 	HeightFog->Init(this);
 	FXAA = MakeUnique<FFXAARenderer>();

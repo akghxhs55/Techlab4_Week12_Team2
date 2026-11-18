@@ -69,10 +69,12 @@ struct VS_OUT
 #if LIGHTING_MODEL_GOURAUD
     float3 VertexDiffuse : TEXCOORD1;
     float3 VertexSpecular : TEXCOORD2;
+    float3 WorldPosition : TEXCOORD3;
 #elif !VIEW_MODE_WORLD_NORMAL
     float3 WorldPosition : TEXCOORD1;
     float ViewDepth : TEXCOORD2;
 #endif
+    float BoneWeight : TEXCOORD6;
 };
 
 struct FUberOutput
@@ -315,6 +317,57 @@ FLightResult CalculateTiledLighting(float3 PixelPosition, float3 P, float ViewDe
 #endif
 
 
+// Week11 Unreal 스타일 본 가중치 히트맵 그라디언트 (0: 마젠타 -> 파랑 -> 하늘 -> 초록 -> 노랑 -> 빨강)
+float3 CalculateBoneWeightHeatmap(float Weight)
+{
+    const float t = saturate(Weight);
+    const float3 MagentaColor = float3(160.0f / 255.0f, 32.0f / 255.0f, 240.0f / 255.0f);
+    const float3 BlueColor    = float3(0.0f, 0.05f, 0.95f);
+    const float3 CyanColor    = float3(0.0f, 0.95f, 0.95f);
+    const float3 GreenColor   = float3(0.1f, 0.95f, 0.1f);
+    const float3 YellowColor  = float3(1.0f, 0.90f, 0.0f);
+    const float3 RedColor     = float3(1.0f, 0.08f, 0.05f);
+
+    float3 StartColor;
+    float3 EndColor;
+    float SegmentU;
+    if (t < 0.15f)
+    {
+        StartColor = MagentaColor;
+        EndColor = BlueColor;
+        SegmentU = t / 0.15f;
+    }
+    else if (t < 0.35f)
+    {
+        StartColor = BlueColor;
+        EndColor = CyanColor;
+        SegmentU = (t - 0.15f) / 0.20f;
+    }
+    else if (t < 0.55f)
+    {
+        StartColor = CyanColor;
+        EndColor = GreenColor;
+        SegmentU = (t - 0.35f) / 0.20f;
+    }
+    else if (t < 0.78f)
+    {
+        StartColor = GreenColor;
+        EndColor = YellowColor;
+        SegmentU = (t - 0.55f) / 0.23f;
+    }
+    else
+    {
+        StartColor = YellowColor;
+        EndColor = RedColor;
+        SegmentU = (t - 0.78f) / 0.22f;
+    }
+
+    // 구간 경계에서 마흐 밴드가 생기지 않도록 Smoothstep으로 부드럽게 잇는다.
+    SegmentU = saturate(SegmentU);
+    SegmentU = SegmentU * SegmentU * (3.0f - 2.0f * SegmentU);
+    return lerp(StartColor, EndColor, SegmentU);
+}
+
 VS_OUT Uber_VS(FVertexFactoryInput Input)
 {
     VS_OUT Output;
@@ -323,14 +376,16 @@ VS_OUT Uber_VS(FVertexFactoryInput Input)
     float4 ViewPosition = mul(WorldPosition, View);
     Output.Position = mul(ViewPosition, Projection);
     Output.Color = VF.Color;
-#if VF_GPU_SKIN
-    // 웨이트 히트맵은 스킨 정점에만 있는 디버그 정보라 VF 밖에서 직접 읽는다
+    Output.BoneWeight = 0.0f;
     if (ShadowFlags.y > 0.5f)
     {
+#if VF_GPU_SKIN
         const uint Bone = (uint)(ShadowFlags.y - 0.5f);   // 본 번호 + 1로 실은 값을 되돌린다
-        Output.Color = float4(GpuSkinWeightColor(GpuSkinWeightForBone(Input.BlendIndices, Input.BlendWeights, Bone)), 1.0f);
-    }
+        Output.BoneWeight = GpuSkinWeightForBone(Input.BlendIndices, Input.BlendWeights, Bone);
+#else
+        Output.BoneWeight = Input.Color.r;
 #endif
+    }
     Output.UV = VF.UV * UVTransform.zw + UVTransform.xy;
 
     float3 N = VF.WorldNormal;
@@ -340,6 +395,7 @@ VS_OUT Uber_VS(FVertexFactoryInput Input)
     FLightResult Lit = CalculateLighting(float3(0.0f, 0.0f, 0.0f), WorldPosition.xyz, ViewPosition.x, N, true);
     Output.VertexDiffuse = Lit.Diffuse;
     Output.VertexSpecular = Lit.Specular;
+    Output.WorldPosition = WorldPosition.xyz;
 #elif !VIEW_MODE_WORLD_NORMAL
     Output.WorldPosition = WorldPosition.xyz;
     Output.ViewDepth = ViewPosition.x;
@@ -356,7 +412,22 @@ FUberOutput Uber_PS(VS_OUT Input)
 #else
     if (ShadowFlags.y > 0.5f)
     {
-        Output.LitColor = float4(Input.Color.rgb, 1.0f);
+        const float3 HeatColor = CalculateBoneWeightHeatmap(Input.BoneWeight);
+        if (ShadowFlags.z > 0.5f)
+        {
+            const float3 WireColor = (ShadowFlags.z > 1.5f)
+                ? float3(1.0f, 1.0f, 1.0f)
+                : lerp(HeatColor, float3(1.0f, 1.0f, 1.0f), 0.72f);
+            Output.LitColor = float4(pow(max(WireColor, 0.0f), 2.2f), 0.85f);
+            Output.NormalRoughness = float4(ShadingNormal, 0.8f); // SV_Target1도 반드시 채운다
+            return Output;
+        }
+
+        const float3 HeatmapL = normalize(CameraPosition.xyz - Input.WorldPosition);
+        const float HalfLambert = dot(ShadingNormal, HeatmapL) * 0.5f + 0.5f;
+        const float LightingFactor = HalfLambert * 0.65f + 0.35f;
+        const float3 LinearHeatColor = pow(max(HeatColor, 0.0f), 2.2f) * LightingFactor;
+        Output.LitColor = float4(LinearHeatColor, 1.0f);
         Output.NormalRoughness = float4(ShadingNormal, 0.8f); // SV_Target1도 반드시 채운다
         return Output;
     }

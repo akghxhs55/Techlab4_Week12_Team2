@@ -3,6 +3,7 @@
 #include "Core/EngineString.h"
 #include "Core/Types.h"
 #include "Editor/AssetEditor/FPreviewScene.h"
+#include "Editor/Rendering/GridRenderer.h"
 #include "Editor/Viewports/EditorViewportClient.h"
 
 class FGizmo;
@@ -51,6 +52,8 @@ public:
 	FPreviewScene& GetPreviewScene() { return PreviewScene; }
 	FEditorViewportClient* GetViewportClient() const { return ViewportClient.get(); }
 	virtual const FGizmo* GetPreviewGizmo() const { return nullptr; }
+	virtual bool IsGridVisible() const { return false; }
+	virtual bool UsesPreviewSkybox() const { return false; }
 
 	bool IsCloseRequested() const { return bCloseRequested; }
 
@@ -96,10 +99,11 @@ public:
 	FAssetEditorViewportClient(FAssetEditor& InAssetEditor, FPreviewScene& InPreviewScene);
 
 	// 씬을 그리는 Draw는 기반 클래스의 것을 그대로 쓴다.
-	using FEditorViewportClient::Draw;
+	void Draw(FRenderer* Renderer) override;
 	void Draw(const FSceneView* View, FScenePassCallbacks& Callbacks) override;
 
 private:
 	// 이 클라이언트를 만든 에디터. 클라이언트보다 오래 산다.
 	FAssetEditor& AssetEditor;
+	FGridRenderer GridRenderer;
 };

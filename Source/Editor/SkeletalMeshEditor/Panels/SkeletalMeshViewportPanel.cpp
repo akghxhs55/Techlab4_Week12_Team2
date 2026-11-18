@@ -10,6 +10,8 @@ FSkeletalMeshViewportPanel::FSkeletalMeshViewportPanel(FSkeletalMeshEditor& InEd
 
 void FSkeletalMeshViewportPanel::DrawContent()
 {
+	DrawPreviewViewToolbar(Editor, ToolbarState);
+
 	// 이동/회전/크기 세 가지 (EGizmoMode 순서)
 	constexpr int32 GizmoModeCount = 3;
 

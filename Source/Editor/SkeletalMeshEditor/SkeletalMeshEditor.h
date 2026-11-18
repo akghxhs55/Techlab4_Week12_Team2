@@ -16,6 +16,7 @@ public:
 	}
 
 	const char* GetEditorTypeName() const override { return "SkeletalMesh"; }
+	bool UsesPreviewSkybox() const override { return true; }
 	const FGizmo* GetPreviewGizmo() const override { return BoneGizmo.GetTarget() ? &BoneGizmo : nullptr; }
 
 	// 선택한 본의 프리뷰 포즈를 부모 기준 로컬 변환으로 조회·수정합니다.
@@ -35,6 +36,9 @@ public:
 	EGizmoMode  GetGizmoMode() const { return BoneGizmo.GetMode(); }
 	EGizmoSpace GetGizmoSpace() const { return BoneGizmo.GetSpace(); }
 	bool IsGizmoDragging() const { return BoneGizmo.IsUsing(); }
+
+	// 에셋 브라우저에서 선택한 애니메이션 시퀀스 에디터를 연다.
+	void OpenAnimationAsset(const FString& InAssetPath);
 
 protected:
 	// 이 에디터에 연결된 탭을 생성합니다.

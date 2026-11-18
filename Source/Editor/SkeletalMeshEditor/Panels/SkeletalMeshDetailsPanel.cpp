@@ -17,6 +17,11 @@ void FSkeletalMeshDetailsPanel::DrawContent()
 	{
 		Editor.ResetBone(BoneIndex);
 	}
+	ImGui::SameLine();
+	if (ImGui::Button("Reset All Transform"))
+	{
+		Editor.ResetPose();
+	}
 
 	ImGui::Separator();
 

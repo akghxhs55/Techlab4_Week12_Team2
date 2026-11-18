@@ -13,15 +13,18 @@ public:
 
 	// 맨 위 검색창과 본 계층 트리를 그린다. 애니메이션 뷰어의 Skeleton Tree도 같은 함수를 쓴다.
 	// 검색어는 패널마다 따로 두므로 호출하는 쪽이 버퍼를 넘긴다.
-	static void DrawTree(FSkeletalPreviewEditor& InEditor, char* InSearchBuffer, size_t InSearchBufferSize);
+	static void DrawTree(FSkeletalPreviewEditor& InEditor, char* InSearchBuffer, size_t InSearchBufferSize,
+		int32* InOutLastSelectedBone = nullptr);
 
 protected:
 	void DrawContent() override;
 
 private:
-	static void DrawBoneHierarchy(FSkeletalPreviewEditor& InEditor, int32 BoneIndex, const char* Filter);
+	static void DrawBoneHierarchy(FSkeletalPreviewEditor& InEditor, int32 BoneIndex, const char* Filter,
+		const TArray<uint8>& AncestorMask, int32* InOutLastSelectedBone, bool& bScrollToSelection);
 	// 이 본이나 자손 중 하나라도 검색어를 이름에 포함하면 true
 	static bool SubtreeMatches(FSkeletalPreviewEditor& InEditor, int32 BoneIndex, const char* Filter);
 
 	char SearchBuffer[128] = {};
+	int32 LastSelectedBone = -1;
 };

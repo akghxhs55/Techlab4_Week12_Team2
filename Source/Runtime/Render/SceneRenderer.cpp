@@ -324,7 +324,10 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 	PrepareDrawData(Renderer, RenderData);
 
 	// 스카이 배경을 물체보다 먼저 HDR 타깃에 깐다. 이 패스가 LightingHDR을 Clear하고, 포워드 패스는 Load로 그 위에 그린다.
-	FSkyboxRenderer* Skybox = Renderer->GetSkybox();
+	FSkyboxRenderer* PreviewSkybox = Renderer->GetPreviewSkybox();
+	FSkyboxRenderer* Skybox = (Options.bUsePreviewSkybox && PreviewSkybox && PreviewSkybox->IsValid())
+		? PreviewSkybox
+		: Renderer->GetSkybox();
 	// 직교 뷰에서는 스카이를 그리지 않는다.
 	const bool bDrawSkybox = Skybox && Skybox->IsValid() && View.bIsPerspective;
 	if (bDrawSkybox)
@@ -479,6 +482,44 @@ bool FSceneRenderer::AddCorePasses(FRenderGraphBuilder& Graph, FRenderer* Render
 			}
 			SCOPED_GPU_STAT(GPUStats::STAT_GPU_ForwardOpaque);
 			Renderer->DrawMeshes(ForwardBatches);
+
+			// 언리얼 본 가중치 히트맵: 활성화된 스켈레탈 메시 위에 와이어프레임 오버레이를 한 번 더 그린다.
+			if (!View.bIsWireframe)
+			{
+				TArray<FMeshDrawBatch> HeatmapWireBatches;
+				for (const FMeshDrawBatch& SrcBatch : ForwardBatches)
+				{
+					FMeshDrawBatch WireBatch = SrcBatch;
+					WireBatch.Items.Reset();
+					for (const FMeshDrawBatch::FItem& SrcItem : SrcBatch.Items)
+					{
+						if (SrcItem.ObjectDataSize < sizeof(FForwardObjectConstants))
+						{
+							continue;
+						}
+						const auto* SrcConstants = reinterpret_cast<const FForwardObjectConstants*>(SrcItem.ObjectData.data());
+						if (SrcConstants->ShadowFlags.Y > 0.5f)
+						{
+							FMeshDrawBatch::FItem WireItem = SrcItem;
+							auto* WireConstants = reinterpret_cast<FForwardObjectConstants*>(WireItem.ObjectData.data());
+							WireConstants->ShadowFlags.Z = 1.0f;
+							WireBatch.Items.Add(std::move(WireItem));
+						}
+					}
+					if (!WireBatch.Items.IsEmpty())
+					{
+						WireBatch.bForceWireframe = true;
+						WireBatch.Pipeline.BlendState = EBlendState::AlphaBlend;
+						WireBatch.Pipeline.DepthStencilState = EDepthStencilState::PrepassReadOnly;
+						HeatmapWireBatches.Add(std::move(WireBatch));
+					}
+				}
+				if (!HeatmapWireBatches.IsEmpty())
+				{
+					Renderer->DrawMeshes(HeatmapWireBatches);
+				}
+			}
+
 			UnbindForwardLighting(Renderer);
 		})) return false;
 

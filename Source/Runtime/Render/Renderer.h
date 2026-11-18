@@ -43,6 +43,7 @@ public:
 	FCameraOverlayRenderer* GetCameraOverlay() const { return CameraOverlay.get(); }
 	FTextRenderer* GetSceneText() const { return SceneText.get(); }
 	FSkyboxRenderer* GetSkybox() const { return Skybox.get(); }
+	FSkyboxRenderer* GetPreviewSkybox() const { return PreviewSkybox.get(); }
 
 	FConstantBuffer* GetToneMapConstants() const { return ToneMapConstants.get(); }
 	FConstantBuffer* GetDecalConstants() const { return DecalConstants.get(); }
@@ -65,4 +66,5 @@ private:
 	TUniquePtr<FCameraOverlayRenderer> CameraOverlay;
 	TUniquePtr<FTextRenderer> SceneText;
 	TUniquePtr<FSkyboxRenderer> Skybox;
+	TUniquePtr<FSkyboxRenderer> PreviewSkybox;
 };

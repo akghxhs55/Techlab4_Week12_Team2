@@ -21,18 +21,6 @@ namespace
 		const FVector Result = C0 * N.X + FVector::Cross(R2, R0) * N.Y + FVector::Cross(R0, R1) * N.Z;
 		return (R0.Dot(C0) < 0.0f ? Result * -1.0f : Result).Normalized();
 	}
-
-	FVector4 WeightToColor(float Weight)
-	{
-		if (Weight <= 0.0f)
-			return FVector4(0.08f, 0.08f, 0.10f, 1.0f);
-		const float T = std::min(Weight, 1.0f);
-		const FVector Low(0.0f, 0.2f, 1.0f);
-		const FVector Mid(0.0f, 1.0f, 0.2f);
-		const FVector High(1.0f, 0.1f, 0.0f);
-		const FVector C = T < 0.5f ? Low + (Mid - Low) * (T * 2.0f) : Mid + (High - Mid) * (T * 2.0f - 1.0f);
-		return FVector4(C.X, C.Y, C.Z, 1.0f);
-	}
 }
 
 FSkeletalMeshObject::FSkeletalMeshObject(USkeletalMesh* InMesh)
@@ -83,7 +71,9 @@ void FSkeletalMeshObject::SkinVerticesCPU(TArray<FVertex>& OutVertices, FBox& Ou
 						if (W.BoneIndex[k] == DebugWeightBone)
 							Weight += W.Weight[k];
 					}
-					Out.Color = WeightToColor(Weight);
+					// 픽셀 셰이더에서 언리얼 히트맵 그라디언트로 보간되도록 스칼라 가중치를 정점에 실어 전달한다.
+					const float ClampedWeight = std::clamp(Weight, 0.0f, 1.0f);
+					Out.Color = FVector4(ClampedWeight, ClampedWeight, ClampedWeight, 1.0f);
 				}
 
 				for (int Axis = 0; Axis < 3; ++Axis)

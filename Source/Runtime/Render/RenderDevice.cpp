@@ -279,7 +279,11 @@ void FRenderDevice::CreateStates()
 
 		Desc.FillMode = D3D11_FILL_WIREFRAME;
 		Desc.CullMode = D3D11_CULL_NONE;
+		Desc.DepthBias = -50;
+		Desc.SlopeScaledDepthBias = -1.0f;
 		Device->CreateRasterizerState(&Desc, RasterizerStates[(uint8)ERasterizerState::Wireframe].GetAddressOf());
+		Desc.DepthBias = 0;
+		Desc.SlopeScaledDepthBias = 0.0f;
 
 		D3D11_RASTERIZER_DESC LightShadowDesc = {};
 		LightShadowDesc.FillMode = D3D11_FILL_SOLID;

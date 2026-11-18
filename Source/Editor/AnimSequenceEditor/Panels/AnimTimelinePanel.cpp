@@ -1,9 +1,12 @@
 #include "EnginePCH.h"
 #include "Editor/EditorUI/EditorStyle.h"
+#include "Editor/Viewports/ViewportToolbarWidgets.h"
 #include "AnimTimelinePanel.h"
 #include "Editor/AnimSequenceEditor/AnimSequenceEditor.h"
 #include "Animation/AnimNotify.h"
 #include "Animation/AnimNotifyState.h"
+#include "Asset/AssetManager.h"
+#include "Render/Texture2D.h"
 #include "UObject/Class.h"
 #include "UObject/Property.h"
 #include "UObject/UObjectHash.h"
@@ -131,15 +134,214 @@ namespace
 
 void FAnimTimelinePanel::DrawContent()
 {
-    if (!Editor.GetSequence())
+    UAnimSequence* Sequence = Editor.GetSequence();
+    if (!Sequence)
     {
         ImGui::TextDisabled("No sequence");
         return;
     }
 
-    DrawTransport();
-    ImGui::Separator();
-    DrawTrack();
+    const ImVec2 PanelAvail = ImGui::GetContentRegionAvail();
+    if (PanelAvail.x < 100.0f || PanelAvail.y < 60.0f)
+    {
+        return;
+    }
+
+    const float TransportBtnSide = std::round(ImGui::GetFrameHeight() * 1.5f);
+    const float MinLeftWidth = EditorStyle::Scale(150.0f);
+    const float MaxLeftWidth = std::max(MinLeftWidth, PanelAvail.x - EditorStyle::Scale(200.0f));
+    const float LeftWidth = std::clamp(EditorStyle::Scale(LeftPaneWidth), MinLeftWidth, MaxLeftWidth);
+    const float SplitterWidth = EditorStyle::Scale(6.0f);
+    const float RightWidth = std::max(60.0f, PanelAvail.x - LeftWidth - SplitterWidth);
+
+    const float EffectiveRulerHeight = std::max(EditorStyle::Scale(RulerHeight), ImGui::GetFrameHeight() + EditorStyle::Scale(2.0f));
+    const float ScaledRowHeight = std::max(EditorStyle::Scale(NotifyRowHeight), ImGui::GetTextLineHeight() + EditorStyle::Scale(8.0f));
+    const float BottomBarHeight = TransportBtnSide + EditorStyle::Scale(8.0f);
+    const float BodyHeight = std::max(EffectiveRulerHeight + ScaledRowHeight, PanelAvail.y - BottomBarHeight - EditorStyle::Scale(4.0f));
+
+    // 필터에 맞는 Notify 트랙 목록 구성
+    TArray<int32> VisibleTracks;
+    const int32 NumTracks = Sequence->GetNumNotifyTracks();
+    for (int32 Track = 0; Track < NumTracks; ++Track)
+    {
+        if (TrackFilterBuffer[0] == '\0')
+        {
+            VisibleTracks.Add(Track);
+            continue;
+        }
+        if (EditorStyle::ContainsIgnoreCase(Sequence->GetNotifyTrackName(Track).c_str(), TrackFilterBuffer))
+        {
+            VisibleTracks.Add(Track);
+            continue;
+        }
+        for (const FAnimNotifyEvent& Event : Sequence->GetNotifies())
+        {
+            if (Event.TrackIndex == Track &&
+                EditorStyle::ContainsIgnoreCase(NotifyLabel(Event).c_str(), TrackFilterBuffer))
+            {
+                VisibleTracks.Add(Track);
+                break;
+            }
+        }
+    }
+
+    const ImVec2 BodyOrigin = ImGui::GetCursorScreenPos();
+
+    // 1. 상단 고정 헤더 줄: [필터 검색 + 프레임] | [프레임 눈금자 + 플레이헤드]
+    DrawHeaderRow(BodyOrigin, LeftWidth, RightWidth, EffectiveRulerHeight);
+
+    bool bSplitterHovered = false;
+    bool bSplitterDragging = false;
+
+    // 헤더 영역 세로 경계 스플리터
+    ImGui::SetCursorScreenPos(ImVec2(BodyOrigin.x + LeftWidth, BodyOrigin.y));
+    ImGui::InvisibleButton("##HeaderPaneSplitter", ImVec2(SplitterWidth, EffectiveRulerHeight));
+    if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+    {
+        bSplitterHovered = true;
+    }
+    if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+    {
+        bSplitterDragging = true;
+    }
+
+    // 2. 중단 스크롤 영역: [노티파이/트랙 목록] | [타임라인 트랙 영역]
+    const float TracksScrollHeight = std::max(ScaledRowHeight, BodyHeight - EffectiveRulerHeight);
+    ImGui::SetCursorScreenPos(ImVec2(BodyOrigin.x, BodyOrigin.y + EffectiveRulerHeight));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0.0f, 0.0f));
+    if (ImGui::BeginChild("##TimelineTracksScroll", ImVec2(PanelAvail.x, TracksScrollHeight), false, ImGuiWindowFlags_HorizontalScrollbar))
+    {
+        ImDrawList* Draw = ImGui::GetWindowDrawList();
+        const ImVec2 ScrollOrigin = ImGui::GetCursorScreenPos();
+        const float Length = Editor.GetPlayLength();
+        const float Rate = Editor.GetFrameRate();
+        const float PixelsPerSecond = Length > 0.0f ? RightWidth / Length : 1.0f;
+        const float RightOriginX = ScrollOrigin.x + LeftWidth + SplitterWidth;
+
+        // 2-A. "Notifies" 카테고리 헤더 행 (접기/펼치기 + 트랙 추가 버튼)
+        {
+            const ImVec2 CatLeftMin = ScrollOrigin;
+            const ImVec2 CatLeftMax(CatLeftMin.x + LeftWidth, CatLeftMin.y + ScaledRowHeight);
+            Draw->AddRectFilled(CatLeftMin, CatLeftMax, EditorColor::BgHeader);
+
+            ImGui::SetCursorScreenPos(CatLeftMin);
+            const float AddBtnW = EditorStyle::Scale(20.0f);
+            ImGui::InvisibleButton("##NotifiesCategoryBtn", ImVec2(std::max(1.0f, LeftWidth - AddBtnW - EditorStyle::Scale(4.0f)), ScaledRowHeight));
+            if (ImGui::IsItemHovered())
+            {
+                Draw->AddRectFilled(CatLeftMin, ImVec2(CatLeftMax.x - AddBtnW - EditorStyle::Scale(4.0f), CatLeftMax.y), EditorColor::White(16));
+            }
+            if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+            {
+                bNotifiesExpanded = !bNotifiesExpanded;
+            }
+
+            // 삼각형 화살표 + "Notifies" 텍스트
+            const float ArrowSize = EditorStyle::Scale(8.0f);
+            const float CenterY = (CatLeftMin.y + CatLeftMax.y) * 0.5f;
+            const ImVec2 ArrowCenter(CatLeftMin.x + EditorStyle::Scale(10.0f), CenterY);
+            if (bNotifiesExpanded)
+            {
+                Draw->AddTriangleFilled(
+                    ImVec2(ArrowCenter.x - ArrowSize * 0.45f, ArrowCenter.y - ArrowSize * 0.25f),
+                    ImVec2(ArrowCenter.x + ArrowSize * 0.45f, ArrowCenter.y - ArrowSize * 0.25f),
+                    ImVec2(ArrowCenter.x, ArrowCenter.y + ArrowSize * 0.35f),
+                    EditorColor::TextSecondary);
+            }
+            else
+            {
+                Draw->AddTriangleFilled(
+                    ImVec2(ArrowCenter.x - ArrowSize * 0.25f, ArrowCenter.y - ArrowSize * 0.45f),
+                    ImVec2(ArrowCenter.x + ArrowSize * 0.35f, ArrowCenter.y),
+                    ImVec2(ArrowCenter.x - ArrowSize * 0.25f, ArrowCenter.y + ArrowSize * 0.45f),
+                    EditorColor::TextSecondary);
+            }
+            Draw->AddText(ImVec2(CatLeftMin.x + EditorStyle::Scale(22.0f), CenterY - ImGui::GetTextLineHeight() * 0.5f),
+                EditorColor::TextPrimary, "Notifies");
+
+            // 오른쪽 끝 "+ Track" 추가 버튼
+            ImGui::SetCursorScreenPos(ImVec2(CatLeftMax.x - AddBtnW - EditorStyle::Scale(2.0f),
+                CatLeftMin.y + (ScaledRowHeight - AddBtnW) * 0.5f));
+            if (ImGui::Button("+##AddNotifyTrackBtn", ImVec2(AddBtnW, AddBtnW)))
+            {
+                Sequence->AddNotifyTrack();
+                Editor.MarkNotifiesDirty();
+                bNotifiesExpanded = true;
+            }
+            ImGui::SetItemTooltip("Add Notify Track");
+
+            // 오른쪽 타임라인 쪽 카테고리 줄 배경 + 프레임 격자
+            const ImVec2 CatRightMin(RightOriginX, ScrollOrigin.y);
+            const ImVec2 CatRightMax(RightOriginX + RightWidth, ScrollOrigin.y + ScaledRowHeight);
+            Draw->AddRectFilled(CatRightMin, CatRightMax, EditorColor::BgRaised);
+            Draw->AddLine(ImVec2(CatLeftMin.x, CatLeftMax.y - 1.0f), ImVec2(CatRightMax.x, CatRightMax.y - 1.0f), EditorColor::Border);
+
+            const float PixelsPerFrame = Rate > 0.0f ? PixelsPerSecond / Rate : 0.0f;
+            if (PixelsPerFrame >= 6.0f)
+            {
+                const int32 NumFrames = static_cast<int32>(std::floor(Length * Rate + 0.0001f));
+                for (int32 Frame = 0; Frame <= NumFrames; ++Frame)
+                {
+                    const float X = RightOriginX + Frame * PixelsPerFrame;
+                    Draw->AddLine(ImVec2(X, CatRightMin.y), ImVec2(X, CatRightMax.y), EditorColor::White(14));
+                }
+            }
+        }
+
+        // 2-B. 펼쳐진 경우 Notify 트랙 헤더(왼쪽) & Notify 트랙(오른쪽)
+        float TotalTrackHeight = ScaledRowHeight;
+        if (bNotifiesExpanded)
+        {
+            const ImVec2 TracksLeftOrigin(ScrollOrigin.x, ScrollOrigin.y + ScaledRowHeight);
+            const ImVec2 TracksRightOrigin(RightOriginX, ScrollOrigin.y + ScaledRowHeight);
+            const float NotifyHeight = DrawNotifyTracks(TracksRightOrigin, RightWidth, PixelsPerSecond, ScaledRowHeight, VisibleTracks);
+            DrawTrackHeaders(TracksLeftOrigin, LeftWidth, ScaledRowHeight, VisibleTracks);
+            TotalTrackHeight += NotifyHeight;
+        }
+
+        // 플레이헤드 수직선 (스크롤 영역 전체 관통)
+        const float PlayheadX = RightOriginX + Editor.GetPlaybackTime() * PixelsPerSecond;
+        const float LineBottom = std::max(ScrollOrigin.y + TotalTrackHeight, ScrollOrigin.y + TracksScrollHeight);
+        Draw->AddLine(ImVec2(PlayheadX, ScrollOrigin.y), ImVec2(PlayheadX, LineBottom), EditorColor::AccentBright, 2.0f);
+
+        // 세로 분할선 및 트랙 영역 스플리터
+        const float SplitLineX = ScrollOrigin.x + LeftWidth + SplitterWidth * 0.5f;
+        ImGui::SetCursorScreenPos(ImVec2(ScrollOrigin.x + LeftWidth, ScrollOrigin.y));
+        ImGui::InvisibleButton("##TracksPaneSplitter", ImVec2(SplitterWidth, std::max(1.0f, LineBottom - ScrollOrigin.y)));
+        if (ImGui::IsItemHovered() || ImGui::IsItemActive())
+        {
+            bSplitterHovered = true;
+        }
+        if (ImGui::IsItemActive() && ImGui::IsMouseDragging(ImGuiMouseButton_Left))
+        {
+            bSplitterDragging = true;
+        }
+        const ImU32 SplitColor = bTimelineSplitterActive ? EditorColor::AccentBright : EditorColor::Border;
+        const float SplitThickness = bTimelineSplitterActive ? 2.0f : 1.0f;
+        Draw->AddLine(ImVec2(SplitLineX, ScrollOrigin.y), ImVec2(SplitLineX, LineBottom), SplitColor, SplitThickness);
+
+        ImGui::SetCursorScreenPos(ImVec2(ScrollOrigin.x, ScrollOrigin.y + TotalTrackHeight));
+        ImGui::Dummy(ImVec2(0.0f, 0.0f));
+    }
+    ImGui::EndChild();
+    ImGui::PopStyleVar();
+
+    bTimelineSplitterActive = bSplitterHovered || bSplitterDragging;
+    if (bTimelineSplitterActive)
+    {
+        ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+    }
+    if (bSplitterDragging)
+    {
+        const float Scale = std::max(EditorStyle::Scale(1.0f), 0.1f);
+        const float MaxUnscaled = std::max(150.0f, (PanelAvail.x - EditorStyle::Scale(200.0f)) / Scale);
+        LeftPaneWidth = std::clamp((LeftWidth + ImGui::GetIO().MouseDelta.x) / Scale, 150.0f, MaxUnscaled);
+    }
+
+    // 3. 하단 바: [재생/정지/역재생/배속 버튼] | [타임라인 스크러버 + 프레임 + Notifies + Save]
+    ImGui::SetCursorScreenPos(ImVec2(BodyOrigin.x, BodyOrigin.y + BodyHeight + EditorStyle::Scale(2.0f)));
+    DrawBottomTransportBar(LeftWidth, RightWidth + SplitterWidth);
+    DrawRecordNotifyPopup();
 
     // Delete 키: 타임라인 창에 포커스가 있고 글자 입력 중이 아닐 때 선택한 Notify 삭제
     if (ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows) && !ImGui::GetIO().WantTextInput
@@ -149,45 +351,405 @@ void FAnimTimelinePanel::DrawContent()
     }
 }
 
-void FAnimTimelinePanel::DrawTransport()
+void FAnimTimelinePanel::LoadIcons()
 {
+    if (bIconsLoaded) return;
+    bIconsLoaded = true;
+
+    auto LoadIcon = [](const char* PrimaryPath, const char* FallbackPath = nullptr) -> UTexture2D*
+    {
+        UTexture2D* Tex = UAssetManager::GetAssetByPath<UTexture2D>(PrimaryPath);
+        if (!Tex && FallbackPath)
+        {
+            Tex = UAssetManager::GetAssetByPath<UTexture2D>(FallbackPath);
+        }
+        return Tex;
+    };
+
+    IconBackward = LoadIcon("Engine/Icons/Timeline/Backwards.png");
+    IconStepBack = LoadIcon("Engine/Icons/Timeline/Step_Backwards.png");
+    IconRecord = LoadIcon("Engine/Icons/Timeline/Record.png");
+    IconForward = LoadIcon("Engine/Icons/Timeline/Play.png", "Engine/Icons/Toolbar/Play.png");
+    IconPause = LoadIcon("Engine/Icons/Timeline/Pause.png", "Engine/Icons/Toolbar/Pause.png");
+    IconStepForward = LoadIcon("Engine/Icons/Timeline/Step_Forward_.png");
+    IconLoop = LoadIcon("Engine/Icons/Timeline/Loop.png");
+}
+
+void FAnimTimelinePanel::DrawHeaderRow(const ImVec2& Origin, float LeftWidth, float RightWidth, float HeaderHeight)
+{
+    ImDrawList* Draw = ImGui::GetWindowDrawList();
+    const ImGuiIO& IO = ImGui::GetIO();
     const float Length = Editor.GetPlayLength();
     const float Rate = Editor.GetFrameRate();
+    const float Time = Editor.GetPlaybackTime();
+    const int32 CurrentFrame = static_cast<int32>(std::lround(Time * Rate));
+    const float SplitterWidth = EditorStyle::Scale(6.0f);
 
-    if (ImGui::Button("|<")) Editor.SetPlaybackTime(0.0f);
-    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize("<").x + ImGui::GetStyle().FramePadding.x * 2.0f);
-    if (ImGui::Button("<")) Editor.StepFrame(-1);
-    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize(Editor.IsPlaying() ? "Pause" : "Play").x + ImGui::GetStyle().FramePadding.x * 2.0f);
-    if (ImGui::Button(Editor.IsPlaying() ? "Pause" : "Play"))
+    // ---- 왼쪽: 필터 검색창 + 현재 프레임 배지 ----
+    ImGui::SetCursorScreenPos(ImVec2(Origin.x, Origin.y + (HeaderHeight - ImGui::GetFrameHeight()) * 0.5f));
+    char FrameBadge[16];
+    std::snprintf(FrameBadge, sizeof(FrameBadge), "%d", CurrentFrame);
+    const float BadgeWidth = std::max(EditorStyle::Scale(28.0f), ImGui::CalcTextSize(FrameBadge).x + EditorStyle::Scale(10.0f));
+    const ImGuiStyle& Style = ImGui::GetStyle();
+    const bool bHasFilter = (TrackFilterBuffer[0] != '\0');
+    const float ClearWidth = bHasFilter ? ImGui::GetFrameHeight() : 0.0f;
+    const float FilterWidth = std::max(40.0f, LeftWidth - BadgeWidth - Style.ItemSpacing.x * (bHasFilter ? 2.0f : 1.0f) - (bHasFilter ? ClearWidth : 0.0f) - EditorStyle::Scale(2.0f));
+
+    const ImTextureID SearchIcon = ViewportToolbarWidgets::GetIcon("Search");
+    const float SearchIconSize = (SearchIcon != ImTextureID_Invalid) ? EditorStyle::Scale(14.0f) : 0.0f;
+    const float SearchPadLeft = (SearchIcon != ImTextureID_Invalid) ? (SearchIconSize + EditorStyle::Scale(8.0f)) : 0.0f;
+
+    ImGui::SetNextItemWidth(FilterWidth);
+    ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(Style.FramePadding.x + SearchPadLeft, Style.FramePadding.y));
+    ImGui::InputTextWithHint("##TimelineFilter", "Filter...", TrackFilterBuffer, sizeof(TrackFilterBuffer));
+    ImGui::PopStyleVar();
+
+    if (SearchIcon != ImTextureID_Invalid)
     {
-        if (Editor.IsPlaying()) Editor.Pause();
-        else Editor.Play();
+        const ImVec2 BoxMin = ImGui::GetItemRectMin();
+        const ImVec2 BoxMax = ImGui::GetItemRectMax();
+        const float IconX = BoxMin.x + Style.FramePadding.x + EditorStyle::Scale(2.0f);
+        const float IconY = BoxMin.y + ((BoxMax.y - BoxMin.y) - SearchIconSize) * 0.5f;
+        Draw->AddImage(SearchIcon,
+            ImVec2(IconX, IconY), ImVec2(IconX + SearchIconSize, IconY + SearchIconSize),
+            ImVec2(0.0f, 0.0f), ImVec2(1.0f, 1.0f), IM_COL32(180, 185, 195, 220));
     }
-    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize(">").x + ImGui::GetStyle().FramePadding.x * 2.0f);
-    if (ImGui::Button(">")) Editor.StepFrame(+1);
-    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize(">|").x + ImGui::GetStyle().FramePadding.x * 2.0f);
-    if (ImGui::Button(">|")) Editor.SetPlaybackTime(Length);
 
-    EditorStyle::SameLineOrWrap(ImGui::GetFrameHeight() + ImGui::CalcTextSize("Loop").x + ImGui::GetStyle().ItemInnerSpacing.x);
-    ImGui::Checkbox("Loop", &Editor.bLooping);
-    EditorStyle::SameLineOrWrap(ImGui::GetFrameHeight() + ImGui::CalcTextSize("Notifies").x + ImGui::GetStyle().ItemInnerSpacing.x);
+    if (bHasFilter)
+    {
+        ImGui::SameLine();
+        if (ImGui::Button("X##ClearTimelineFilter", ImVec2(ClearWidth, ImGui::GetFrameHeight())))
+        {
+            TrackFilterBuffer[0] = '\0';
+        }
+        ImGui::SetItemTooltip("Clear filter");
+    }
+
+    ImGui::SameLine();
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", FrameBadge);
+
+    // ---- 세로 구분선 ----
+    Draw->AddLine(
+        ImVec2(Origin.x + LeftWidth + SplitterWidth * 0.5f, Origin.y),
+        ImVec2(Origin.x + LeftWidth + SplitterWidth * 0.5f, Origin.y + HeaderHeight),
+        bTimelineSplitterActive ? EditorColor::AccentBright : EditorColor::Border,
+        bTimelineSplitterActive ? 2.0f : 1.0f);
+
+    // ---- 오른쪽: 프레임 눈금자 + 플레이헤드 배지 ----
+    const ImVec2 RulerOrigin(Origin.x + LeftWidth + SplitterWidth, Origin.y);
+    const ImVec2 RulerMax(RulerOrigin.x + RightWidth, RulerOrigin.y + HeaderHeight);
+    Draw->AddRectFilled(RulerOrigin, RulerMax, EditorColor::BgHeader);
+    Draw->AddLine(ImVec2(RulerOrigin.x, RulerMax.y - 1.0f), ImVec2(RulerMax.x, RulerMax.y - 1.0f), EditorColor::Border);
+
+    const int32 TotalFrames = std::max(Editor.GetNumFrames(), 1);
+    const float PixelsPerSecond = Length > 0.0f ? RightWidth / Length : 1.0f;
+    const float PixelsPerFrame = Rate > 0.0f ? PixelsPerSecond / Rate : RightWidth / static_cast<float>(TotalFrames);
+
+    // 라벨이 겹치지 않는 최소 프레임 간격 선택
+    const int32 FrameSteps[] = { 1, 2, 5, 10, 20, 50, 100 };
+    int32 LabelStep = FrameSteps[IM_ARRAYSIZE(FrameSteps) - 1];
+    for (int32 Candidate : FrameSteps)
+    {
+        if (Candidate * PixelsPerFrame >= EditorStyle::Scale(28.0f))
+        {
+            LabelStep = Candidate;
+            break;
+        }
+    }
+
+    Draw->PushClipRect(RulerOrigin, RulerMax, true);
+    for (int32 Frame = 0; Frame <= TotalFrames; ++Frame)
+    {
+        const float X = RulerOrigin.x + Frame * PixelsPerFrame;
+        const bool bMajor = (Frame % LabelStep) == 0;
+        if (bMajor)
+        {
+            Draw->AddLine(ImVec2(X, RulerOrigin.y + HeaderHeight - EditorStyle::Scale(10.0f)),
+                ImVec2(X, RulerMax.y), EditorColor::TextMuted);
+            char Label[16];
+            std::snprintf(Label, sizeof(Label), "%d", Frame);
+            Draw->AddText(ImVec2(X + EditorStyle::Scale(3.0f), RulerOrigin.y + EditorStyle::Scale(2.0f)),
+                EditorColor::TextSecondary, Label);
+        }
+        else if (PixelsPerFrame >= 4.0f)
+        {
+            Draw->AddLine(ImVec2(X, RulerOrigin.y + HeaderHeight - EditorStyle::Scale(5.0f)),
+                ImVec2(X, RulerMax.y), EditorColor::TextDisabled);
+        }
+    }
+
+    // 스크럽: 눈금자 클릭/드래그
+    ImGui::SetCursorScreenPos(RulerOrigin);
+    ImGui::InvisibleButton("##Scrub", ImVec2(RightWidth, HeaderHeight));
+    if (ImGui::IsItemActivated())
+    {
+        bWasPlayingBeforeScrub = Editor.IsPlaying();
+    }
+    if (ImGui::IsItemActive())
+    {
+        Editor.SetPlaybackTime(std::clamp((IO.MousePos.x - RulerOrigin.x) / PixelsPerSecond, 0.0f, Length));
+    }
+    if (ImGui::IsItemDeactivated() && bWasPlayingBeforeScrub)
+    {
+        Editor.Play();
+    }
+
+    // 플레이헤드 상단 배지 + 수직선
+    const float PlayheadX = RulerOrigin.x + Editor.GetPlaybackTime() * PixelsPerSecond;
+    const float Percent = Length > 0.0f ? (Time / Length) * 100.0f : 0.0f;
+    char HeadText[48];
+    std::snprintf(HeadText, sizeof(HeadText), "%d (%.2fs) (%.1f%%)", CurrentFrame, Time, Percent);
+    const ImVec2 HeadTextSize = ImGui::CalcTextSize(HeadText);
+    const float TagW = EditorStyle::Scale(8.0f);
+    const float TagH = EditorStyle::Scale(12.0f);
+    Draw->AddRectFilled(
+        ImVec2(PlayheadX - TagW * 0.5f, RulerOrigin.y + 1.0f),
+        ImVec2(PlayheadX + TagW * 0.5f, RulerOrigin.y + 1.0f + TagH),
+        EditorColor::AccentBright, 2.0f);
+    const float TextX = std::min(PlayheadX + TagW * 0.5f + EditorStyle::Scale(4.0f),
+        RulerMax.x - HeadTextSize.x - EditorStyle::Scale(4.0f));
+    Draw->AddText(ImVec2(std::max(RulerOrigin.x + 2.0f, TextX), RulerOrigin.y + 1.0f),
+        EditorColor::TextPrimary, HeadText);
+    Draw->AddLine(ImVec2(PlayheadX, RulerOrigin.y), ImVec2(PlayheadX, RulerMax.y), EditorColor::AccentBright, 2.0f);
+    Draw->PopClipRect();
+}
+
+void FAnimTimelinePanel::DrawBottomTransportBar(float LeftWidth, float RightWidth)
+{
+    LoadIcons();
+
+    const float Length = Editor.GetPlayLength();
+    const float Rate = Editor.GetFrameRate();
+    const int32 TotalFrames = Editor.GetNumFrames();
+    const float Time = Editor.GetPlaybackTime();
+    const int32 CurrentFrame = static_cast<int32>(std::lround(Time * Rate));
+    const float BtnSide = std::round(ImGui::GetFrameHeight() * 1.5f);
+    const float IconSide = EditorStyle::Scale(21.0f);
+    const float Gap = EditorStyle::Scale(4.0f);
+
+    const ImVec2 BarOrigin = ImGui::GetCursorScreenPos();
+    ImDrawList* Draw = ImGui::GetWindowDrawList();
+    Draw->AddLine(
+        ImVec2(BarOrigin.x, BarOrigin.y - EditorStyle::Scale(2.0f)),
+        ImVec2(BarOrigin.x + LeftWidth + RightWidth, BarOrigin.y - EditorStyle::Scale(2.0f)),
+        EditorColor::Border, 1.0f);
+
+    auto DrawIconButton = [BtnSide, IconSide](const char* Id, UTexture2D* Icon, const char* FallbackText,
+        const ImVec4& Tint = ImVec4(1, 1, 1, 1), bool bLeftBar = false, bool bRightBar = false) -> bool
+    {
+        if (Icon && Icon->GetResource() && Icon->GetResource()->GetSRV())
+        {
+            const ImVec2 Pos = ImGui::GetCursorScreenPos();
+            const bool bClicked = ImGui::Button(Id, ImVec2(BtnSide, BtnSide));
+            ImDrawList* DrawList = ImGui::GetWindowDrawList();
+            const float OffsetX = bLeftBar ? EditorStyle::Scale(2.0f) : (bRightBar ? -EditorStyle::Scale(2.0f) : 0.0f);
+            const ImVec2 Center(Pos.x + BtnSide * 0.5f + OffsetX, Pos.y + BtnSide * 0.5f);
+            const ImVec2 Min(Center.x - IconSide * 0.5f, Center.y - IconSide * 0.5f);
+            const ImVec2 Max(Center.x + IconSide * 0.5f, Center.y + IconSide * 0.5f);
+            const ImU32 Color = ImGui::ColorConvertFloat4ToU32(Tint);
+            DrawList->AddImage((ImTextureID)Icon->GetResource()->GetSRV(), Min, Max, ImVec2(0, 0), ImVec2(1, 1), Color);
+
+            const float BarW = EditorStyle::Scale(2.5f);
+            const float BarPad = EditorStyle::Scale(3.0f);
+            if (bLeftBar)
+            {
+                const float BarX = Min.x - BarW;
+                DrawList->AddRectFilled(ImVec2(BarX, Min.y + BarPad), ImVec2(BarX + BarW, Max.y - BarPad), Color);
+            }
+            if (bRightBar)
+            {
+                const float BarX = Max.x;
+                DrawList->AddRectFilled(ImVec2(BarX, Min.y + BarPad), ImVec2(BarX + BarW, Max.y - BarPad), Color);
+            }
+            return bClicked;
+        }
+        return ImGui::Button(FallbackText, ImVec2(BtnSide, BtnSide));
+    };
+
+    // ---- 하단 왼쪽: 재생 / 역재생 / 프레임 / 루프 / 배속 버튼 ----
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(Gap, 0.0f));
+    ImGui::SetCursorScreenPos(ImVec2(BarOrigin.x, BarOrigin.y + EditorStyle::Scale(2.0f)));
+
+    // 1. |< (처음으로)
+    if (DrawIconButton("##ToFront", IconBackward, "|<", ImVec4(1, 1, 1, 1), true, false))
+    {
+        Editor.SetPlaybackTime(0.0f);
+    }
+    ImGui::SetItemTooltip("To Beginning (First Frame)");
+
+    // 2. <| (1프레임 뒤로)
+    ImGui::SameLine();
+    if (DrawIconButton("##StepBack", IconStepBack, "<|"))
+    {
+        Editor.StepFrame(-1);
+    }
+    ImGui::SetItemTooltip("Previous Frame (Step Back)");
+
+    // 3. < (역방향 재생 / 일시정지 토글)
+    ImGui::SameLine();
+    const bool bPlayingReverse = Editor.IsPlaying() && Editor.IsReverse();
+    UTexture2D* RevIcon = bPlayingReverse ? IconPause : IconBackward;
+    if (DrawIconButton("##ReversePlay", RevIcon, bPlayingReverse ? "||" : "<"))
+    {
+        if (bPlayingReverse) Editor.Pause();
+        else Editor.PlayReverse();
+    }
+    ImGui::SetItemTooltip(bPlayingReverse ? "Pause" : "Play Reverse");
+
+    // 4. ● (현재 프레임에 Notify 추가)
+    ImGui::SameLine();
+    if (DrawIconButton("##RecordNotify", IconRecord, "O", ImVec4(0.90f, 0.22f, 0.22f, 1.0f)))
+    {
+        RecordNotifyTime = std::clamp(Rate > 0.0f ? std::round(Time * Rate) / Rate : Time, 0.0f, Length);
+        bOpenRecordNotifyPopup = true;
+    }
+    ImGui::SetItemTooltip("Add Notify at Current Frame");
+
+    // 5. > (순방향 재생 / 일시정지 토글)
+    ImGui::SameLine();
+    const bool bPlayingForward = Editor.IsPlaying() && !Editor.IsReverse();
+    UTexture2D* FwdIcon = bPlayingForward ? IconPause : IconForward;
+    if (DrawIconButton("##ForwardPlay", FwdIcon, bPlayingForward ? "||" : ">"))
+    {
+        if (bPlayingForward) Editor.Pause();
+        else Editor.PlayForward();
+    }
+    ImGui::SetItemTooltip(bPlayingForward ? "Pause" : "Play Forward");
+
+    // 6. |> (1프레임 앞으로)
+    ImGui::SameLine();
+    if (DrawIconButton("##StepForward", IconStepForward, "|>"))
+    {
+        Editor.StepFrame(+1);
+    }
+    ImGui::SetItemTooltip("Next Frame (Step Forward)");
+
+    // 7. >| (마지막으로)
+    ImGui::SameLine();
+    if (DrawIconButton("##ToEnd", IconForward, ">|", ImVec4(1, 1, 1, 1), false, true))
+    {
+        Editor.SetPlaybackTime(Length);
+    }
+    ImGui::SetItemTooltip("To End (Last Frame)");
+
+    // 8. Loop (루프 토글)
+    ImGui::SameLine();
+    const ImVec4 LoopTint = Editor.bLooping ? ImVec4(1.0f, 0.85f, 0.3f, 1.0f) : ImVec4(0.45f, 0.45f, 0.45f, 1.0f);
+    if (DrawIconButton("##LoopToggle", IconLoop, "Loop", LoopTint))
+    {
+        Editor.bLooping = !Editor.bLooping;
+    }
+    ImGui::SetItemTooltip(Editor.bLooping ? "Loop: Enabled" : "Loop: Disabled");
+
+    // 9. 배속 조절 (x1.0)
+    const float MinTransportLeftWidth = BtnSide * 8.0f + Gap * 7.0f + EditorStyle::Scale(68.0f);
+    const float EffectiveLeftWidth = std::max(LeftWidth, MinTransportLeftWidth);
+    const float CenteredControlY = BarOrigin.y + EditorStyle::Scale(2.0f) + (BtnSide - ImGui::GetFrameHeight()) * 0.5f;
+    ImGui::SameLine(0.0f, EditorStyle::Scale(6.0f));
+    ImGui::SetCursorScreenPos(ImVec2(ImGui::GetCursorScreenPos().x, CenteredControlY));
+    const float RateWidth = std::max(EditorStyle::Scale(42.0f), BarOrigin.x + EffectiveLeftWidth - ImGui::GetCursorScreenPos().x - EditorStyle::Scale(6.0f));
+    float AbsRate = std::abs(Editor.PlayRate);
+    ImGui::SetNextItemWidth(std::min(RateWidth, EditorStyle::Scale(56.0f)));
+    if (ImGui::DragFloat("##Rate", &AbsRate, 0.05f, 0.1f, 3.0f, "x%.1f"))
+    {
+        AbsRate = std::clamp(AbsRate, 0.1f, 3.0f);
+        Editor.PlayRate = Editor.IsReverse() ? -AbsRate : AbsRate;
+    }
+    ImGui::SetItemTooltip("Playback Rate");
+    ImGui::PopStyleVar();
+
+    // ---- 하단 오른쪽: 프레임 범위 + 타임라인 스크럽 바 + Notifies + Save ----
+    const float RightStartX = BarOrigin.x + EffectiveLeftWidth + EditorStyle::Scale(6.0f);
+    const float RightEndX = BarOrigin.x + LeftWidth + RightWidth;
+    const float BarY = CenteredControlY;
+
+    const float FrameInputW = EditorStyle::Scale(44.0f);
+    char TotalStr[32];
+    std::snprintf(TotalStr, sizeof(TotalStr), "%d  (%.2fs/%.2fs)", TotalFrames, Time, Length);
+    const float TotalStrW = ImGui::CalcTextSize(TotalStr).x;
+    const float StartLabelW = ImGui::CalcTextSize("0").x;
+
+    const float NotifiesCheckW = ImGui::GetFrameHeight() + ImGui::CalcTextSize("Notifies").x + ImGui::GetStyle().ItemInnerSpacing.x;
+    const float SaveBtnW = ImGui::CalcTextSize("Save").x + ImGui::GetStyle().FramePadding.x * 2.0f;
+    const bool bDirty = Editor.IsDirty();
+    const bool bHasSaveMsg = !bDirty && !Editor.GetSaveMessage().empty();
+    const float StatusW = bDirty ? ImGui::CalcTextSize("Unsaved").x : (bHasSaveMsg ? ImGui::CalcTextSize(Editor.GetSaveMessage().c_str()).x : 0.0f);
+
+    const float Spacing = EditorStyle::Scale(8.0f);
+    const float FixedRightControlsW = StartLabelW + FrameInputW + TotalStrW + NotifiesCheckW + SaveBtnW
+        + (StatusW > 0.0f ? StatusW + Spacing : 0.0f) + Spacing * 6.0f;
+    const float ScrubBarW = std::max(EditorStyle::Scale(60.0f), (RightEndX - RightStartX) - FixedRightControlsW);
+
+    ImGui::SetCursorScreenPos(ImVec2(RightStartX, BarY));
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("0");
+
+    ImGui::SameLine(0.0f, Spacing);
+    ImGui::SetNextItemWidth(FrameInputW);
+    int32 InputFrame = CurrentFrame;
+    const bool bFrameCommitted = ImGui::InputInt("##FrameInput", &InputFrame, 0, 0, ImGuiInputTextFlags_EnterReturnsTrue);
+    if (bFrameCommitted || ImGui::IsItemDeactivatedAfterEdit())
+    {
+        InputFrame = std::clamp(InputFrame, 0, std::max(TotalFrames, 0));
+        Editor.SetPlaybackTime(Rate > 0.0f ? static_cast<float>(InputFrame) / Rate : 0.0f);
+    }
+    ImGui::SetItemTooltip("Current Frame (enter number to jump)");
+
+    // 가로 타임라인 스크럽 바 (0 ~ Length)
+    ImGui::SameLine(0.0f, Spacing);
+    const ImVec2 ScrubMin = ImGui::GetCursorScreenPos();
+    const float ScrubHeight = ImGui::GetFrameHeight();
+    const ImVec2 ScrubMax(ScrubMin.x + ScrubBarW, ScrubMin.y + ScrubHeight);
+    ImGui::InvisibleButton("##BottomTimelineScrub", ImVec2(ScrubBarW, ScrubHeight));
+    if (ImGui::IsItemActivated())
+    {
+        bWasPlayingBeforeBottomScrub = Editor.IsPlaying();
+    }
+    if (ImGui::IsItemActive())
+    {
+        const float Alpha = std::clamp((ImGui::GetIO().MousePos.x - ScrubMin.x) / std::max(ScrubBarW, 1.0f), 0.0f, 1.0f);
+        Editor.SetPlaybackTime(Alpha * Length);
+    }
+    if (ImGui::IsItemDeactivated() && bWasPlayingBeforeBottomScrub)
+    {
+        Editor.Play();
+    }
+
+    const float TroughPadY = EditorStyle::Scale(5.0f);
+    const ImVec2 TroughMin(ScrubMin.x, ScrubMin.y + TroughPadY);
+    const ImVec2 TroughMax(ScrubMax.x, ScrubMax.y - TroughPadY);
+    Draw->AddRectFilled(TroughMin, TroughMax, EditorColor::BgDeepest, EditorStyle::Scale(3.0f));
+    Draw->AddRect(TroughMin, TroughMax, EditorColor::Border, EditorStyle::Scale(3.0f));
+
+    const float Norm = Length > 0.0f ? std::clamp(Time / Length, 0.0f, 1.0f) : 0.0f;
+    const float KnobW = EditorStyle::Scale(10.0f);
+    const float TravelW = std::max(1.0f, ScrubBarW - KnobW);
+    const float KnobX = ScrubMin.x + Norm * TravelW;
+    if (Norm > 0.0f)
+    {
+        Draw->AddRectFilled(TroughMin, ImVec2(KnobX + KnobW * 0.5f, TroughMax.y),
+            EditorColor::WithAlpha(EditorColor::Accent, 140), EditorStyle::Scale(3.0f));
+    }
+    const ImU32 KnobColor = (ImGui::IsItemHovered() || ImGui::IsItemActive())
+        ? EditorColor::TextPrimary
+        : EditorColor::TextMuted;
+    Draw->AddRectFilled(ImVec2(KnobX, TroughMin.y + 1.0f), ImVec2(KnobX + KnobW, TroughMax.y - 1.0f),
+        KnobColor, EditorStyle::Scale(3.0f));
+
+    ImGui::SameLine(0.0f, Spacing);
+    ImGui::AlignTextToFramePadding();
+    ImGui::TextDisabled("%s", TotalStr);
+
+    // Week12 기존 기능 유지: Notifies 체크박스 + Save 버튼
+    ImGui::SameLine(0.0f, Spacing);
     ImGui::Checkbox("Notifies", &Editor.bPreviewNotifies);
     if (ImGui::IsItemHovered())
     {
         ImGui::SetTooltip("Fire notifies while playing (sounds etc.). Name-based notifies are logged.");
     }
-    EditorStyle::SameLineOrWrap(EditorStyle::Scale(90.0f) + ImGui::CalcTextSize("Rate").x + ImGui::GetStyle().ItemInnerSpacing.x);
-    ImGui::SetNextItemWidth(EditorStyle::Scale(90.0f));
-    ImGui::DragFloat("Rate", &Editor.PlayRate, 0.01f, -2.0f, 2.0f, "%.2fx");
 
-    const float Time = Editor.GetPlaybackTime();
-    EditorStyle::SameLineOrWrap(EditorStyle::Scale(250.0f));
-    ImGui::Text("%.2f / %.2f s   Frame %d / %d", Time, Length,
-        static_cast<int>(std::lround(Time * Rate)), Editor.GetNumFrames());
-
-    // 저장: 변경이 있을 때만 누를 수 있다 (Ctrl+S와 같음)
-    EditorStyle::SameLineOrWrap(ImGui::CalcTextSize("Save").x + ImGui::GetStyle().FramePadding.x * 2.0f);
-    const bool bDirty = Editor.IsDirty();
+    ImGui::SameLine(0.0f, Spacing);
     ImGui::BeginDisabled(!bDirty);
     if (ImGui::Button("Save"))
     {
@@ -199,105 +761,42 @@ void FAnimTimelinePanel::DrawTransport()
         ImGui::SetTooltip("Save notifies and root motion settings to the .anim.bin (Ctrl+S)");
     }
 
-    EditorStyle::SameLineOrWrap(EditorStyle::Scale(180.0f));
     if (bDirty)
     {
-        ImGui::TextColored(EditorColor::ToVec4(EditorColor::Warning), "Unsaved changes");
+        ImGui::SameLine(0.0f, Spacing);
+        ImGui::AlignTextToFramePadding();
+        ImGui::TextColored(EditorColor::ToVec4(EditorColor::Warning), "Unsaved");
     }
-    else if (!Editor.GetSaveMessage().empty())
+    else if (bHasSaveMsg)
     {
+        ImGui::SameLine(0.0f, Spacing);
+        ImGui::AlignTextToFramePadding();
         const bool bFailed = Editor.GetSaveMessage().rfind("failed") != FString::npos;
-        ImGui::TextColored(bFailed ? EditorColor::ToVec4(EditorColor::Error) : EditorColor::ToVec4(EditorColor::Success), "%s", Editor.GetSaveMessage().c_str());
+        ImGui::TextColored(bFailed ? EditorColor::ToVec4(EditorColor::Error) : EditorColor::ToVec4(EditorColor::Success),
+            "%s", Editor.GetSaveMessage().c_str());
     }
 }
 
-void FAnimTimelinePanel::DrawTrack()
-{
-    const float Length = Editor.GetPlayLength();
-    const float Rate = Editor.GetFrameRate();
-
-    ImDrawList* Draw = ImGui::GetWindowDrawList();
-    const ImGuiIO& IO = ImGui::GetIO();
-    const ImVec2 PanelOrigin = ImGui::GetCursorScreenPos();
-
-    // 왼쪽 열: 트랙 이름. 눈금자 줄의 왼쪽 칸에는 트랙 추가 버튼.
-    ImGui::SetCursorScreenPos(ImVec2(PanelOrigin.x + 4.0f, PanelOrigin.y + (RulerHeight - ImGui::GetFrameHeight()) * 0.5f));
-    if (ImGui::SmallButton("+ Track"))
-    {
-        Editor.GetSequence()->AddNotifyTrack();
-        Editor.MarkNotifiesDirty();
-    }
-
-    // 오른쪽: 시간축 (눈금자와 Notify 트랙이 같은 X축을 쓴다)
-    const ImVec2 Origin(PanelOrigin.x + TrackHeaderWidth, PanelOrigin.y);
-    const float Width = std::max(ImGui::GetContentRegionAvail().x - TrackHeaderWidth, 50.0f);
-    const float PixelsPerSecond = Length > 0.0f ? Width / Length : 1.0f;   // 클립 전체를 한 화면에
-    ImGui::SetCursorScreenPos(Origin);
-
-    Draw->AddRectFilled(Origin, ImVec2(Origin.x + Width, Origin.y + RulerHeight), EditorColor::BgHeader);
-
-    // 눈금: 60픽셀 이상 간격이 나오는 가장 작은 단위를 고른다
-    const float Steps[] = { 1.0f / Rate, 0.1f, 0.25f, 0.5f, 1.0f, 2.0f, 5.0f, 10.0f };
-    float Step = Steps[IM_ARRAYSIZE(Steps) - 1];
-    for (float Candidate : Steps)
-    {
-        if (Candidate * PixelsPerSecond >= 60.0f) { Step = Candidate; break; }
-    }
-    for (float T = 0.0f; T <= Length + 0.0001f; T += Step)
-    {
-        const float X = Origin.x + T * PixelsPerSecond;
-        Draw->AddLine(ImVec2(X, Origin.y + RulerHeight - 6.0f), ImVec2(X, Origin.y + RulerHeight), EditorColor::TextMuted);
-        char Label[16];
-        std::snprintf(Label, sizeof(Label), "%.2f", T);
-        Draw->AddText(ImVec2(X + 3.0f, Origin.y + 3.0f), EditorColor::TextSecondary, Label);
-    }
-
-    // 스크럽: 누른 동안 마우스를 잡아 두므로 영역 밖으로 끌어도 계속된다
-    ImGui::InvisibleButton("##Scrub", ImVec2(Width, RulerHeight));
-    if (ImGui::IsItemActivated())
-    {
-        bWasPlayingBeforeScrub = Editor.IsPlaying();
-    }
-    if (ImGui::IsItemActive())
-    {
-        Editor.SetPlaybackTime(std::clamp((IO.MousePos.x - Origin.x) / PixelsPerSecond, 0.0f, Length));
-    }
-    if (ImGui::IsItemDeactivated() && bWasPlayingBeforeScrub)
-    {
-        Editor.Play();
-    }
-
-    // Notify 트랙 (눈금자와 같은 X축). 왼쪽 열에 트랙 이름.
-    const ImVec2 TracksOrigin(Origin.x, ImGui::GetCursorScreenPos().y);
-    const float TracksHeight = DrawNotifyTracks(TracksOrigin, Width, PixelsPerSecond);
-    DrawTrackHeaders(ImVec2(PanelOrigin.x, TracksOrigin.y));
-    ImGui::SetCursorScreenPos(ImVec2(PanelOrigin.x, TracksOrigin.y + TracksHeight));
-    ImGui::Dummy(ImVec2(0.0f, 0.0f));   // 커서를 트랙 아래로 옮긴 뒤 레이아웃을 확정한다
-
-    // 플레이헤드: 눈금자부터 트랙 끝까지
-    const float PlayheadX = Origin.x + Editor.GetPlaybackTime() * PixelsPerSecond;
-    Draw->AddLine(ImVec2(PlayheadX, Origin.y), ImVec2(PlayheadX, TracksOrigin.y + TracksHeight), EditorColor::AccentBright, 2.0f);
-}
-
-void FAnimTimelinePanel::DrawTrackHeaders(const ImVec2& HeaderOrigin)
+void FAnimTimelinePanel::DrawTrackHeaders(const ImVec2& HeaderOrigin, float Width, float RowHeight, const TArray<int32>& VisibleTracks)
 {
     UAnimSequence* Sequence = Editor.GetSequence();
     ImDrawList* Draw = ImGui::GetWindowDrawList();
     const int32 NumTracks = Sequence->GetNumNotifyTracks();
-    const ImVec2 CellSize(TrackHeaderWidth - 2.0f, NotifyRowHeight);
+    const ImVec2 CellSize(Width, RowHeight);
 
     bool bOpenMenu = false;
     bool bOpenRename = false;
 
-    for (int32 Track = 0; Track < NumTracks; ++Track)
+    for (int32 Row = 0; Row < VisibleTracks.Num(); ++Row)
     {
-        const ImVec2 Min(HeaderOrigin.x, HeaderOrigin.y + Track * NotifyRowHeight);
+        const int32 Track = VisibleTracks[Row];
+        const ImVec2 Min(HeaderOrigin.x, HeaderOrigin.y + Row * RowHeight);
         const ImVec2 Max(Min.x + CellSize.x, Min.y + CellSize.y);
-        Draw->AddRectFilled(Min, Max, (Track % 2) ? RowColorB : RowColorA);
+        Draw->AddRectFilled(Min, Max, (Row % 2) ? RowColorB : RowColorA);
 
-        // 긴 이름은 칸 안에서 자른다
+        // 긴 이름은 칸 안에서 자른다 (Notifies 아래에 들여쓰기)
         Draw->PushClipRect(Min, Max, true);
-        Draw->AddText(ImVec2(Min.x + 6.0f, Min.y + (NotifyRowHeight - ImGui::GetTextLineHeight()) * 0.5f),
+        Draw->AddText(ImVec2(Min.x + EditorStyle::Scale(22.0f), Min.y + (RowHeight - ImGui::GetTextLineHeight()) * 0.5f),
             EditorColor::TextSecondary, Sequence->GetNotifyTrackName(Track).c_str());
         Draw->PopClipRect();
 
@@ -398,35 +897,47 @@ void FAnimTimelinePanel::DrawTrackHeaders(const ImVec2& HeaderOrigin)
     }
 }
 
-float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Width, float PixelsPerSecond)
+float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Width, float PixelsPerSecond, float RowHeight, const TArray<int32>& VisibleTracks)
 {
     const UAnimSequence* Sequence = Editor.GetSequence();
     const TArray<FAnimNotifyEvent>& Notifies = Sequence->GetNotifies();
     const float Rate = Editor.GetFrameRate();
     const float Length = Editor.GetPlayLength();
 
-    const int32 NumRows = Sequence->GetNumNotifyTracks();
-    const float Height = NumRows * NotifyRowHeight;
+    const int32 NumRows = VisibleTracks.Num();
+    const float Height = NumRows * RowHeight;
     ImDrawList* Draw = ImGui::GetWindowDrawList();
     const ImVec2 TracksMax(TracksOrigin.x + Width, TracksOrigin.y + Height);
+
+    auto RowForTrack = [&VisibleTracks](int32 TrackIndex) -> int32
+    {
+        for (int32 Row = 0; Row < VisibleTracks.Num(); ++Row)
+        {
+            if (VisibleTracks[Row] == TrackIndex)
+            {
+                return Row;
+            }
+        }
+        return INDEX_NONE;
+    };
 
     // 드래그 중이면 놓일 줄을 밝게 보여 준다
     int32 DropRow = INDEX_NONE;
     if (DraggingNotify.IsValid() && bDragMoved)
         if (const FAnimNotifyEvent* Dragged = Sequence->FindNotify(DraggingNotify))
-            DropRow = Dragged->TrackIndex;
+            DropRow = RowForTrack(Dragged->TrackIndex);
 
     // 줄 배경
     for (int32 Row = 0; Row < NumRows; ++Row)
     {
-        const float Y = TracksOrigin.y + Row * NotifyRowHeight;
+        const float Y = TracksOrigin.y + Row * RowHeight;
         const ImU32 RowColor = (Row == DropRow) ? EditorColor::BgAccentHover : ((Row % 2) ? RowColorB : RowColorA);
-        Draw->AddRectFilled(ImVec2(TracksOrigin.x, Y), ImVec2(TracksMax.x, Y + NotifyRowHeight), RowColor);
+        Draw->AddRectFilled(ImVec2(TracksOrigin.x, Y), ImVec2(TracksMax.x, Y + RowHeight), RowColor);
     }
 
     // 프레임 격자: 프레임 간격이 충분히 넓을 때만
     const float PixelsPerFrame = Rate > 0.0f ? PixelsPerSecond / Rate : 0.0f;
-    if (PixelsPerFrame >= 6.0f)
+    if (PixelsPerFrame >= 6.0f && NumRows > 0)
     {
         const int32 NumFrames = static_cast<int32>(std::floor(Length * Rate + 0.0001f));
         for (int32 Frame = 0; Frame <= NumFrames; ++Frame)
@@ -454,8 +965,12 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
             if (bIsState != (Pass == 0))
                 continue;
 
-            const float RowTop = TracksOrigin.y + Event.TrackIndex * NotifyRowHeight;
-            const float CenterY = RowTop + NotifyRowHeight * 0.5f;
+            const int32 Row = RowForTrack(Event.TrackIndex);
+            if (Row == INDEX_NONE)
+                continue;
+
+            const float RowTop = TracksOrigin.y + Row * RowHeight;
+            const float CenterY = RowTop + RowHeight * 0.5f;
             const float StartX = TracksOrigin.x + Event.TriggerTime * PixelsPerSecond;
             const ImU32 Color = NotifyColorOf(Event);
             const FString Label = NotifyLabel(Event);
@@ -466,7 +981,7 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
             {
                 const float EndX = std::max(TracksOrigin.x + Event.GetEndTriggerTime() * PixelsPerSecond, StartX + MinStateBarWidth);
                 const ImVec2 BarMin(StartX, RowTop + 3.0f);
-                const ImVec2 BarMax(EndX, RowTop + NotifyRowHeight - 3.0f);
+                const ImVec2 BarMax(EndX, RowTop + RowHeight - 3.0f);
                 Draw->AddRectFilled(BarMin, BarMax, WithAlpha(Color, bSelected ? 210 : 150), 3.0f);
                 Draw->AddRect(BarMin, BarMax, bSelected ? SelectedOutline : Color, 3.0f, 0, bSelected ? 2.0f : 1.0f);
 
@@ -497,7 +1012,7 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
                 Draw->AddText(ImVec2(StartX + DiamondRadius + 3.0f, CenterY - ImGui::GetTextLineHeight() * 0.5f), EditorColor::TextSecondary, Label.c_str());
 
                 HitMin = ImVec2(StartX - DiamondRadius - 1.0f, RowTop);
-                HitMax = ImVec2(StartX + DiamondRadius + 1.0f, RowTop + NotifyRowHeight);
+                HitMax = ImVec2(StartX + DiamondRadius + 1.0f, RowTop + RowHeight);
             }
 
             // 미리보기에서 방금 발동했으면 잠깐 빛난다
@@ -522,6 +1037,11 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
     // 끝 핸들 위에서는 좌우 화살표 커서
     if (bHoveredEndHandle || (DraggingNotify.IsValid() && bDragResize && bDragMoved))
         ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+
+    if (NumRows == 0)
+    {
+        return 0.0f;
+    }
 
     // 트랙 영역 전체를 버튼으로 덮어 클릭/드래그를 받는다 (레이아웃 공간도 차지해 창 스크롤이 생긴다)
     ImGui::SetCursorScreenPos(TracksOrigin);
@@ -556,7 +1076,8 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
     {
         const float RawTime = std::clamp((Mouse.x - TracksOrigin.x) / PixelsPerSecond, 0.0f, Length);
         ContextTime = Rate > 0.0f ? std::round(RawTime * Rate) / Rate : RawTime;
-        ContextNotifyTrack = std::clamp(static_cast<int32>((Mouse.y - TracksOrigin.y) / NotifyRowHeight), 0, NumRows - 1);
+        const int32 ClickedRow = std::clamp(static_cast<int32>((Mouse.y - TracksOrigin.y) / RowHeight), 0, NumRows - 1);
+        ContextNotifyTrack = VisibleTracks[ClickedRow];
         ContextNotify = Hovered ? Hovered->Guid : FGuid();
         if (Hovered) Editor.SelectNotify(Hovered->Guid);
         ImGui::OpenPopup("##NotifyContextMenu");
@@ -565,7 +1086,7 @@ float FAnimTimelinePanel::DrawNotifyTracks(const ImVec2& TracksOrigin, float Wid
 
     if (ImGui::IsItemActive() && DraggingNotify.IsValid())
     {
-        UpdateNotifyDrag(TracksOrigin, PixelsPerSecond);
+        UpdateNotifyDrag(TracksOrigin, PixelsPerSecond, RowHeight, VisibleTracks);
     }
 
     if (ImGui::IsItemDeactivated())
@@ -604,10 +1125,20 @@ void FAnimTimelinePanel::DrawNotifyContextMenu()
     ImGui::TextDisabled("Track %s  |  %.3f s (Frame %d)", Sequence->GetNotifyTrackName(ContextNotifyTrack).c_str(),
         ContextTime, static_cast<int>(std::lround(ContextTime * Rate)));
 
-    // 새 Notify를 우클릭한 트랙에 두고 선택한다
+    DrawAddNotifyMenuItems(ContextTime, ContextNotifyTrack);
+
+    ImGui::EndPopup();
+}
+
+void FAnimTimelinePanel::DrawAddNotifyMenuItems(float Time, int32 TrackIndex)
+{
+    UAnimSequence* Sequence = Editor.GetSequence();
+    const float Rate = Editor.GetFrameRate();
+
+    // 새 Notify를 지정한 트랙에 두고 선택한다
     auto Finish = [&](const FGuid& Guid)
         {
-            Sequence->SetNotifyTrackIndex(Guid, ContextNotifyTrack);
+            Sequence->SetNotifyTrackIndex(Guid, TrackIndex);
             Editor.SelectNotify(Guid);
             Editor.MarkNotifiesDirty();
         };
@@ -618,7 +1149,7 @@ void FAnimTimelinePanel::DrawNotifyContextMenu()
     {
         if (ImGui::MenuItem("Named Notify"))
         {
-            Finish(Sequence->AddNotify(ContextTime, FName("NewNotify")));
+            Finish(Sequence->AddNotify(Time, FName("NewNotify")));
         }
         ImGui::Separator();
 
@@ -630,7 +1161,7 @@ void FAnimTimelinePanel::DrawNotifyContextMenu()
             if (ImGui::MenuItem(Class->Name.c_str()))
             {
                 FGuid Guid;
-                if (Sequence->AddNotifyOfClass(Class, ContextTime, 0.0f, &Guid))
+                if (Sequence->AddNotifyOfClass(Class, Time, 0.0f, &Guid))
                     Finish(Guid);
             }
         }
@@ -646,7 +1177,7 @@ void FAnimTimelinePanel::DrawNotifyContextMenu()
         if (ImGui::MenuItem("Named Notify State"))
         {
             FGuid Guid;
-            Sequence->AddNotify<UAnimNotifyState_Named>(ContextTime, DefaultDuration, &Guid)->NotifyName = "NewNotifyState";
+            Sequence->AddNotify<UAnimNotifyState_Named>(Time, DefaultDuration, &Guid)->NotifyName = "NewNotifyState";
             Finish(Guid);
         }
         ImGui::Separator();
@@ -661,12 +1192,50 @@ void FAnimTimelinePanel::DrawNotifyContextMenu()
             if (ImGui::MenuItem(Class->Name.c_str()))
             {
                 FGuid Guid;
-                if (Sequence->AddNotifyOfClass(Class, ContextTime, DefaultDuration, &Guid))
+                if (Sequence->AddNotifyOfClass(Class, Time, DefaultDuration, &Guid))
                     Finish(Guid);
             }
         }
         ImGui::EndMenu();
     }
+}
+
+void FAnimTimelinePanel::DrawRecordNotifyPopup()
+{
+    if (bOpenRecordNotifyPopup)
+    {
+        ImGui::OpenPopup("##RecordAddNotifyPopup");
+        bOpenRecordNotifyPopup = false;
+    }
+
+    if (!ImGui::BeginPopup("##RecordAddNotifyPopup"))
+    {
+        return;
+    }
+
+    UAnimSequence* Sequence = Editor.GetSequence();
+    const float Rate = Editor.GetFrameRate();
+    ImGui::Text("Add Notify at %.2fs (Frame %d)", RecordNotifyTime, static_cast<int>(std::lround(RecordNotifyTime * Rate)));
+    ImGui::Separator();
+
+    ImGui::SetNextItemWidth(EditorStyle::Scale(150.0f));
+    const bool bEnter = ImGui::InputText("Name", NewNotifyNameBuffer, sizeof(NewNotifyNameBuffer), ImGuiInputTextFlags_EnterReturnsTrue);
+    if ((bEnter || ImGui::Button("Add")) && NewNotifyNameBuffer[0])
+    {
+        const FGuid Guid = Sequence->AddNotify(RecordNotifyTime, FName(NewNotifyNameBuffer));
+        Sequence->SetNotifyTrackIndex(Guid, 0);
+        Editor.SelectNotify(Guid);
+        Editor.MarkNotifiesDirty();
+        ImGui::CloseCurrentPopup();
+    }
+    ImGui::SameLine();
+    if (ImGui::Button("Cancel"))
+    {
+        ImGui::CloseCurrentPopup();
+    }
+
+    ImGui::Separator();
+    DrawAddNotifyMenuItems(RecordNotifyTime, 0);
 
     ImGui::EndPopup();
 }
@@ -688,11 +1257,11 @@ void FAnimTimelinePanel::DeleteNotify(const FGuid& Guid)
     }
 }
 
-void FAnimTimelinePanel::UpdateNotifyDrag(const ImVec2& TracksOrigin, float PixelsPerSecond)
+void FAnimTimelinePanel::UpdateNotifyDrag(const ImVec2& TracksOrigin, float PixelsPerSecond, float RowHeight, const TArray<int32>& VisibleTracks)
 {
     UAnimSequence* Sequence = Editor.GetSequence();
     const FAnimNotifyEvent* Event = Sequence->FindNotify(DraggingNotify);
-    if (!Event)
+    if (!Event || VisibleTracks.IsEmpty())
     {
         DraggingNotify.Invalidate();
         return;
@@ -733,8 +1302,8 @@ void FAnimTimelinePanel::UpdateNotifyDrag(const ImVec2& TracksOrigin, float Pixe
     ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeAll);
 
     // 세로: 마우스가 있는 줄로 트랙 이동
-    const int32 NumTracks = Sequence->GetNumNotifyTracks();
-    const int32 TargetTrack = std::clamp(static_cast<int32>(std::floor((Mouse.y - TracksOrigin.y) / NotifyRowHeight)), 0, NumTracks - 1);
+    const int32 TargetRow = std::clamp(static_cast<int32>(std::floor((Mouse.y - TracksOrigin.y) / RowHeight)), 0, VisibleTracks.Num() - 1);
+    const int32 TargetTrack = VisibleTracks[TargetRow];
 
     // 가로: 시간 이동. 기본은 프레임 단위로 맞추고, Shift를 누르면 자유롭게.
     float TargetTime = (Mouse.x - TracksOrigin.x) / PixelsPerSecond - DragGrabOffset;

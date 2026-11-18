@@ -10,14 +10,18 @@ public:
         const FString& InAssetPath, UAnimSequence* InSequence);
 
     const char* GetEditorTypeName() const override { return "AnimSequence"; }
+    bool UsesPreviewSkybox() const override { return true; }
 
     // 재생 API — 패널은 이것만 부른다
     void  Play();
+    void  PlayForward();
+    void  PlayReverse();
     void  Pause();
     void  SetPlaybackTime(float Time);   // 스크럽: Pause + 시간 설정 + bPoseDirty
     void  StepFrame(int32 Delta);        // ±1프레임 (Pause)
     
     bool  IsPlaying() const { return bPlaying; }
+    bool  IsReverse() const { return PlayRate < 0.0f; }
     void  MarkPoseDirty() { bPoseDirty = true; }  // 설정이 바뀌어 같은 시간의 포즈를 다시 계산해야 할 때
     float GetPlaybackTime() const { return CurrentTime; }
     float GetPlayLength() const;

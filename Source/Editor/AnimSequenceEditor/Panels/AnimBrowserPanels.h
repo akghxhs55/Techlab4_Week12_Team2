@@ -19,6 +19,29 @@ protected:
 
 private:
     char SearchBuffer[128] = {};
+    int32 LastSelectedBone = -1;
+};
+
+struct FAnimAssetEntry
+{
+    FString FullPath;
+    FString DisplayName;
+    FString DisplayPath;
+    FString SizeText;
+};
+
+// 같은 스켈레탈 메시용 애니메이션 시퀀스(.anim.bin)를 검색/필터링해 표 형태로 그리는 공용 뷰
+struct FAnimAssetBrowserView
+{
+    void Refresh(const FString& PreviewMeshPath);
+    // 애니메이션을 더블클릭하면 해당 경로를 OutOpenedPath에 채우고 true를 반환한다.
+    bool Draw(const FString& PreviewMeshPath, const FString& CurrentAnimPath, bool bShowDirtyNotice, FString& OutOpenedPath);
+
+    TArray<FAnimAssetEntry> Entries;
+    FString SelectedPath;
+    FString LastPreviewMeshPath;
+    bool bScanned = false;
+    char SearchBuffer[128] = {};
 };
 
 // Unreal 애니메이션 뷰어의 Asset Browser.
@@ -35,10 +58,5 @@ protected:
     void DrawContent() override;
 
 private:
-    // Assets 폴더의 .anim.bin을 찾아 목록을 다시 만든다. 처음 그릴 때와 Refresh를 누를 때만 부른다.
-    void Refresh();
-
-    TArray<FString> Entries;
-    bool bScanned = false;
-    char SearchBuffer[128] = {};
+    FAnimAssetBrowserView BrowserView;
 };

@@ -4,8 +4,35 @@
 #include "Panels/SkeletalMeshViewportPanel.h"
 #include "Panels/SkeletalMeshInfoPanel.h"
 #include "Panels/SkeletalMeshDetailsPanel.h"
-#include "Panels/SkeletalMeshSettingsPanel.h"
 #include "Panels/BoneHierarchyPanel.h"
+#include "Panels/SkeletalMeshEditorPanel.h"
+#include "Editor/AnimSequenceEditor/Panels/AnimBrowserPanels.h"
+
+namespace
+{
+	// 스켈레탈 메시 뷰어에서 이 메시용 애니메이션(.anim.bin)을 검색·조회하고 더블클릭으로 여는 패널
+	class FSkeletalMeshAssetBrowserPanel final : public FSkeletalMeshEditorPanel
+	{
+	public:
+		explicit FSkeletalMeshAssetBrowserPanel(FSkeletalMeshEditor& InEditor)
+			: FSkeletalMeshEditorPanel(InEditor, "Asset Browser")
+		{
+		}
+
+	protected:
+		void DrawContent() override
+		{
+			FString OpenedPath;
+			if (BrowserView.Draw(Editor.GetAssetPath(), FString(), false, OpenedPath))
+			{
+				Editor.OpenAnimationAsset(OpenedPath);
+			}
+		}
+
+	private:
+		FAnimAssetBrowserView BrowserView;
+	};
+}
 
 FSkeletalMeshEditorTab::FSkeletalMeshEditorTab(FSkeletalMeshEditor& InEditor)
 	: FAssetEditorTab(InEditor)
@@ -20,7 +47,7 @@ FSkeletalMeshEditorTab::FSkeletalMeshEditorTab(FSkeletalMeshEditor& InEditor)
 	Panels.Add(MakeUnique<FSkeletalMeshInfoPanel>(InEditor));
 	Panels.Add(MakeUnique<FBoneHierarchyPanel>(InEditor));
 	Panels.Add(MakeUnique<FSkeletalMeshDetailsPanel>(InEditor));
-	Panels.Add(MakeUnique<FSkeletalMeshSettingsPanel>(InEditor));
+	Panels.Add(MakeUnique<FSkeletalMeshAssetBrowserPanel>(InEditor));
 	for (auto& Panel : Panels)
 	{
 		Panel->SetDockClass(PanelClassId);
@@ -61,19 +88,19 @@ void FSkeletalMeshEditorTab::BuildDefaultLayout(ImGuiID InDockSpaceId, const ImV
 	ImGui::DockBuilderAddNode(InDockSpaceId, ImGuiDockNodeFlags_DockSpace);
 	ImGui::DockBuilderSetNodeSize(InDockSpaceId, Size);
 	ImGuiID ViewportId = InDockSpaceId;
+	const ImGuiID HierarchyId = ImGui::DockBuilderSplitNode(ViewportId, ImGuiDir_Left, 0.18f, nullptr, &ViewportId);
 	ImGuiID RightId = ImGui::DockBuilderSplitNode(ViewportId, ImGuiDir_Right, 0.22f, nullptr, &ViewportId);
-	// 오른쪽 패널을 위에서부터 Info 20%, Hierarchy 30%, Details 30%, Settings 20%로 배치합니다.
+	// 오른쪽 패널을 위에서부터 Info, Details, Asset Browser 순서로 배치합니다.
 	ImGuiID RemainingId = RightId;
-	const ImGuiID InfoId = ImGui::DockBuilderSplitNode(RemainingId, ImGuiDir_Up, 0.20f, nullptr, &RemainingId);
-	const ImGuiID HierarchyId = ImGui::DockBuilderSplitNode(RemainingId, ImGuiDir_Up, 3.0f / 8.0f, nullptr, &RemainingId);
+	const ImGuiID InfoId = ImGui::DockBuilderSplitNode(RemainingId, ImGuiDir_Up, 0.22f, nullptr, &RemainingId);
 	ImGuiID DetailsId = RemainingId;
-	const ImGuiID SettingsId = ImGui::DockBuilderSplitNode(DetailsId, ImGuiDir_Down, 0.40f, nullptr, &DetailsId);
+	const ImGuiID BrowserId = ImGui::DockBuilderSplitNode(DetailsId, ImGuiDir_Down, 0.45f, nullptr, &DetailsId);
 
 	ImGui::DockBuilderDockWindow(Panels[0]->GetWindowName(), ViewportId);
 	ImGui::DockBuilderDockWindow(Panels[1]->GetWindowName(), InfoId);
 	ImGui::DockBuilderDockWindow(Panels[2]->GetWindowName(), HierarchyId);
 	ImGui::DockBuilderDockWindow(Panels[3]->GetWindowName(), DetailsId);
-	ImGui::DockBuilderDockWindow(Panels[4]->GetWindowName(), SettingsId);
+	ImGui::DockBuilderDockWindow(Panels[4]->GetWindowName(), BrowserId);
 	ImGui::DockBuilderFinish(InDockSpaceId);
 }
 
