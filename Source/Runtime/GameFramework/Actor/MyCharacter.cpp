@@ -90,11 +90,11 @@ void AMyCharacter::DetectedHit(const FHitResult& Hit)
 	if (AMyCharacter* HitCharacter = Cast<AMyCharacter>(HitActor))
 	{
 		KRS_LOG(Info, "[Attack] {} -> {}", GetName(), HitCharacter->GetName());
-		HitCharacter->SetIsHit();
+		HitCharacter->SetIsHit(this);
 	}
 }
 
-void AMyCharacter::SetIsHit()
+void AMyCharacter::SetIsHit(AActor* Attacker)
 {
 	UAnimInstance* AnimInstance = SkeletalMeshComponent->GetAnimInstance();
 	if (UMyAnimInstance* MyInstance = Cast<UMyAnimInstance>(AnimInstance))

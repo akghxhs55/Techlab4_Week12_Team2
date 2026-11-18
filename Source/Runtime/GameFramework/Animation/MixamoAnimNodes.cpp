@@ -323,7 +323,7 @@ void FAnimNode_MixamoBlendSpacePlayer::Update(const FAnimationUpdateContext& Con
 	// 상태 전환으로 섞이는 동안에는 이 상태의 가중치만큼만 움직인다
 	const float MoveSize = Move.Size();
 	const float Distance = MoveSize * Context.GetFinalBlendWeight();
-	if (MoveSize > 0.0f && Distance > 0.0f)
+	if (bExtractRootMotion && MoveSize > 0.0f && Distance > 0.0f)
 	{
 		AddTravelRootMotion(AnimInstance, Move * (1.0f / MoveSize), Distance);
 	}
