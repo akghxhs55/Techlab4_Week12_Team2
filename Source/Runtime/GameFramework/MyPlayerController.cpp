@@ -1,6 +1,7 @@
 #include "EnginePCH.h"
 #include "GameFramework/MyPlayerController.h"
 #include "GameFramework/Actor/MyCharacter.h"
+#include "GameFramework/Actor/KurisuCharacter.h"
 
 void AMyPlayerController::InputKey(int32 Key, bool bDown)
 {
@@ -24,5 +25,12 @@ void AMyPlayerController::InputKey(int32 Key, bool bDown)
 		{
 			MyCharacter->Jump();
 		}
+	}
+
+	// Kurisu 슬라이드: E. Shift(짧게 구르기 / 길게 Run)와 C(걷기)는 캐릭터 Tick이 키 상태를 읽는다
+	if (Key == static_cast<int32>(EKeyCode::E))
+	{
+		if (AKurisuCharacter* Kurisu = Cast<AKurisuCharacter>(GetPawn()))
+			Kurisu->Slide();
 	}
 }

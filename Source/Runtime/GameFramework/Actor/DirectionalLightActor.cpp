@@ -11,6 +11,7 @@ ADirectionalLightActor::ADirectionalLightActor()
     // Icon 옆에 붙어서 빛의 방향을 알려주는 기즈모 arrow (로컬 x축)
     ArrowComponent = CreateDefaultSubobject<UStaticMeshComponent>("UArrowComponent");
     ArrowComponent->SetEditorIcon(true);
+    ArrowComponent->SetHiddenInGame(true);
     ArrowComponent->SetupAttachment(DirectionalLightComponent);
     ArrowComponent->SetStaticMesh(UAssetManager::GetAssetByPath<UStaticMesh>("Arrow"));
     ArrowComponent->SetMaterial(0, UAssetManager::GetAssetByPath<UMaterial>("EditorArrowMaterial"));
