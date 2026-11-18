@@ -95,6 +95,9 @@ void FParticleSystemEditorTab::DrawToolbar()
 	ImGui::Indent(LeftPadding);
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + VerticalPadding);
 
+	DrawSimulationControls();
+
+	ImGui::SameLine(0.0f, 24.0f);
 	ImGui::AlignTextToFramePadding();
 	ImGui::TextUnformatted("LOD");
 	ImGui::SameLine();
@@ -109,6 +112,56 @@ void FParticleSystemEditorTab::DrawToolbar()
 	ImGui::SetCursorPosY(ImGui::GetCursorPosY() + (std::max)(VerticalPadding - Style.ItemSpacing.y, 0.0f));
 	ImGui::PopID();
 	ImGui::Separator();
+}
+
+void FParticleSystemEditorTab::DrawSimulationControls() const
+{
+	constexpr float ButtonWidth = 60.0f;
+	constexpr float SpeedWidth = 70.0f;
+
+	const bool bPaused = ParticleEditor.IsSimulationPaused();
+	if (ImGui::Button(bPaused ? "Play" : "Pause", ImVec2(ButtonWidth, 0.0f)))
+	{
+		ParticleEditor.ToggleSimulationPaused();
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip(bPaused ? "Resume the preview simulation" : "Pause the preview simulation");
+	}
+
+	ImGui::SameLine();
+	if (ImGui::Button("Restart", ImVec2(ButtonWidth, 0.0f)))
+	{
+		ParticleEditor.RestartSimulation();
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Reset all particles and restart the simulation");
+	}
+
+	ImGui::SameLine();
+	ImGui::BeginDisabled(!bPaused);
+	if (ImGui::Button("Step", ImVec2(ButtonWidth, 0.0f)))
+	{
+		ParticleEditor.StepSimulation();
+	}
+	ImGui::EndDisabled();
+	if (ImGui::IsItemHovered(ImGuiHoveredFlags_AllowWhenDisabled))
+	{
+		ImGui::SetTooltip("Advance the paused simulation by one frame (1/60 s)");
+	}
+
+	ImGui::SameLine();
+	float SpeedPercent = ParticleEditor.GetSimulationSpeed() * 100.0f;
+	ImGui::SetNextItemWidth(SpeedWidth);
+	if (ImGui::DragFloat("##SimSpeed", &SpeedPercent, 1.0f, 1.0f, 1000.0f, "%.0f%%", ImGuiSliderFlags_AlwaysClamp))
+	{
+		ParticleEditor.SetSimulationSpeed(SpeedPercent / 100.0f);
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Simulation speed (Ctrl+Click to type)");
+	}
 }
 
 void FParticleSystemEditorTab::DrawOrbitControls(float RightPadding) const

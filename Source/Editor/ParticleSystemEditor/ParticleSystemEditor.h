@@ -26,6 +26,13 @@ public:
 
 	void RestartSimulation() const;
 
+	bool IsSimulationPaused() const { return bSimulationPaused; }
+	void SetSimulationPaused(bool bPaused) { bSimulationPaused = bPaused; }
+	void ToggleSimulationPaused() { bSimulationPaused = !bSimulationPaused; }
+	void StepSimulation(float StepSeconds = 1.0f / 60.0f);
+	float GetSimulationSpeed() const { return SimulationSpeed; }
+	void SetSimulationSpeed(float InSpeed);
+
 	UObject* GetSelectedObject() const; // Emitter가 선택되어 있으면 Emitter를, Module이 선택되어 있으면 Module을 반환
 
 	int32 GetNumLODs() const;
@@ -111,6 +118,10 @@ private:
 	float OrbitAngle = 0.0f;
 
 	bool bShowStats = false;
+
+	bool bSimulationPaused = false;
+	float SimulationSpeed = 1.0f;
+	float PendingStepTime = 0.0f;
 
 	bool bUnsavedPromptRequested = false;
 	bool bCloseConfirmed = false;

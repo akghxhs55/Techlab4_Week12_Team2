@@ -20,6 +20,7 @@
 #include "Particles/Module/ParticleModuleTypeDataBeam.h"
 #include "Particles/Module/ParticleModuleTypeDataRibbon.h"
 #include "Particles/Module/ParticleModuleVelocity.h"
+#include <algorithm>
 #include <cmath>
 
 FParticleSystemEditor::FParticleSystemEditor(UEditorEngine& InEditorEngine, FEditorManager& InEditorManager,
@@ -57,8 +58,29 @@ void FParticleSystemEditor::Tick(float DeltaTime)
 
 	CameraInput = {};
 
-	UpdateOrbitPreview(DeltaTime);
-	FAssetEditor::Tick(DeltaTime);
+	float SimDelta = bSimulationPaused ? 0.0f : DeltaTime * SimulationSpeed;
+	if (PendingStepTime > 0.0f)
+	{
+		SimDelta = PendingStepTime;
+		PendingStepTime = 0.0f;
+	}
+
+	if (SimDelta > 0.0f)
+	{
+		UpdateOrbitPreview(SimDelta);
+		FAssetEditor::Tick(SimDelta);
+	}
+}
+
+void FParticleSystemEditor::StepSimulation(float StepSeconds)
+{
+	bSimulationPaused = true;
+	PendingStepTime = (std::max)(StepSeconds, 0.0f);
+}
+
+void FParticleSystemEditor::SetSimulationSpeed(float InSpeed)
+{
+	SimulationSpeed = std::clamp(InSpeed, 0.01f, 10.0f);
 }
 
 void FParticleSystemEditor::UpdateOrbitPreview(float DeltaTime)
