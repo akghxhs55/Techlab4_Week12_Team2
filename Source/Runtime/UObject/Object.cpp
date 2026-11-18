@@ -12,11 +12,36 @@
 
 TArray<UObject*> GUObjectArray;
 
+void UObjectBase::SetOuter(UObject* InOuter)
+{
+	if (Outer == InOuter)
+		return;
+	// 검색표에 있던 객체만 새 키로 다시 넣는다. 등록되지 않은 객체(UObject(false))는 건드리지 않는다.
+	UObject* Self = static_cast<UObject*>(this);
+	const bool bWasHashed = UnhashObjectName(Self);
+	Outer = InOuter;
+	if (bWasHashed)
+		HashObjectName(Self);
+}
+
+void UObjectBase::SetName(const FName& InName)
+{
+	if (Name == InName)
+		return;
+	UObject* Self = static_cast<UObject*>(this);
+	const bool bWasHashed = UnhashObjectName(Self);
+	Name = FName(InName);
+	if (bWasHashed)
+		HashObjectName(Self);
+}
+
 UObject::UObject()
 {
 	ObjectUUID = FEngineStatics::GetUUID();
 	InternalIndex = GUObjectArray.Num();
 	GUObjectArray.Add(this);
+	// Outer/Name은 StaticAllocateObject가 생성자보다 먼저 채워 두었다.
+	HashObjectName(this);
 }
 
 UObject::UObject(bool bRegister)
@@ -32,6 +57,7 @@ UObject::~UObject()
 		{
 			UnhashObject(this, GetClass());
 		}
+		UnhashObjectName(this);
 		int32 LastIndex = GUObjectArray.Num() - 1;
 		if (InternalIndex != LastIndex)
 		{

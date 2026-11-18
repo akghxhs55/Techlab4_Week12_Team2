@@ -105,7 +105,8 @@ FName MakeUniqueObjectName(UObject* Outer, const UClass* Class, FName BaseName)
 
 	// 로드된 객체는 저장된 이름(예: AActor_3)을 그대로 쓰지만 ClassUnique는 0부터 다시 시작하므로,
 	// 같은 Outer 안에 이미 있는 이름이면 번호를 계속 올린다. (겹치면 StaticAllocateObject가 기존 객체를 덮어쓴다)
-	const FString Base = BaseName.ToString();
+	// 끝 번호는 뗀 이름을 쓴다. ToString()을 쓰면 복사할 때마다 cube_0 → cube_0_1 → cube_0_1_2처럼 길어진다.
+	const FString Base = BaseName.GetPlainNameString();
 	FName Candidate;
 	do
 	{
@@ -135,6 +136,11 @@ UObject* StaticDuplicateObjectEx(FObjectDuplicationParameters& Parameters)
 		Params.Name = Parameters.DestName;
 		Params.SetFlags = Parameters.ApplyFlags | Parameters.SourceObject->GetMaskedFlags(Parameters.FlagMask);
 		DupRootObject = StaticConstructObject_Internal(Params);
+		if (!DupRootObject)
+		{
+			KRS_LOG(Error, "StaticDuplicateObjectEx: failed to create duplicate of {}", Source->GetName());
+			return nullptr;
+		}
 	}
 
 	FDuplicatedObjectAnnotation DuplicatedObjectAnnotation;
@@ -192,10 +198,14 @@ UObject* StaticFindObjectFast(UClass* Class, UObject* InOuter, FName InName, EFi
 {
 	const bool bExactClass = HasFlag(Flags, EFindObjectFlags::ExactClass);
 
-	for (UObject* Obj : GUObjectArray)            
+	// Outer와 이름이 같은 객체만 검색표에서 바로 꺼낸다. (GUObjectArray 전체 순회 대신)
+	const TArray<UObject*>* Bucket = FindObjectsWithOuterAndName(InOuter, InName);
+	if (!Bucket)
+		return nullptr;
+
+	for (UObject* Obj : *Bucket)
 	{
-		// Outer와 이름이 같은지: 이 두 개가 같은 객체인가 조건
-		if (!Obj || Obj->GetOuter() != InOuter || Obj->GetFName() != InName)
+		if (!Obj)
 			continue;
 
 		// 제외 플래그: 이 플래그를 가진 객체는 못 찾은 것으로 친다
@@ -222,11 +232,16 @@ UObject* StaticAllocateObject(const UClass* InClass, UObject* InOuter, FName InN
 	}
 	else
 	{
-		Obj = StaticFindObjectFast(nullptr, InOuter, InName, EFindObjectFlags::ExactClass);
-		if (Obj && !Obj->GetClass()->IsChildOf(InClass))
+		Obj = StaticFindObjectFast(nullptr, InOuter, InName);
+		const bool bCanRecycle = Obj && bCanRecycleSubobjects &&
+			Obj->HasAnyFlags(EObjectFlags::RF_DefaultSubObject) && Obj->GetClass()->IsChildOf(InClass);
+		if (Obj && !bCanRecycle)
 		{
-			KRS_LOG(Error, "Cannot replace existing object {} of a different class", InName.ToString());
-			return nullptr;
+			// 기존 객체를 같은 메모리에 다시 생성하면 그 객체를 가리키던 포인터가 모르는 사이에
+			// 다른 객체(혹은 다른 크기의 객체)를 가리키게 된다. 파괴하지 않고 새 이름을 준다.
+			KRS_LOG(Warning, "Object name '{}' already exists in this outer, renamed", InName.ToString());
+			InName = MakeUniqueObjectName(InOuter, InClass, InName);
+			Obj = nullptr;
 		}
 	}
 	bool bSubObject = false;
@@ -235,14 +250,10 @@ UObject* StaticAllocateObject(const UClass* InClass, UObject* InOuter, FName InN
 		//GUObjectAllocator.AllocateUObject
 		Obj = static_cast<UObject*>(UObject::operator new(InClass->Size));
 	}
-	else if (bCanRecycleSubobjects && Obj->HasAnyFlags(EObjectFlags::RF_DefaultSubObject))
+	else
 	{
 		bSubObject = true;                    // 재활용: 파괴하지 않음
 		Obj->SetFlags(InFlags);
-	}
-	else
-	{
-		Obj->~UObject();                      // 교체: 같은 메모리에 다시 생성
 	}
 
 	if (!bSubObject)

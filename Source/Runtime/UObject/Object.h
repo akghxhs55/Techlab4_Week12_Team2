@@ -71,9 +71,10 @@ public:
 	FString GetName() const { return Name.ToString(); }    // Name 출력용
 
 	UObject* GetOuter() const { return Outer; }
-	void SetOuter(UObject* InOuter) { Outer = InOuter; }
+	// (Outer, Name) 검색표도 함께 갱신한다.
+	void SetOuter(UObject* InOuter);
 
-	void SetName(const FName& InName) { Name = FName(InName); }
+	void SetName(const FName& InName);
 
 	inline void SetFlags(EObjectFlags NewFlags) { Flags |= NewFlags; }
 	inline void ClearFlags(EObjectFlags FlagsToClear) { Flags &= ~FlagsToClear; }

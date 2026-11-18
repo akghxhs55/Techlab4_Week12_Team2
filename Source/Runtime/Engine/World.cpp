@@ -149,6 +149,8 @@ AActor* UWorld::SpawnActor(UClass* Class, FName InName, const FTransform* Transf
 
 void UWorld::Tick(float RealDeltaTime)
 {
+	bIsTicking = true;
+
 	// Hit Stop 시간 흐름
 	if (HitStopTimeRemaining > 0.0f)
 	{
@@ -191,6 +193,10 @@ void UWorld::Tick(float RealDeltaTime)
 		SCOPE_CYCLE_COUNTER(STAT_UpdateAllTransforms);
 		Scene.UpdateAllTransforms();
 	}
+
+	// Tick 안의 모든 순회(틱 함수, 오브젝트 이터레이터, 오버랩 콜백)가 끝났으므로 이제 해제해도 안전하다.
+	bIsTicking = false;
+	FlushPendingDestroyActors();
 }
 
 void UWorld::AddRenderedViewLocation(const FVector& ViewLocation)
@@ -312,6 +318,9 @@ void UWorld::PreviewWorldTick(float DeltaTime)
 
 void UWorld::ClearWorld()
 {
+	// 지연 삭제 대기 중인 액터는 이미 레벨에서 빠져 있으므로 따로 해제한다.
+	FlushPendingDestroyActors();
+
 	EndPlay();
 
 	// BeginPlay 대기 중인 Actor 제거
@@ -319,7 +328,14 @@ void UWorld::ClearWorld()
 	{
 		BeginPlayList.Dequeue();
 	}
-	
+
+	// 레벨 액터를 메인 카메라로 쓰고 있었다면 ClearActors가 지운 뒤 댕글링이 되므로 기본 카메라로 되돌린다.
+	if (MainCamera && MainCamera->GetLevel())
+	{
+		MainCamera = nullptr;
+		CreateMainCamera();
+	}
+
 	for (ULevel* Level : Levels)
 	{
 		for (AActor* Actor : Level->Actors)
@@ -329,17 +345,23 @@ void UWorld::ClearWorld()
 				Actor->EndPlay();
 			Actor->UnregisterAllComponents();
 			Actor->RegisterAllActorTickFunctions(false);
+
+			// DestroyActor와 마찬가지로 에디터 등 외부 구독자가 포인터를 정리할 기회를 준다.
+			if (GWorldActorDestroyedCallback)
+			{
+				GWorldActorDestroyedCallback(this, Actor);
+			}
 		}
 		Level->ClearActors();
 	}
 	// 액터 EndPlay에서 새로 등록한 작업까지 최종 정리한다.
 	CoroutineScheduler.Reset();
-	// 액터를 지우기 전에 렌더 프록시와 틱 등록부터 푼다. ClearActors는 액터를 delete만 하므로,
-	// 그대로 두면 지워진 컴포넌트를 가리키는 프록시가 FScene에 남아 다음 프레임에 터진다.
+	// 프록시와 틱 등록은 위 루프에서 액터마다 delete 전에 이미 풀었다. 여기서는 그 경로로 빠지지 않고
+	// FScene에 남은 프록시를 마저 비운다. 남겨 두면 지워진 컴포넌트를 가리키는 프록시가 다음 프레임에 터진다.
 	Scene.RemoveAllLights();
 	Scene.RemoveAllDecals();
 	Scene.RemoveAllPrimitives();
-	KRS_LOG(Info, "{} : ", PersistentLevel->GetActorNum());
+	KRS_LOG(Info, "ClearWorld : {} actors remain", PersistentLevel->GetActorNum());
 }
 
 // 메인 카메라 생성
@@ -391,10 +413,61 @@ void UWorld::SetOnActorDestroyedCallback(FOnWorldActorDestroyed InCallback)
 	GWorldActorDestroyedCallback = std::move(InCallback);
 }
 
+bool UWorld::IsPendingDestroy(const AActor* Actor) const
+{
+	return Actor && PendingDestroyActors.Contains(const_cast<AActor*>(Actor));
+}
+
+void UWorld::ReleaseWorldReferences(AActor* Actor)
+{
+	if (!Actor)
+		return;
+
+	// 컨트롤러가 사라질 폰을 계속 빙의하고 있지 않게 먼저 푼다. 폰이 아직 살아 있을 때 UnPossessed가 불린다.
+	if (PlayerController && PlayerController->GetPawn() == Actor)
+	{
+		PlayerController->UnPossess();
+	}
+	if (PlayerPawn == Actor)
+	{
+		PlayerPawn = nullptr;
+	}
+	if (PlayerController == Actor)
+	{
+		PlayerController->ClearInputState();
+		PlayerController->UnPossess();
+		PlayerController = nullptr;
+	}
+	if (MainCamera == Actor)
+	{
+		// 렌더러는 메인 카메라가 항상 있다고 가정하므로 기본 카메라를 다시 만든다.
+		MainCamera = nullptr;
+		CreateMainCamera();
+	}
+}
+
+void UWorld::FlushPendingDestroyActors()
+{
+	if (PendingDestroyActors.IsEmpty())
+		return;
+
+	// 소멸자 안에서 다시 Destroy가 불려도 목록이 꼬이지 않게 옮겨 놓고 해제한다.
+	TArray<AActor*> ToDelete = std::move(PendingDestroyActors);
+	PendingDestroyActors.Reset();
+	for (AActor* Actor : ToDelete)
+	{
+		delete Actor;
+	}
+}
+
 bool UWorld::DestroyActor(AActor* Actor)
 {
 	if (!Actor)
 		return false;
+
+	// 이번 Tick에 이미 정리된 액터. 두 번 EndPlay/delete되지 않게 막는다.
+	if (IsPendingDestroy(Actor))
+		return true;
 
 	ULevel* Level = Actor->GetLevel();
 
@@ -430,6 +503,8 @@ bool UWorld::DestroyActor(AActor* Actor)
 	FString ActorName = Actor->GetName();
 	uint32 ActorUUID = Actor->GetUUID();
 
+	ReleaseWorldReferences(Actor);
+
 	if (Actor->HasBegunPlay())
 		Actor->EndPlay();
 
@@ -444,8 +519,16 @@ bool UWorld::DestroyActor(AActor* Actor)
 		GWorldActorDestroyedCallback(this, Actor);
 	}
 
-	// 4. Actor 삭제
-	delete Actor;
+	// 4. Actor 삭제. Tick 중이면 호출자(자기 Tick, 오버랩 콜백, 이터레이터 루프)가
+	// 아직 이 포인터를 들고 있을 수 있으므로 메모리 해제만 Tick 끝으로 미룬다.
+	if (bIsTicking)
+	{
+		PendingDestroyActors.Add(Actor);
+	}
+	else
+	{
+		delete Actor;
+	}
 
 	KRS_LOG(Info, "Destroy Actor : {} UUID {}", ActorName, ActorUUID);
 
@@ -500,7 +583,7 @@ bool UWorld::SweepSingle(const FRay& WorldRay, float MaxDistance, float Radius, 
 			if (!bIntersects) continue;
 			NearestT = Enter;
 			OutHit.bBlockingHit = true;
-			OutHit.bStartPentrating = Enter == 0.0f;
+			OutHit.bStartPenetrating = Enter == 0.0f;
 			OutHit.HitComponent = Component;
 			OutHit.Distance = Enter;
 			OutHit.Time = Enter / MaxDistance;
@@ -640,7 +723,7 @@ bool UWorld::SweepAgainstCandidates(const TArray<FPrimitiveSceneProxy*>& Candida
 
 		NearestT = T;
 		OutHit.bBlockingHit = true;
-		OutHit.bStartPentrating = bInside;
+		OutHit.bStartPenetrating = bInside;
 		OutHit.HitComponent = Proxy->GetComponent();
 		OutHit.Distance = T;
 		OutHit.Time = T / MaxDistance;
@@ -918,6 +1001,10 @@ void UWorld::UpdateOverlaps()
 	for (int32 i = 0; i < Shapes.Num(); ++i)
 	{
 		UShapeComponent* A = Shapes[i];
+		// 앞선 쌍의 오버랩 콜백에서 Destroy되어 등록 해제된 도형. 메모리는 Tick 끝까지 살아 있지만
+		// 여기서 새 겹침을 만들면 곧 해제될 도형이 상대의 OverlapInfos에 남는다.
+		if (!A->IsRegistered())
+			continue;
 		AActor* OwnerA = A->GetOwner();
 
 		Candidates.clear();
@@ -943,7 +1030,12 @@ void UWorld::UpdateOverlaps()
 
 		for (int32 j : Candidates)
 		{
+			// 콜백으로 A나 B가 이번 루프 도중 등록 해제될 수 있다. 해제 시 OverlapInfos는 이미 정리되었다.
+			if (!A->IsRegistered())
+				break;
 			UShapeComponent* B = Shapes[j];
+			if (!B->IsRegistered())
+				continue;
 			AActor* OwnerB = B->GetOwner();
 
 			// 같은 Actor의 콜라이더끼리는 여기서는 무시한다.
@@ -1007,6 +1099,15 @@ float UWorld::GetEffectiveTimeDilation() const
 
 void UWorld::StartHitStop(float Duration, float Dilation)
 {
+	// 진행 중인 히트스탑이 있으면 더 강한(느린) 쪽을 유지한다.
+	// 약하고 짧은 히트스탑이 들어와 진행 중인 강한 히트스탑을 덮어쓰지 않게 한다.
+	if (HitStopTimeRemaining > 0.0f)
+	{
+		HitStopDilation = std::min(HitStopDilation, Dilation);
+	}
+	else
+	{
+		HitStopDilation = Dilation;
+	}
 	HitStopTimeRemaining = std::max(HitStopTimeRemaining, Duration);
-	HitStopDilation = Dilation;
 }

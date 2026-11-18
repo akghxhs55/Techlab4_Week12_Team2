@@ -4,6 +4,8 @@
 #include "UObject/Object.h"
 #include "UObject/Class.h"
 
+#include <unordered_map>
+
 //클래스에 해당하는 UObject들의 리스트(O(1)에 바로 가져옴)
 static TMap<const UClass*, TSet<UObject*>>& GetClassToObjects() { static TMap<const UClass*, TSet<UObject*>> M; return M; }
 
@@ -14,6 +16,63 @@ static TMap<FString, UClass*>& GetClassMap()
 {
 	static TMap<FString, UClass* > Map;
 	return Map;
+}
+
+namespace
+{
+	struct FObjectNameKey
+	{
+		const UObject* Outer;
+		FName Name;
+
+		bool operator==(const FObjectNameKey& Other) const { return Outer == Other.Outer && Name == Other.Name; }
+	};
+
+	struct FObjectNameKeyHash
+	{
+		size_t operator()(const FObjectNameKey& Key) const noexcept
+		{
+			const size_t OuterHash = std::hash<const void*>{}(Key.Outer);
+			return OuterHash ^ (FNameHash{}(Key.Name) + 0x9e3779b97f4a7c15ull + (OuterHash << 6) + (OuterHash >> 2));
+		}
+	};
+
+	// 대부분 버킷에 객체가 하나뿐이다. 같은 이름이 잠깐 겹치는 경우(이름 변경 도중 등)를 위해 배열로 둔다.
+	std::unordered_map<FObjectNameKey, TArray<UObject*>, FObjectNameKeyHash>& GetOuterNameToObjects()
+	{
+		static std::unordered_map<FObjectNameKey, TArray<UObject*>, FObjectNameKeyHash> M;
+		return M;
+	}
+}
+
+void HashObjectName(UObject* Obj)
+{
+	if (!Obj) return;
+	GetOuterNameToObjects()[FObjectNameKey{ Obj->GetOuter(), Obj->GetFName() }].AddUnique(Obj);
+}
+
+bool UnhashObjectName(UObject* Obj)
+{
+	if (!Obj) return false;
+	auto& Map = GetOuterNameToObjects();
+	const auto It = Map.find(FObjectNameKey{ Obj->GetOuter(), Obj->GetFName() });
+	if (It == Map.end()) return false;
+
+	TArray<UObject*>& Bucket = It->second;
+	const int32 Index = Bucket.Find(Obj);
+	if (Index == INDEX_NONE) return false;
+
+	Bucket.RemoveAtSwap(static_cast<uint32>(Index));
+	if (Bucket.IsEmpty())
+		Map.erase(It);
+	return true;
+}
+
+const TArray<UObject*>* FindObjectsWithOuterAndName(const UObject* Outer, FName Name)
+{
+	const auto& Map = GetOuterNameToObjects();
+	const auto It = Map.find(FObjectNameKey{ Outer, Name });
+	return It != Map.end() ? &It->second : nullptr;
 }
 
 void RegisterClass(UClass* Class)
@@ -35,38 +94,64 @@ UClass* FindClass(const FString& Name)
 
 UObject* FindObjectWithOuter(const UObject* outer, const UClass* Class, FName Name)
 {
-	for (UObject* Obj : GUObjectArray)
+	if (const TArray<UObject*>* Bucket = FindObjectsWithOuterAndName(outer, Name))
 	{
-		if (Obj && Obj->GetOuter() == outer && Obj->GetFName() == Name && Obj->GetClass() == Class)
-			return Obj;
+		for (UObject* Obj : *Bucket)
+		{
+			if (Obj && Obj->GetClass() == Class)
+				return Obj;
+		}
 	}
 	return nullptr;
+}
+
+namespace
+{
+	// 결과에 들어갈 객체 수. 전체 객체 수로 예약하면 이터레이터 하나가 GUObjectArray만큼 메모리를 잡는다.
+	int32 CountObjectsOfClass(const UClass* ClassToLookFor, bool bIsIncludeDerivedClass)
+	{
+		int32 Count = 0;
+		if (const TSet<UObject*>* Objects = GetClassToObjects().Find(ClassToLookFor))
+			Count += static_cast<int32>(Objects->Num());
+
+		if (bIsIncludeDerivedClass)
+			if (const TSet<UClass*>* ChildClasses = GetClassToChildren().Find(ClassToLookFor))
+				for (UClass* Child : *ChildClasses)
+					Count += CountObjectsOfClass(Child, true);
+		return Count;
+	}
+
+	void AppendObjectsOfClass(const UClass* ClassToLookFor, TArray<UObject*>& Results, bool bIsIncludeDerivedClass)
+	{
+		//Class에 해당하는 Objects 리스트를 가져온다.
+		if (const TSet<UObject*>* Objects = GetClassToObjects().Find(ClassToLookFor))
+		{
+			for (UObject* Obj : *Objects)
+			{
+				Results.Add(Obj);
+			}
+		}
+
+		if (!bIsIncludeDerivedClass) return;
+
+		//자식 클래스인 목록을 가져온다
+		if (const TSet<UClass*>* ChildClasses = GetClassToChildren().Find(ClassToLookFor))
+		{
+			for (UClass* Child : *ChildClasses)
+			{
+				AppendObjectsOfClass(Child, Results, true);
+			}
+		}
+	}
 }
 
 void GetObjectsOfClass(const UClass* ClassToLookFor, TArray<UObject*>& Results, bool bIsIncludeDerivedClass)
 {
 	if (!ClassToLookFor) return;
 
-	Results.Reserve(Results.Num() + GUObjectArray.Num());
-	//Class에 해당하는 Objects 리스트를 가져온다.
-	if (const TSet<UObject*>* Objects = GetClassToObjects().Find(ClassToLookFor))
-	{
-		for (UObject* Obj : *Objects)
-		{
-			Results.Add(Obj);
-		}
-	}
-
-	if (!bIsIncludeDerivedClass) return;
-
-	//자식 클래스인 목록을 가져온다
-	if (const TSet<UClass*>* ChildClasses = GetClassToChildren().Find(ClassToLookFor))
-	{
-		for (UClass* Child : *ChildClasses)
-		{
-			GetObjectsOfClass(Child, Results, bIsIncludeDerivedClass);
-		}
-	}
+	// 정확한 개수만큼 한 번만 예약하고, 재귀 단계마다 재할당하지 않는다.
+	Results.Reserve(static_cast<uint32>(Results.Num() + CountObjectsOfClass(ClassToLookFor, bIsIncludeDerivedClass)));
+	AppendObjectsOfClass(ClassToLookFor, Results, bIsIncludeDerivedClass);
 }
 
 void HashObject(UObject* Obj, const UClass* Class)

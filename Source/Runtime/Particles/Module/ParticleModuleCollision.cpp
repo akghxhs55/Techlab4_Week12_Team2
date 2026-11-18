@@ -115,7 +115,7 @@ void UParticleModuleCollision::Update(FParticleEmitterInstance& Owner, int32 Off
 			if (!UWorld::SweepAgainstCandidates(CandidateCache, Ray, Length, Radius, Hit))
 				return;
 			// 시작부터 겹쳐 있으면 법선을 믿을 수 없다 → 이번 프레임은 건너뛴다
-			if (Hit.bStartPentrating)
+			if (Hit.bStartPenetrating)
 				return;
 
 			// 경로상 비율 t는 공간 변환(아핀)에 상관없이 같으므로 응답은 시뮬레이션 공간에서 계산한다
