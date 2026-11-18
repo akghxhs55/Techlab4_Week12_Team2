@@ -10,4 +10,7 @@ public:
 protected:
 	void DrawContent() override;
 	bool IsViewportPanel() const override { return true; }
+
+private:
+	void DrawStatsOverlay(const ImVec2& ViewMin) const;
 };

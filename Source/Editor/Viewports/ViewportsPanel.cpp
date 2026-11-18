@@ -18,6 +18,8 @@
 #include "Render/SkinningStats.h"
 #include "Render/SkeletalMeshObject.h"
 #include "Components/SkinnedMeshComponent.h"
+#include "Components/ParticleSystemComponent.h"
+#include "Particles/ParticleEmitterInstance.h"
 #include "Editor/Gizmo/Gizmo.h"
 #include "Input/InputSystem.h"
 
@@ -531,6 +533,29 @@ const FRenderStats& Stats = RenderData.RenderStats;
 			{ GPUStats::STAT_GPU_ShadowDepths, GPUStats::STAT_GPU_DepthPrepass, GPUStats::STAT_GPU_ForwardOpaque },
 			[](TStatId Id) { return FStatRegistry::FindGPU(Id); });
 		Lines.Add({ std::format("  GPU dropped frames {}", FRealtimeGPUProfiler::GetDroppedFrames()), ValueColor });
+	}
+
+	if (FStatOverlay::IsEnabled(EStatFlags::Particle)) {
+		const UWorld* World = Client->GetWorld();
+		uint32 NumComponents = 0, NumEmitters = 0;
+		uint64 Active = 0, Capacity = 0, MemoryBytes = 0;
+		for (TObjectIterator<UParticleSystemComponent> It; It; ++It) {
+			if (!It->IsRegistered() || It->GetWorld() != World) continue;
+			++NumComponents;
+			for (const FParticleEmitterInstance* Instance : It->GetEmitterInstances()) {
+				if (!Instance) continue;
+				++NumEmitters;
+				Active += Instance->ActiveParticles;
+				Capacity += Instance->MaxActiveParticles;
+				MemoryBytes += Instance->GetParticleMemoryBytes();
+			}
+		}
+
+		Lines.Add({ "Particle", TitleColor });
+		Lines.Add({ std::format("  Components {}   Emitters {}", NumComponents, NumEmitters), ValueColor });
+		Lines.Add({ std::format("  Particles {} / {} ({:.1f} %)", Active, Capacity,
+			Capacity > 0 ? 100.0 * static_cast<double>(Active) / static_cast<double>(Capacity) : 0.0), ValueColor });
+		Lines.Add({ std::format("  Memory {:.1f} KB", static_cast<double>(MemoryBytes) / 1024.0), ValueColor });
 	}
 
 	if (Lines.Num() == 0 && ProfileLines.Num() == 0)

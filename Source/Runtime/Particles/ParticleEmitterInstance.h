@@ -15,6 +15,14 @@ class UParticleEmitter;
 class UParticleLODLevel;
 class UParticleSystemComponent;
 
+struct FParticleEmitterStats
+{
+	uint64 UpdateCycles = 0;
+	uint64 SpawnCycles = 0;
+	double UpdateMs = 0.0;
+	double SpawnMs = 0.0;
+};
+
 struct FParticleEmitterInstance
 {
 	FParticleEmitterInstance() = default;
@@ -47,6 +55,14 @@ struct FParticleEmitterInstance
 	FRandomStream RandomStream;
 
 	FBox BoundingBox;   // 월드 공간. 파티클 크기와 컴포넌트 스케일까지 포함
+
+	FParticleEmitterStats Stats;
+	uint64 GetParticleMemoryBytes() const
+	{
+		if (MaxActiveParticles <= 0)
+			return 0;
+		return static_cast<uint64>(MaxActiveParticles) * ParticleStride + sizeof(uint16) * (MaxActiveParticles + 1);
+	}
 
 	// 디버그: Burst가 터질 때마다 로그 (콘솔 p.LogBursts)
 	static bool bLogBursts;

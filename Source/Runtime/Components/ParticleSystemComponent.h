@@ -46,6 +46,7 @@ public:
 	void SetTemplate(UParticleSystem* NewTemplate);
 	const TArray<FParticleEmitterInstance*>& GetEmitterInstances() const { return EmitterInstances; }
 	bool HasCompleted() const { return bWasCompleted; }
+	double GetSendRenderDataMs() const { return SendRenderDataMs; }
 
 	FPrimitiveSceneProxy* CreateSceneProxy() override;
 	FBox CalcBounds() const override;
@@ -120,6 +121,7 @@ private:
 	// EmitterInstances를 만든 템플릿. Template이 직렬화 등으로 바뀌면 이 값과 달라진다
 	UParticleSystem* InitializedTemplate = nullptr;
 	bool bWasCompleted = false;
+	double SendRenderDataMs = 0.0;
 
 	int32 LODLevel = 0;
 	float LODCheckTimer = 0.0f;

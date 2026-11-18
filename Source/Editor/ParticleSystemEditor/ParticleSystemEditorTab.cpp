@@ -115,12 +115,15 @@ void FParticleSystemEditorTab::DrawOrbitControls(float RightPadding) const
 {
 	constexpr float FieldWidth = 80.0f;
 	const char* OrbitText = "Orbit Preview";
+	const char* StatsText = "Stats";
 
 	const ImGuiStyle& Style = ImGui::GetStyle();
 	const bool bOrbit = ParticleEditor.IsOrbitPreviewEnabled();
 
 	// 오른쪽 정렬
-	float GroupWidth = ImGui::GetFrameHeight() + Style.ItemInnerSpacing.x + ImGui::CalcTextSize(OrbitText).x;
+	const float CheckboxWidth = ImGui::GetFrameHeight() + Style.ItemInnerSpacing.x;
+	float GroupWidth = CheckboxWidth + ImGui::CalcTextSize(StatsText).x + Style.ItemSpacing.x
+		+ CheckboxWidth + ImGui::CalcTextSize(OrbitText).x;
 	if (bOrbit)
 	{
 		GroupWidth += 2.0f * (Style.ItemSpacing.x + FieldWidth);
@@ -132,6 +135,17 @@ void FParticleSystemEditorTab::DrawOrbitControls(float RightPadding) const
 	{
 		ImGui::SetCursorPosX(TargetX);
 	}
+
+	bool bShowStats = ParticleEditor.IsStatsOverlayEnabled();
+	if (ImGui::Checkbox(StatsText, &bShowStats))
+	{
+		ParticleEditor.SetStatsOverlayEnabled(bShowStats);
+	}
+	if (ImGui::IsItemHovered())
+	{
+		ImGui::SetTooltip("Show per-emitter performance stats in the viewport");
+	}
+	ImGui::SameLine();
 
 	bool bChecked = bOrbit;
 	if (ImGui::Checkbox(OrbitText, &bChecked))

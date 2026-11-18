@@ -4,6 +4,7 @@
 #include "ParticleLODLevel.h"
 #include "ParticleModule.h"
 #include "ParticleTypes.h"
+#include "ParticleStats.h"
 #include "Module/ParticleModuleRequired.h"
 #include "Module/ParticleModuleSpawn.h"
 #include "Module/ParticleModuleSubUV.h"
@@ -624,6 +625,7 @@ void FParticleEmitterInstance::Tick(float DeltaTime)
 	if (SpriteTemplate == nullptr || CurrentLODLevel == nullptr)
 		return;
 
+	FScopeCycleCounter UpdateTimer{ TStatId{} };
 	UpdateEmitterTime(DeltaTime);
 
 	KillParticles();
@@ -634,6 +636,17 @@ void FParticleEmitterInstance::Tick(float DeltaTime)
 			continue;
 		Module->Update(*this, SpriteTemplate->GetModuleOffset(Module), DeltaTime);
 	}
+	uint64 UpdateCycles = UpdateTimer.Finish();
+
+	FScopeCycleCounter SpawnTimer{ TStatId{} };
 	Spawn(DeltaTime);
+	Stats.SpawnCycles = SpawnTimer.Finish();
+
+	FScopeCycleCounter BoundsTimer{ TStatId{} };
 	UpdateBoundingBox(DeltaTime);
+	UpdateCycles += BoundsTimer.Finish();
+	Stats.UpdateCycles = UpdateCycles;
+
+	Stats.UpdateMs = SmoothParticleStatMs(Stats.UpdateMs, Stats.UpdateCycles);
+	Stats.SpawnMs = SmoothParticleStatMs(Stats.SpawnMs, Stats.SpawnCycles);
 }

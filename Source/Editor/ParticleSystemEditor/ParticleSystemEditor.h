@@ -60,6 +60,10 @@ public:
 	float GetOrbitSpeed() const { return OrbitSpeed; }
 	void SetOrbitSpeed(float InDegreesPerSecond) { OrbitSpeed = InDegreesPerSecond; }
 
+	bool IsStatsOverlayEnabled() const { return bShowStats; }
+	void SetStatsOverlayEnabled(bool bEnabled) { bShowStats = bEnabled; }
+	UParticleSystemComponent* GetPreviewComponent() const { return PreviewComponent; }
+
 	void NotifyPropertyEdited();
 	void NotifyStructureChanged();
 
@@ -105,6 +109,8 @@ private:
 	float OrbitRadius = 100.0f;
 	float OrbitSpeed = 180.0f;
 	float OrbitAngle = 0.0f;
+
+	bool bShowStats = false;
 
 	bool bUnsavedPromptRequested = false;
 	bool bCloseConfirmed = false;

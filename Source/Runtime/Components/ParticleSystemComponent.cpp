@@ -6,6 +6,7 @@
 #include "Particles/ParticleMeshEmitterInstance.h"
 #include "Render/Mesh.h"
 #include "Particles/ParticleHelper.h"
+#include "Particles/ParticleStats.h"
 #include "Render/LineBatcher.h"
 #include "UObject/UObjectIterator.h"
 #include "Engine/Scene.h"
@@ -170,6 +171,7 @@ void UParticleSystemComponent::SendRenderDynamicData()
 	if (!Proxy)
 		return;
 
+	FScopeCycleCounter Timer{ TStatId{} };
 	TArray<TUniquePtr<FDynamicEmitterDataBase>>& RenderData = Proxy->GetDynamicEmitterData();
 	if (RenderData.Num() != EmitterInstances.Num())
 	{
@@ -183,6 +185,7 @@ void UParticleSystemComponent::SendRenderDynamicData()
 		else
 			RenderData[Index].reset();
 	}
+	SendRenderDataMs = SmoothParticleStatMs(SendRenderDataMs, Timer.Finish());
 }
 
 void UParticleSystemComponent::TickComponent(float DeltaTime)
