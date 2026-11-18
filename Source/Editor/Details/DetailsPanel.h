@@ -24,6 +24,7 @@ public:
 	void OnRender() override;
 
 	void SelectComponent(UActorComponent* Component);
+	void OnActorDestroyed(AActor* Actor);
 	void DrawCompoenetList(AActor* SelectedActor, UActorComponent*& OutSelectedComponent);
 
 	const char* GetPanelName() const override { return "Details"; }

@@ -476,6 +476,55 @@ void FOutlinerPanel::SelectActor(AActor* Actor, bool bAdditiveToggle, bool bRang
     NotifySelectionChanged();
 }
 
+void FOutlinerPanel::OnActorDestroyed(AActor* Actor)
+{
+    if (!Actor)
+        return;
+
+    if (SelectionAnchorActor == Actor)
+        SelectionAnchorActor = nullptr;
+    if (RenamingActor == Actor)
+        RenamingActor = nullptr;
+    if (PendingDeleteActor == Actor)
+        PendingDeleteActor = nullptr;
+    for (int32 i = PendingDeleteActors.Num() - 1; i >= 0; --i)
+    {
+        if (PendingDeleteActors[i] == Actor)
+            PendingDeleteActors.RemoveAt(i);
+    }
+    if (PendingAttachChild && PendingAttachChild->GetOwner() == Actor)
+    {
+        PendingAttachChild = nullptr;
+        bPendingDetach = false;
+    }
+    if (PendingAttachParent && PendingAttachParent->GetOwner() == Actor)
+    {
+        PendingAttachParent = nullptr;
+    }
+    if (const int32 VisIdx = VisibleActorOrder.Find(Actor); VisIdx != INDEX_NONE)
+    {
+        VisibleActorOrder.RemoveAt(VisIdx);
+    }
+
+    bool bRemovedSelection = false;
+    for (int32 i = SelectedActors.Num() - 1; i >= 0; --i)
+    {
+        if (SelectedActors[i] == Actor)
+        {
+            SelectedActors.RemoveAt(i);
+            bRemovedSelection = true;
+        }
+    }
+    if (!SelectionAnchorActor && !SelectedActors.IsEmpty())
+    {
+        SelectionAnchorActor = SelectedActors[0];
+    }
+    if (bRemovedSelection)
+    {
+        NotifySelectionChanged();
+    }
+}
+
 void FOutlinerPanel::SelectActors(const TArray<AActor*>& Actors)
 {
     RenamingActor = nullptr;

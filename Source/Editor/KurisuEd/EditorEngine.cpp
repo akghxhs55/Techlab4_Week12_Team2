@@ -505,6 +505,49 @@ void UEditorEngine::InitPanels()
 
 	DetailsPanel->SetWorld(GetActiveWorld());
 
+	UWorld::SetOnActorDestroyedCallback(
+		[this](UWorld* /*DestroyedInWorld*/, AActor* DestroyedActor)
+		{
+			if (!DestroyedActor)
+			{
+				return;
+			}
+
+			if (Gizmo && Gizmo->GetTarget() && Gizmo->GetTarget()->GetOwner() == DestroyedActor)
+			{
+				Gizmo->SetTarget(nullptr, false);
+			}
+			if (Outline)
+			{
+				const TArray<UPrimitiveComponent*>& CurTargets = Outline->GetTargets();
+				bool bHadTarget = false;
+				TArray<UPrimitiveComponent*> Remaining;
+				for (UPrimitiveComponent* Prim : CurTargets)
+				{
+					if (Prim && Prim->GetOwner() == DestroyedActor)
+					{
+						bHadTarget = true;
+					}
+					else if (Prim)
+					{
+						Remaining.Add(Prim);
+					}
+				}
+				if (bHadTarget)
+				{
+					Outline->SetTargets(Remaining);
+				}
+			}
+			if (DetailsPanel)
+			{
+				DetailsPanel->OnActorDestroyed(DestroyedActor);
+			}
+			if (OutlinerPanel)
+			{
+				OutlinerPanel->OnActorDestroyed(DestroyedActor);
+			}
+		});
+
 	ViewportsPanel->SetWorld(EditorWorld);
 	ViewportsPanel->SetIsPlayingQuery([this]() { return IsPlaying(); });
 	ViewportsPanel->SetGizmo(Gizmo.get());
@@ -1539,6 +1582,7 @@ void UEditorEngine::FinishGizmoDragUndo()
 // ImGui를 정리한다. UObject 일괄 삭제와 공용 자원·Device 정리는 FEngineLoop가 이어서 한다.
 void UEditorEngine::PreExit()
 {
+	UWorld::SetOnActorDestroyedCallback(nullptr);
 	EndViewportNavCapture();
 	bTrackingGizmoDrag = false;
 	UndoHistory.Clear();

@@ -15,6 +15,7 @@
 #include "Engine/EngineTypes.h"
 #include "Render/SceneRenderData.h"
 #include "Script/CoroutineScheduler.h"
+#include <functional>
 #include "World.generated.h"
 
 class ULevel;
@@ -83,6 +84,9 @@ public:
 	int32 GetActorNum();
 
 	bool DestroyActor(AActor* Actor);
+
+	using FOnWorldActorDestroyed = std::function<void(UWorld*, AActor*)>;
+	static void SetOnActorDestroyedCallback(FOnWorldActorDestroyed InCallback);
 
 	// View별 Billboard 행렬 공급자는 이 동기 호출 동안만 사용하며 저장하지 않는다.
 	using FBillboardTraceTransform = FMatrix(*)(const UBillboardComponent&, const void*);

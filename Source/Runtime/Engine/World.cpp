@@ -46,6 +46,8 @@
 
 namespace
 {
+	UWorld::FOnWorldActorDestroyed GWorldActorDestroyedCallback;
+
 	inline void WritePerObjectConstants(uint8* Dest, const FMatrix& LocalToWorld, const FMatrix& WorldToLocal, bool bReceiveShadow)
 	{
 		FPerObjectConstants Constants{};
@@ -384,6 +386,11 @@ int32 UWorld::GetActorNum()
 	return PersistentLevel->GetActorNum();
 }
 
+void UWorld::SetOnActorDestroyedCallback(FOnWorldActorDestroyed InCallback)
+{
+	GWorldActorDestroyedCallback = std::move(InCallback);
+}
+
 bool UWorld::DestroyActor(AActor* Actor)
 {
 	if (!Actor)
@@ -430,6 +437,12 @@ bool UWorld::DestroyActor(AActor* Actor)
 	Actor->UnregisterAllComponents();
 
 	Actor->RegisterAllActorTickFunctions(false);
+
+	// 에디터 등 외부 구독자가 댕글링 포인터를 남기지 않도록 실제 메모리 해제 직전에 통지
+	if (GWorldActorDestroyedCallback)
+	{
+		GWorldActorDestroyedCallback(this, Actor);
+	}
 
 	// 4. Actor 삭제
 	delete Actor;

@@ -41,6 +41,7 @@ public:
     void DrawActorNode(AActor* Actor);
     void SelectActor(AActor* Actor, bool bAdditiveToggle = false, bool bRangeSelect = false);
     void SelectActors(const TArray<AActor*>& Actors);
+    void OnActorDestroyed(AActor* Actor);
 
     AActor* GetSelectedActor() const;
     const TArray<AActor*>& GetSelectedActors() const { return SelectedActors; }

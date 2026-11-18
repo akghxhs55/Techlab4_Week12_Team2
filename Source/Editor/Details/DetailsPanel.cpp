@@ -3592,6 +3592,54 @@ void FDetailsPanel::TryReparent(USceneComponent* DroppedComponent, USceneCompone
 }
 
 
+void FDetailsPanel::OnActorDestroyed(AActor* Actor)
+{
+	if (!Actor)
+	{
+		return;
+	}
+
+	if (EditingNameComponent && EditingNameComponent->GetOwner() == Actor)
+	{
+		EditingNameComponent = nullptr;
+		bIsEditingName = false;
+	}
+	if (PendingRootComponent && PendingRootComponent->GetOwner() == Actor)
+	{
+		PendingRootComponent = nullptr;
+	}
+	if (PendingDeleteComponent && PendingDeleteComponent->GetOwner() == Actor)
+	{
+		PendingDeleteComponent = nullptr;
+	}
+	if (PendingDroppedComponent && PendingDroppedComponent->GetOwner() == Actor)
+	{
+		PendingDroppedComponent = nullptr;
+	}
+	if (PendingDragComponent && PendingDragComponent->GetOwner() == Actor)
+	{
+		PendingDragComponent = nullptr;
+	}
+
+	const int32 Idx = TargetActors.Find(Actor);
+	if (Idx != INDEX_NONE)
+	{
+		TargetActors.RemoveAt(Idx);
+	}
+
+	if (TargetActor == Actor)
+	{
+		bPendingEditCommit = false;
+		PendingEditSnapshots.Empty();
+		TargetActor = TargetActors.IsEmpty() ? nullptr : TargetActors.Last();
+		TargetComponent = TargetActor ? TargetActor->GetRootComponent() : nullptr;
+	}
+	else if (TargetComponent && TargetComponent->GetOwner() == Actor)
+	{
+		TargetComponent = TargetActor ? TargetActor->GetRootComponent() : nullptr;
+	}
+}
+
 FDetailsPanel::~FDetailsPanel()
 {
 	//delete transform;
