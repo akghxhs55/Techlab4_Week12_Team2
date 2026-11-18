@@ -374,6 +374,11 @@ void FRenderDevice::CreateStates()
 		Desc.RenderTarget[0].DestBlendAlpha = D3D11_BLEND_ONE;
 		Device->CreateBlendState(&Desc, BlendStates[(uint8)EBlendState::Additive].GetAddressOf());
 
+		// 가산 파티클: 알파(텍스처 알파 x 파티클 Alpha 모듈)만큼만 더한다. 알파는 기존 값을 유지한다.
+		Desc.RenderTarget[0].SrcBlend = D3D11_BLEND_SRC_ALPHA;
+		Desc.RenderTarget[0].DestBlend = D3D11_BLEND_ONE;
+		Device->CreateBlendState(&Desc, BlendStates[(uint8)EBlendState::ParticleAdditive].GetAddressOf());
+
 		// 스텐실 마스크 패스처럼 색은 쓰지 않고 깊이·스텐실만 갱신할 때 쓴다.
 		Desc.RenderTarget[0].BlendEnable = FALSE;
 		Desc.RenderTarget[0].RenderTargetWriteMask = 0;
