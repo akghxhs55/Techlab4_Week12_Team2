@@ -78,6 +78,8 @@ MSBuild.exe .\Kurisu.slnx -t:KurisuEditor -p:Configuration=Release -p:Platform=x
 
 ## 프로젝트 썸네일
 
+에디터를 실행하면 현재 Windows 사용자의 `.kproject` 탐색기 아이콘을 `KurisuBackground`로 자동 등록합니다. 새로 만든 프로젝트와 기존 프로젝트 모두에 적용되며, 아이콘은 에디터 실행 파일에 포함되어 배포본에서도 동작합니다. 연결 프로그램은 변경하지 않습니다.
+
 - 새 프로젝트의 `Config`에는 `DefaultGame.ini`와 `EngineResources/Config`에서 복사한 기본 `editor.ini`, `imgui.ini`가 생성됩니다. 새 프로젝트의 렌더 설정과 창 배치는 이 템플릿에서 관리합니다.
 - 대표 씬은 `Config/DefaultGame.ini`의 `[Game] GameDefaultMap`으로 지정합니다. 기본값은 `Content/Scenes/Main.scene`입니다.
 - 프로젝트를 열면 대표 씬을 불러옵니다. 썸네일이 없으면 최초 화면에서 자동 생성하므로, 새 프로젝트에서 저장을 누르지 않고 종료해도 기본 씬의 썸네일이 남습니다.
