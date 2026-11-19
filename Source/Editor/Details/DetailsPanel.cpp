@@ -52,6 +52,126 @@
 
 namespace
 {
+	float GDetailsNameColumnRatio = 0.42f;
+	int32 GPropertyGridDepth = 0;
+	int32 GStructIndentLevel = 0;
+
+	struct FPropertyGridTableState
+	{
+		ImGuiTable* Table = nullptr;
+		ImGuiID DividerId = 0;
+		bool bOpen = false;
+	};
+	TArray<FPropertyGridTableState> GPropertyGridTableStack;
+
+	void DrawPropertyGridLabel(const char* LabelText)
+	{
+		if (GStructIndentLevel > 0)
+		{
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + static_cast<float>(GStructIndentLevel) * EditorStyle::Scale(12.0f));
+		}
+		const float AvailWidth = ImGui::GetContentRegionAvail().x;
+		ImGui::AlignTextToFramePadding();
+		ImGui::TextUnformatted(LabelText);
+		if (ImGui::IsItemHovered() && ImGui::CalcTextSize(LabelText).x > AvailWidth)
+		{
+			ImGui::SetTooltip("%s", LabelText);
+		}
+	}
+
+	bool BeginPropertyGridTable(const char* TableId)
+	{
+		const float PaddingX = EditorStyle::Scale(6.0f);
+		const float PaddingY = EditorStyle::Scale(4.0f);
+		const float AvailWidth = (std::max)(1.0f, ImGui::GetContentRegionAvail().x);
+		const float MinLabelInner = EditorStyle::Scale(60.0f);
+		const float MaxLabelInner = (std::max)(MinLabelInner, AvailWidth - EditorStyle::Scale(90.0f) - PaddingX * 2.0f);
+		const float TargetLabelInner = std::clamp(AvailWidth * GDetailsNameColumnRatio - PaddingX * 2.0f, MinLabelInner, MaxLabelInner);
+
+		ImGui::PushStyleColor(ImGuiCol_TableBorderLight, EditorColor::ToVec4(EditorColor::Border));
+		ImGui::PushStyleColor(ImGuiCol_TableBorderStrong, EditorColor::ToVec4(EditorColor::BorderStrong));
+		ImGui::PushStyleVar(ImGuiStyleVar_CellPadding, ImVec2(PaddingX, PaddingY));
+
+		// ImGuiTableFlags_BordersInner로 행 사이 가로선과 중앙 세로 구분선만 그리고 바깥쪽 테두리는 없앤다.
+		// 열 폭 조절은 EndPropertyGridTable의 가로 전용 스플리터로 모든 카테고리에서 동기화한다.
+		const ImGuiTableFlags Flags =
+			ImGuiTableFlags_BordersInner |
+			ImGuiTableFlags_NoSavedSettings |
+			ImGuiTableFlags_SizingFixedFit;
+
+		if (!ImGui::BeginTable(TableId, 2, Flags))
+		{
+			ImGui::PopStyleVar();
+			ImGui::PopStyleColor(2);
+			return false;
+		}
+
+		ImGui::TableSetupColumn("Name", ImGuiTableColumnFlags_WidthFixed | ImGuiTableColumnFlags_NoResize, TargetLabelInner);
+		ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch | ImGuiTableColumnFlags_NoResize);
+
+		FPropertyGridTableState State;
+		State.Table = ImGui::GetCurrentTable();
+		State.DividerId = ImGui::GetID("##GridColSplitter");
+		State.bOpen = true;
+		GPropertyGridTableStack.Add(State);
+		++GPropertyGridDepth;
+		return true;
+	}
+
+	void EndPropertyGridTable()
+	{
+		if (GPropertyGridTableStack.IsEmpty())
+		{
+			return;
+		}
+
+		const FPropertyGridTableState State = GPropertyGridTableStack.Last();
+		GPropertyGridTableStack.Pop();
+		if (GPropertyGridDepth > 0)
+		{
+			--GPropertyGridDepth;
+		}
+
+		ImGui::EndTable();
+
+		if (State.bOpen && State.Table && State.Table->Columns.size() >= 2)
+		{
+			const ImRect TableRect(ImGui::GetItemRectMin(), ImGui::GetItemRectMax());
+			const float DividerX = State.Table->Columns[0].MaxX;
+			const float HalfHit = EditorStyle::Scale(4.0f);
+			const ImRect HitRect(DividerX - HalfHit, TableRect.Min.y, DividerX + HalfHit, TableRect.Max.y);
+
+			ImGui::ItemAdd(HitRect, State.DividerId, nullptr, ImGuiItemFlags_NoNav);
+			bool bHovered = false;
+			bool bHeld = false;
+			ImGui::ButtonBehavior(HitRect, State.DividerId, &bHovered, &bHeld, ImGuiButtonFlags_FlattenChildren | ImGuiButtonFlags_NoNavFocus);
+
+			if (bHovered || bHeld)
+			{
+				// 옆(가로) 조절 커서만 허용한다.
+				ImGui::SetMouseCursor(ImGuiMouseCursor_ResizeEW);
+				const ImU32 HighlightCol = bHeld ? EditorColor::AccentBright : EditorColor::BorderStrong;
+				ImGui::GetWindowDrawList()->AddLine(
+					ImVec2(DividerX, TableRect.Min.y),
+					ImVec2(DividerX, TableRect.Max.y),
+					HighlightCol,
+					EditorStyle::Scale(2.0f));
+			}
+
+			if (bHeld)
+			{
+				const float TotalW = (std::max)(1.0f, TableRect.GetWidth());
+				const float MinColW = EditorStyle::Scale(60.0f);
+				const float MaxColW = (std::max)(MinColW, TotalW - EditorStyle::Scale(90.0f));
+				const float NewColW = std::clamp(ImGui::GetIO().MousePos.x - TableRect.Min.x, MinColW, MaxColW);
+				GDetailsNameColumnRatio = std::clamp(NewColW / TotalW, 0.15f, 0.80f);
+			}
+		}
+
+		ImGui::PopStyleVar();
+		ImGui::PopStyleColor(2);
+	}
+
 	struct FDragSettings
 	{
 		float Speed;
@@ -239,45 +359,64 @@ namespace
 			BufferSource = Path;
 		}
 
-		if (CustomFont) ImGui::PushFont(CustomFont);
-		ImGui::InputTextWithHint("Script Path", "Content/Scripts/MyScript.lua", Buffer, sizeof(Buffer));
-		const bool bCommitted = ImGui::IsItemDeactivatedAfterEdit();
-		if (CustomFont) ImGui::PopFont();
-		if (bCommitted)
+		if (BeginPropertyGridTable("ScriptProperties"))
 		{
-			Script->SetScriptPath(Buffer);
-			BufferOwner = nullptr;   // 정규화된 경로로 다시 채운다
-			return;
-		}
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			DrawPropertyGridLabel("Script Path");
 
-		std::error_code Ec;
-		if (bHasPath && !fs::exists(FLuaScriptManager::ToPath(Path), Ec))
-			ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "File not found");
+			ImGui::TableSetColumnIndex(1);
+			ImGui::SetNextItemWidth(-1.0f);
+			if (CustomFont) ImGui::PushFont(CustomFont);
+			ImGui::InputTextWithHint("##ScriptPath", "Content/Scripts/MyScript.lua", Buffer, sizeof(Buffer));
+			const bool bCommitted = ImGui::IsItemDeactivatedAfterEdit();
+			if (CustomFont) ImGui::PopFont();
+			if (bCommitted)
+			{
+				Script->SetScriptPath(Buffer);
+				BufferOwner = nullptr;   // 정규화된 경로로 다시 채운다
+				EndPropertyGridTable();
+				return;
+			}
 
-		// 기존 파일 연결
-		if (ImGui::Button("Browse"))
-		{
-			const FString Picked = PickScriptPath(false, Script->GetOwner());
-			if (!Picked.empty())
-				Script->SetScriptPath(Picked);
+			std::error_code Ec;
+			if (bHasPath && !fs::exists(FLuaScriptManager::ToPath(Path), Ec))
+			{
+				ImGui::TextColored(EditorColor::ToVec4(EditorColor::Error), "File not found");
+			}
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			DrawPropertyGridLabel("Actions");
+
+			ImGui::TableSetColumnIndex(1);
+			// 기존 파일 연결
+			if (ImGui::Button("Browse"))
+			{
+				const FString Picked = PickScriptPath(false, Script->GetOwner());
+				if (!Picked.empty())
+					Script->SetScriptPath(Picked);
+			}
+			ImGui::SameLine();
+			// 템플릿에서 새 파일을 만들어 연결
+			if (ImGui::Button("New"))
+			{
+				const FString Picked = PickScriptPath(true, Script->GetOwner());
+				if (!Picked.empty())
+					Script->SetScriptPath(Picked);
+			}
+			ImGui::SameLine();
+			ImGui::BeginDisabled(!bHasPath);
+			if (ImGui::Button("Edit"))
+				FLuaScriptManager::Get().OpenScriptInEditor(Path);
+			ImGui::SameLine();
+			// 연결만 끊는다. 파일은 남는다.
+			if (ImGui::Button("Clear"))
+				Script->SetScriptPath({});
+			ImGui::EndDisabled();
+
+			EndPropertyGridTable();
 		}
-		ImGui::SameLine();
-		// 템플릿에서 새 파일을 만들어 연결
-		if (ImGui::Button("New"))
-		{
-			const FString Picked = PickScriptPath(true, Script->GetOwner());
-			if (!Picked.empty())
-				Script->SetScriptPath(Picked);
-		}
-		ImGui::SameLine();
-		ImGui::BeginDisabled(!bHasPath);
-		if (ImGui::Button("Edit"))
-			FLuaScriptManager::Get().OpenScriptInEditor(Path);
-		ImGui::SameLine();
-		// 연결만 끊는다. 파일은 남는다.
-		if (ImGui::Button("Clear"))
-			Script->SetScriptPath({});
-		ImGui::EndDisabled();
 	}
 
 	bool DrawAxisControl(const FString& _label, float& _value, float _speed, float _minValue, float _maxValue, float _resetValue, FVector4 _color)
@@ -312,37 +451,31 @@ namespace
 
 	bool DrawVector3Controller(const FString& _label, float* _values, float _resetValue, float _columnWidth)
 	{
+		(void)_columnWidth;
 		ImGuiIO& io = ImGui::GetIO();
 		auto boldFont = io.FontDefault ? io.FontDefault : io.Fonts->Fonts[0];
 
-		ImGuiTableFlags flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
-
 		bool isVectorChanged = false;
+		const bool bUseOwnTable = (GPropertyGridDepth == 0);
 
 		ImGui::PushID(_label.c_str());
-		if (ImGui::BeginTable(_label.c_str(), 2, flags)) // 고유 ID, 열 2개, 플래그
+		if (!bUseOwnTable || BeginPropertyGridTable(_label.c_str()))
 		{
-			// ImGuiTableColumnFlags_WidthFixed: 초기 너비 고정
-			// ImGuiTableColumnFlags_WidthStretch: 창 크기에 따라 너비 조절 (기본값)
-			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, EditorStyle::Scale(_columnWidth));
-			ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthStretch);
-
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::AlignTextToFramePadding();
-			ImGui::TextUnformatted(_label.c_str());
+			DrawPropertyGridLabel(_label.c_str());
 
 			ImGui::TableSetColumnIndex(1);
 			// [컨트롤러 UI 코드] // 오른쪽 열: 컨트롤러
 			const float Gap = EditorStyle::Scale(2.0f);
-            const float ButtonWidth = ImGui::GetFrameHeight() + EditorStyle::Scale(2.0f);
-            const float Available = ImGui::GetContentRegionAvail().x;
-            const bool bStackAxes = Available < EditorStyle::Scale(210.0f);
-            const float ValueWidth = bStackAxes
-                ? ImMax(1.0f, Available - ButtonWidth - Gap)
-                : ImMax(3.0f, Available - 3.0f * ButtonWidth - 5.0f * Gap);
-            ImGui::PushMultiItemsWidths(bStackAxes ? 1 : 3, ValueWidth);
-            ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ Gap, ImGui::GetStyle().ItemSpacing.y });
+			const float ButtonWidth = ImGui::GetFrameHeight() + EditorStyle::Scale(2.0f);
+			const float Available = ImGui::GetContentRegionAvail().x;
+			const bool bStackAxes = Available < EditorStyle::Scale(165.0f);
+			const float ValueWidth = bStackAxes
+				? ImMax(1.0f, Available - ButtonWidth - Gap)
+				: ImMax(3.0f, Available - 3.0f * ButtonWidth - 5.0f * Gap);
+			ImGui::PushMultiItemsWidths(bStackAxes ? 1 : 3, ValueWidth);
+			ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{ Gap, ImGui::GetStyle().ItemSpacing.y });
 			ImGui::PushFont(boldFont);
 
 			isVectorChanged |= DrawAxisControl("X", _values[0], 0.1f, 0.0f, 0.0f, _resetValue, { 0.8f, 0.1f, 0.1f, 1.0f });
@@ -361,9 +494,11 @@ namespace
 
 			ImGui::PopFont();
 			ImGui::PopStyleVar();
-			ImGui::EndTable();
+			if (bUseOwnTable)
+			{
+				EndPropertyGridTable();
+			}
 		}
-
 
 		ImGui::PopID();
 
@@ -1094,7 +1229,7 @@ namespace
 
 		ImGui::TableNextRow();
 		ImGui::TableSetColumnIndex(0);
-		ImGui::TextUnformatted(Label);
+		DrawPropertyGridLabel(Label);
 		ImGui::TableSetColumnIndex(1);
 		ImGui::PushID(TextureSlot);
 
@@ -1154,11 +1289,8 @@ namespace
 
 			if (bOpen)
 			{
-				if (ImGui::BeginTable("MaterialProperties", 2))
+				if (BeginPropertyGridTable("MaterialProperties"))
 				{
-					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, EditorStyle::Scale(110.0f));
-					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
 					DrawMaterialTextureSlot(MeshComponent, Slot, 0, "Texture", Effective, Override);
 					DrawMaterialTextureSlot(MeshComponent, Slot, 1, "Normal Map", Effective, Override);
 
@@ -1166,7 +1298,7 @@ namespace
 
 					// 3: Base Color
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("Base Color");
+					DrawPropertyGridLabel("Base Color");
 
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
@@ -1185,7 +1317,7 @@ namespace
 					ImGui::TableNextRow();
 
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("Shininess");
+					DrawPropertyGridLabel("Shininess");
 
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
@@ -1205,7 +1337,7 @@ namespace
 
 					// 4: UV Scroll Speed
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("UV Scroll");
+					DrawPropertyGridLabel("UV Scroll");
 
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
@@ -1225,7 +1357,7 @@ namespace
 
 					// 5: Sampler State
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("Sampler");
+					DrawPropertyGridLabel("Sampler");
 
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
@@ -1253,7 +1385,7 @@ namespace
 
 					// 6: Blend State
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("Blend Mode");
+					DrawPropertyGridLabel("Blend Mode");
 
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
@@ -1277,7 +1409,7 @@ namespace
 						ImGui::EndCombo();
 					}
 
-					ImGui::EndTable();
+					EndPropertyGridTable();
 				}
 				ImGui::TreePop();
 			}
@@ -1495,14 +1627,21 @@ namespace
 		if (const FStructProperty* StructProperty = CastField<FStructProperty>(&Property))
 		{
 			// USTRUCT: 구조체의 프로퍼티를 한 단계 들여 그린다. 컨테이너가 객체가 아니라 이 멤버의 주소다.
-			ImGui::Indent();
+			const bool bUsePlainIndent = (GPropertyGridDepth == 0);
+			if (bUsePlainIndent)
+			{
+				ImGui::Indent();
+			}
 			ImGui::PushID(Label);
 
 			if (const FPropertyEditor::FStructDrawer* Drawer = GetStructDrawers().Find(StructProperty->Struct))
 			{
 				const bool bCustomChanged = (*Drawer)(Object, ValuePtr, *StructProperty->Struct, StructProperty->Meta, CustomFont);
 				ImGui::PopID();
-				ImGui::Unindent();
+				if (bUsePlainIndent)
+				{
+					ImGui::Unindent();
+				}
 				return bCustomChanged;
 			}
 
@@ -1529,7 +1668,10 @@ namespace
 			}
 
 			ImGui::PopID();
-			ImGui::Unindent();
+			if (bUsePlainIndent)
+			{
+				ImGui::Unindent();
+			}
 			return bChanged;
 		}
 
@@ -1543,21 +1685,56 @@ namespace
 	{
 		void* ValuePtr = Property.ContainerPtrToValuePtr(Container);
 		const FString Label = "##" + Property.Name;
-
 		const char* DisplayName = Property.Name.c_str();
 
-		// 패널이 넓으면 라벨 | 값을 한 줄에, 좁거나 라벨이 길면 라벨 아래 줄에 값을 놓는다.
+		if (GPropertyGridDepth > 0)
+		{
+			if (Property.IsA<FTransformProperty>())
+			{
+				if (Property.Name != "Transform" || GStructIndentLevel > 0)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					DrawPropertyGridLabel(DisplayName);
+					ImGui::TableSetColumnIndex(1);
+					++GStructIndentLevel;
+					const bool bChanged = DrawPropertyValue(Object, Property, ValuePtr, Label.c_str(), CustomFont, MetaOverride);
+					--GStructIndentLevel;
+					return bChanged;
+				}
+				return DrawPropertyValue(Object, Property, ValuePtr, Label.c_str(), CustomFont, MetaOverride);
+			}
+
+			if (Property.IsA<FStructProperty>())
+			{
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				DrawPropertyGridLabel(DisplayName);
+				ImGui::TableSetColumnIndex(1);
+				++GStructIndentLevel;
+				const bool bChanged = DrawPropertyValue(Object, Property, ValuePtr, Label.c_str(), CustomFont, MetaOverride);
+				--GStructIndentLevel;
+				return bChanged;
+			}
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			DrawPropertyGridLabel(DisplayName);
+			ImGui::TableSetColumnIndex(1);
+			ImGui::SetNextItemWidth(-1.0f);
+			return DrawPropertyValue(Object, Property, ValuePtr, Label.c_str(), CustomFont, MetaOverride);
+		}
+
+		// 테이블 바깥에서 단일 호출될 때의 폴백 레이아웃
 		const float StartX = ImGui::GetCursorPosX();
 		const float AvailableWidth = ImGui::GetContentRegionAvail().x;
-		const float LabelWidth = AvailableWidth * 0.45f;
+		const float LabelWidth = AvailableWidth * GDetailsNameColumnRatio;
 
 		const bool bInline = !Property.IsA<FTransformProperty>() && !Property.IsA<FStructProperty>() && AvailableWidth >= EditorStyle::Scale(260.0f) && ImGui::CalcTextSize(DisplayName).x < LabelWidth;
 
 		ImGui::AlignTextToFramePadding();
 		ImGui::TextWrapped("%s", DisplayName);
 
-		// SameLine(x)는 테이블 칸 안에서 칸 시작 위치를 한 번 더 더해 값 위젯이 칸 밖으로 밀려난다.
-		// StartX는 이미 칸 시작을 포함한 창 기준 좌표이므로 SetCursorPosX로 직접 옮긴다.
 		if (bInline)
 		{
 			ImGui::SameLine();
@@ -1621,17 +1798,21 @@ namespace
 			ImGui::PushID(Class->Name.c_str());
 			if (ImGui::CollapsingHeader(Class->Name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				for (const FProperty* Property : Class->GetProperties())
+				if (BeginPropertyGridTable("CategoryProperties"))
 				{
-					if (!Property->HasAnyFlags(CPF_Edit))
+					for (const FProperty* Property : Class->GetProperties())
 					{
-						continue;
-					}
+						if (!Property->HasAnyFlags(CPF_Edit))
+						{
+							continue;
+						}
 
-					const bool bReadOnly = Property->HasAnyFlags(CPF_EditConst);
-					if (bReadOnly) ImGui::BeginDisabled();
-					bChanged |= DrawProperty(Object, *Property, CustomFont);
-					if (bReadOnly) ImGui::EndDisabled();
+						const bool bReadOnly = Property->HasAnyFlags(CPF_EditConst);
+						if (bReadOnly) ImGui::BeginDisabled();
+						bChanged |= DrawProperty(Object, *Property, CustomFont);
+						if (bReadOnly) ImGui::EndDisabled();
+					}
+					EndPropertyGridTable();
 				}
 			}
 			ImGui::PopID();
@@ -1835,28 +2016,25 @@ namespace
 		float ResetValue,
 		float ColumnWidth)
 	{
+		(void)ColumnWidth;
 		OutAxisChanged[0] = OutAxisChanged[1] = OutAxisChanged[2] = false;
 		ImGuiIO& IO = ImGui::GetIO();
 		auto BoldFont = IO.FontDefault ? IO.FontDefault : IO.Fonts->Fonts[0];
-		const ImGuiTableFlags Flags = ImGuiTableFlags_BordersInnerV | ImGuiTableFlags_Resizable;
+		const bool bUseOwnTable = (GPropertyGridDepth == 0);
 
 		bool bAnyChanged = false;
 		ImGui::PushID(Label.c_str());
-		if (ImGui::BeginTable(Label.c_str(), 2, Flags))
+		if (!bUseOwnTable || BeginPropertyGridTable(Label.c_str()))
 		{
-			ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, EditorStyle::Scale(ColumnWidth));
-			ImGui::TableSetupColumn("Content", ImGuiTableColumnFlags_WidthStretch);
-
 			ImGui::TableNextRow();
 			ImGui::TableSetColumnIndex(0);
-			ImGui::AlignTextToFramePadding();
-			ImGui::TextUnformatted(Label.c_str());
+			DrawPropertyGridLabel(Label.c_str());
 
 			ImGui::TableSetColumnIndex(1);
 			const float Gap = EditorStyle::Scale(2.0f);
 			const float ButtonWidth = ImGui::GetFrameHeight() + EditorStyle::Scale(2.0f);
 			const float Available = ImGui::GetContentRegionAvail().x;
-			const bool bStackAxes = Available < EditorStyle::Scale(210.0f);
+			const bool bStackAxes = Available < EditorStyle::Scale(165.0f);
 			const float ValueWidth = bStackAxes
 				? ImMax(1.0f, Available - ButtonWidth - Gap)
 				: ImMax(3.0f, Available - 3.0f * ButtonWidth - 5.0f * Gap);
@@ -1879,7 +2057,10 @@ namespace
 
 			ImGui::PopFont();
 			ImGui::PopStyleVar();
-			ImGui::EndTable();
+			if (bUseOwnTable)
+			{
+				EndPropertyGridTable();
+			}
 		}
 		ImGui::PopID();
 		return bAnyChanged;
@@ -2453,7 +2634,11 @@ namespace
 
 		if (const FStructProperty* StructProp = CastField<FStructProperty>(&Property))
 		{
-			ImGui::Indent();
+			const bool bUsePlainIndent = (GPropertyGridDepth == 0);
+			if (bUsePlainIndent)
+			{
+				ImGui::Indent();
+			}
 			ImGui::PushID(Label);
 
 			TArray<const UStruct*> StructChain;
@@ -2476,7 +2661,10 @@ namespace
 			}
 
 			ImGui::PopID();
-			ImGui::Unindent();
+			if (bUsePlainIndent)
+			{
+				ImGui::Unindent();
+			}
 			return bChanged;
 		}
 
@@ -2501,11 +2689,52 @@ namespace
 		const char* DisplayName = Property.Name.c_str();
 		const bool bUsesFullWidthController = Property.IsA<FVectorProperty>() || Property.IsA<FRotatorProperty>();
 
+		if (GPropertyGridDepth > 0)
+		{
+			if (bUsesFullWidthController)
+			{
+				return DrawMultiPropertyValue(Objects, ValuePtrs, Property, Label.c_str(), CustomFont);
+			}
+			if (Property.IsA<FTransformProperty>())
+			{
+				if (Property.Name != "Transform" || GStructIndentLevel > 0)
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					DrawPropertyGridLabel(DisplayName);
+					ImGui::TableSetColumnIndex(1);
+					++GStructIndentLevel;
+					const bool bChanged = DrawMultiPropertyValue(Objects, ValuePtrs, Property, Label.c_str(), CustomFont);
+					--GStructIndentLevel;
+					return bChanged;
+				}
+				return DrawMultiPropertyValue(Objects, ValuePtrs, Property, Label.c_str(), CustomFont);
+			}
+			if (Property.IsA<FStructProperty>())
+			{
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				DrawPropertyGridLabel(DisplayName);
+				ImGui::TableSetColumnIndex(1);
+				++GStructIndentLevel;
+				const bool bChanged = DrawMultiPropertyValue(Objects, ValuePtrs, Property, Label.c_str(), CustomFont);
+				--GStructIndentLevel;
+				return bChanged;
+			}
+
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			DrawPropertyGridLabel(DisplayName);
+			ImGui::TableSetColumnIndex(1);
+			ImGui::SetNextItemWidth(-1.0f);
+			return DrawMultiPropertyValue(Objects, ValuePtrs, Property, Label.c_str(), CustomFont);
+		}
+
 		if (!bUsesFullWidthController)
 		{
 			const float StartX = ImGui::GetCursorPosX();
 			const float AvailableWidth = ImGui::GetContentRegionAvail().x;
-			const float LabelWidth = AvailableWidth * 0.45f;
+			const float LabelWidth = AvailableWidth * GDetailsNameColumnRatio;
 			const bool bInline = !Property.IsA<FTransformProperty>() && !Property.IsA<FStructProperty>()
 				&& AvailableWidth >= EditorStyle::Scale(260.0f) && ImGui::CalcTextSize(DisplayName).x < LabelWidth;
 
@@ -2546,26 +2775,30 @@ namespace
 			ImGui::PushID(Class->Name.c_str());
 			if (ImGui::CollapsingHeader(Class->Name.c_str(), ImGuiTreeNodeFlags_DefaultOpen))
 			{
-				TArray<void*> Containers;
-				Containers.Reserve(Objects.Num());
-				for (UObject* Obj : Objects)
+				if (BeginPropertyGridTable("MultiCategoryProperties"))
 				{
-					Containers.Add(Obj);
-				}
-
-				for (const FProperty* Property : Class->GetProperties())
-				{
-					if (!Property->HasAnyFlags(CPF_Edit)) continue;
-					const bool bReadOnly = Property->HasAnyFlags(CPF_EditConst);
-					if (bReadOnly) ImGui::BeginDisabled();
-					if (DrawMultiPropertyRow(Objects, Containers, *Property, CustomFont))
+					TArray<void*> Containers;
+					Containers.Reserve(Objects.Num());
+					for (UObject* Obj : Objects)
 					{
-						for (UObject* Obj : Objects)
-						{
-							Obj->PostEditChangeProperty(*Property);
-						}
+						Containers.Add(Obj);
 					}
-					if (bReadOnly) ImGui::EndDisabled();
+
+					for (const FProperty* Property : Class->GetProperties())
+					{
+						if (!Property->HasAnyFlags(CPF_Edit)) continue;
+						const bool bReadOnly = Property->HasAnyFlags(CPF_EditConst);
+						if (bReadOnly) ImGui::BeginDisabled();
+						if (DrawMultiPropertyRow(Objects, Containers, *Property, CustomFont))
+						{
+							for (UObject* Obj : Objects)
+							{
+								Obj->PostEditChangeProperty(*Property);
+							}
+						}
+						if (bReadOnly) ImGui::EndDisabled();
+					}
+					EndPropertyGridTable();
 				}
 			}
 			ImGui::PopID();
@@ -2667,11 +2900,8 @@ namespace
 
 			if (bOpen)
 			{
-				if (ImGui::BeginTable("MultiMaterialProperties", 2))
+				if (BeginPropertyGridTable("MultiMaterialProperties"))
 				{
-					ImGui::TableSetupColumn("Label", ImGuiTableColumnFlags_WidthFixed, EditorStyle::Scale(110.0f));
-					ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
 					auto DrawTexRow = [&](int32 TexSlot, const char* RowLabel)
 					{
 						UMaterial* FirstEff = MeshComps[0]->GetMaterial(Slot);
@@ -2685,7 +2915,7 @@ namespace
 						}
 						ImGui::TableNextRow();
 						ImGui::TableSetColumnIndex(0);
-						ImGui::TextUnformatted(RowLabel);
+						DrawPropertyGridLabel(RowLabel);
 						ImGui::TableSetColumnIndex(1);
 						ImGui::PushID(TexSlot);
 						DrawTexturePicker(bTexMixed ? nullptr : FirstTex, "##MultiTex",
@@ -2729,7 +2959,7 @@ namespace
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("Base Color");
+					DrawPropertyGridLabel("Base Color");
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 					FVector4 ColorVal = FirstColor;
@@ -2745,7 +2975,7 @@ namespace
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("Shininess");
+					DrawPropertyGridLabel("Shininess");
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 					float ShininessVal = FirstShininess;
@@ -2760,7 +2990,7 @@ namespace
 
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("UV Scroll");
+					DrawPropertyGridLabel("UV Scroll");
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 					FVector2 UVVal = FirstUV;
@@ -2776,7 +3006,7 @@ namespace
 					const char* SamplerItems[] = { "Linear Clamp", "Linear Wrap" };
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("Sampler");
+					DrawPropertyGridLabel("Sampler");
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 					if (ImGui::BeginCombo("##MultiSampler", bSamplerMixed ? "Multiple Values" : SamplerItems[FirstSampler]))
@@ -2799,7 +3029,7 @@ namespace
 					const char* BlendItems[] = { "Opaque", "Alpha Blend" };
 					ImGui::TableNextRow();
 					ImGui::TableSetColumnIndex(0);
-					ImGui::Text("Blend Mode");
+					DrawPropertyGridLabel("Blend Mode");
 					ImGui::TableSetColumnIndex(1);
 					ImGui::SetNextItemWidth(-1.0f);
 					if (ImGui::BeginCombo("##MultiBlend", bBlendMixed ? "Multiple Values" : BlendItems[FirstBlend]))
@@ -2819,7 +3049,7 @@ namespace
 						ImGui::EndCombo();
 					}
 
-					ImGui::EndTable();
+					EndPropertyGridTable();
 				}
 				ImGui::TreePop();
 			}
@@ -3149,10 +3379,14 @@ void FDetailsPanel::OnRender()
 					MinMaterialSlots = (std::min)(MinMaterialSlots, MC->GetNumMaterials());
 				}
 			}
-			if (SkinnedComps.Num() == RootCompObjs.Num())
+			if (SkinnedComps.Num() == RootCompObjs.Num() && BeginPropertyGridTable("MultiMeshProperties"))
 			{
-				ImGui::TextUnformatted("Skeletal Mesh");
+				ImGui::TableNextRow();
+				ImGui::TableSetColumnIndex(0);
+				DrawPropertyGridLabel("Skeletal Mesh");
+				ImGui::TableSetColumnIndex(1);
 				DrawMultiSkeletalMeshSlot(SkinnedComps);
+				EndPropertyGridTable();
 			}
 			if (MeshComps.Num() == RootCompObjs.Num() && MinMaterialSlots > 0 && MinMaterialSlots != INT_MAX)
 			{
@@ -3252,23 +3486,41 @@ void FDetailsPanel::OnRender()
 			}
 			if (auto* Component = Cast<USkinnedMeshComponent>(TargetComponent))
 			{
-				ImGui::TextUnformatted("Skeletal Mesh");
-				DrawSkeletalMeshSlot(Component);
-			}
-			if (auto* Component = Cast<USkeletalMeshComponent>(TargetComponent))
-			{
-                ImGui::TextUnformatted("Animation Blueprint");
-                DrawAnimBlueprintSlot(Component);
-                const bool bUseBlueprint = !Component->GetAnimBlueprintPath().empty();
-                ImGui::BeginDisabled(bUseBlueprint);
-                ImGui::TextUnformatted("Single Anim Asset");
-                DrawAnimationSlot(Component);
-                ImGui::EndDisabled();
+				if (BeginPropertyGridTable("SkinnedMeshProperties"))
+				{
+					ImGui::TableNextRow();
+					ImGui::TableSetColumnIndex(0);
+					DrawPropertyGridLabel("Skeletal Mesh");
+					ImGui::TableSetColumnIndex(1);
+					DrawSkeletalMeshSlot(Component);
 
-                if (bUseBlueprint)
-                {
-                    ImGui::TextWrapped("Choose None in Animation Blueprint to use a single animation.");
-                }
+					if (auto* SkelComp = Cast<USkeletalMeshComponent>(TargetComponent))
+					{
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						DrawPropertyGridLabel("Animation Blueprint");
+						ImGui::TableSetColumnIndex(1);
+						DrawAnimBlueprintSlot(SkelComp);
+
+						const bool bUseBlueprint = !SkelComp->GetAnimBlueprintPath().empty();
+						ImGui::BeginDisabled(bUseBlueprint);
+						ImGui::TableNextRow();
+						ImGui::TableSetColumnIndex(0);
+						DrawPropertyGridLabel("Single Anim Asset");
+						ImGui::TableSetColumnIndex(1);
+						DrawAnimationSlot(SkelComp);
+						ImGui::EndDisabled();
+
+						if (bUseBlueprint)
+						{
+							ImGui::TableNextRow();
+							ImGui::TableSetColumnIndex(0);
+							ImGui::TableSetColumnIndex(1);
+							ImGui::TextWrapped("Choose None in Animation Blueprint to use a single animation.");
+						}
+					}
+					EndPropertyGridTable();
+				}
 			}
 			DrawShadowPreview();
 

@@ -4,11 +4,24 @@
 #include "Editor/Details/PropertyEditor.h"
 #include "Particles/Distributions.h"
 #include <imgui.h>
+#include <imgui_internal.h>
 
 namespace
 {
 	void DrawCurveKeyCount(const char* Label, int32 NumKeys)
 	{
+		if (ImGui::GetCurrentTable() != nullptr)
+		{
+			ImGui::TableNextRow();
+			ImGui::TableSetColumnIndex(0);
+			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + ImGui::GetStyle().IndentSpacing * 0.5f);
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextUnformatted(Label);
+			ImGui::TableSetColumnIndex(1);
+			ImGui::AlignTextToFramePadding();
+			ImGui::TextDisabled("%d keys (edit in Curve Editor)", NumKeys);
+			return;
+		}
 		ImGui::AlignTextToFramePadding();
 		ImGui::TextDisabled("%s: %d keys (edit in Curve Editor)", Label, NumKeys);
 	}
