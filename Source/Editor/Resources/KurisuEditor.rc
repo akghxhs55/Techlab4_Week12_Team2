@@ -5,6 +5,7 @@
 #pragma code_page(65001)
 
 IDI_ICON2 ICON "../../../EngineResources/Icons/KurisuLogoReverse.ico"
+IDI_PROJECT_ICON ICON "../../../EngineResources/Icons/ProjectBrowser/KurisuBackground.ico"
 
 VS_VERSION_INFO VERSIONINFO
  FILEVERSION KURISU_VERSION_TUPLE
