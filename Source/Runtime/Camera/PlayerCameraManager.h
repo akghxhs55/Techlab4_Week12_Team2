@@ -106,7 +106,6 @@ public:
 	float LetterboxTarget = 0.0f;       // 추가
 	float LetterboxBlendSpeed = 0.0f;   // 추가
 	float VignetteIntensity = 0.0f;
-	float SpeedLineIntensity = 0.0f;
 
 	FVector2 FadeAlpha;
 	float FadeTime;

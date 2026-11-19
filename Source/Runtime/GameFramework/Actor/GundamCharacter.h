@@ -92,7 +92,6 @@ private:
 	void UpdateMeshTilt(float DeltaTime, bool bBoosting, bool bDescending);
 	void UpdateThrusters(float DeltaTime, bool bBoosting);
 	void UpdateWingEffects(float DeltaTime, bool bBoosting);
-	void UpdateSpeedLines(float DeltaTime, bool bBoosting);
 	void TriggerDashShockwave();
 	void DeployOrbitingFunnels();
 	void ClearOrbitingFunnels();
@@ -106,7 +105,6 @@ private:
 	FRotator CurrentMeshTilt = FRotator(0.0f, 0.0f, 0.0f);
 	float CurrentThrusterScale = 0.35f;
 	float CurrentWingScale = 0.89f;
-	float CurrentSpeedLineIntensity = 0.0f;
 
 	TArray<AGundamFunnel*> OrbitingFunnels;
 	float FunnelOrbitTime = 0.0f;

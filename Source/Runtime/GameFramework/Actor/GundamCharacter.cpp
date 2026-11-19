@@ -322,7 +322,6 @@ void AGundamCharacter::Tick(float DeltaTime)
 	UpdateMeshTilt(DeltaTime, bBoosting, bShiftDown);
 	UpdateThrusters(DeltaTime, bBoosting);
 	UpdateWingEffects(DeltaTime, bBoosting);
-	UpdateSpeedLines(DeltaTime, bBoosting);
 	HandleWeaponInput();
 
 	if (CurrentWeapon == EGundamWeapon::Funnel && OrbitingFunnels.IsEmpty() && FunnelRespawnTimer > 0.0f)
@@ -459,26 +458,6 @@ void AGundamCharacter::UpdateWingEffects(float DeltaTime, bool bBoosting)
 		const float BladeScale = CurrentWingScale * (bUpperWing ? 1.0f : 0.85f);
 		Comp->SetRelativeScale3D(FVector(BladeScale, BladeScale, BladeScale));
 	}
-}
-
-void AGundamCharacter::UpdateSpeedLines(float DeltaTime, bool bBoosting)
-{
-	APlayerController* PC = GetController();
-	APlayerCameraManager* PCM = PC ? PC->GetCameraManager() : nullptr;
-	if (!PCM || DeltaTime <= 0.0f)
-	{
-		return;
-	}
-
-	const float TargetIntensity = (DashKeyIndex >= 0) ? 1.0f : (bBoosting ? 0.45f : 0.0f);
-	const float Rate = (TargetIntensity > CurrentSpeedLineIntensity) ? 14.0f : 7.0f;
-	const float Alpha = 1.0f - std::exp(-Rate * DeltaTime);
-	CurrentSpeedLineIntensity += (TargetIntensity - CurrentSpeedLineIntensity) * Alpha;
-	if (CurrentSpeedLineIntensity < 0.005f && TargetIntensity == 0.0f)
-	{
-		CurrentSpeedLineIntensity = 0.0f;
-	}
-	PCM->SpeedLineIntensity = CurrentSpeedLineIntensity;
 }
 
 void AGundamCharacter::TriggerDashShockwave()

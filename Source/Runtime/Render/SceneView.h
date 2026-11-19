@@ -35,11 +35,10 @@ struct FSceneView
 	float LetterboxAmount = 0.0f;                        // 0~1 진행도
 	float LetterboxAspect = 2.39f;                       // 목표 화면비
 	float VignetteIntensity = 0.0f;
-	float SpeedLineIntensity = 0.0f;
 
 	bool NeedsCameraOverlay(bool bVignette, bool bOverlay) const
 	{
-		return (bOverlay && (OverlayColor.A > 0.0f || LetterboxAmount > 0.0f || SpeedLineIntensity > 0.0f))
+		return (bOverlay && (OverlayColor.A > 0.0f || LetterboxAmount > 0.0f))
 			|| (bVignette && VignetteIntensity > 0.0f);
 	}
 

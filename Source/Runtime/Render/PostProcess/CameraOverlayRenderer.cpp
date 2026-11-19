@@ -3,7 +3,6 @@
 #include "Render/RenderCommand.h"
 #include "Render/RenderResourceManager.h"
 #include "Render/SceneView.h"
-#include "Core/EngineTimer.h"
 
 void FCameraOverlayRenderer::Init(FRenderer* InRenderer)
 {
@@ -33,10 +32,8 @@ bool FCameraOverlayRenderer::OnRender(const FSceneView& View, uint32 Width, uint
     Data.ViewSize.V[1] = static_cast<float>(Height);
     Data.VignetteIntensity = bVignette ? View.VignetteIntensity : 0.0f;
     Data.VignettePower = 2.0f;
-	Data.LetterboxAmount = bOverlay ? FMath::Clamp(View.LetterboxAmount, 0.0f, 1.0f) : 0.0f;
-	Data.LetterboxAspect = std::max(View.LetterboxAspect, 0.1f);
-	Data.SpeedLineIntensity = bOverlay ? FMath::Clamp(View.SpeedLineIntensity, 0.0f, 1.0f) : 0.0f;
-	Data.SpeedLineTime = EngineTimer::GetTotalTime();
+    Data.LetterboxAmount = bOverlay ? FMath::Clamp(View.LetterboxAmount, 0.0f, 1.0f) : 0.0f;
+    Data.LetterboxAspect = std::max(View.LetterboxAspect, 0.1f);
 
     RenderCommand::BindPipelineState(PipelineState);
     RenderCommand::BindVertexBuffer(nullptr);
